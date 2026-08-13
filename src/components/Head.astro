@@ -15,3 +15,138 @@ const ogImageUrl = new URL(`/open-graph/${id || "index"}.png`, Astro.site);
 
 <meta property="og:image" content={ogImageUrl} />
 <meta name="twitter:image" content={ogImageUrl} />
+
+<script>
+	// Pan-and-zoom lightbox for content images (wheel = zoom at cursor,
+	// drag = pan, pinch on touch, double-click = toggle, Esc/✕/backdrop = close).
+	const ZOOM = {
+		/** Highest zoom level, as a multiple of the image's natural size. */
+		max: 10,
+		/** Lowest zoom level, as a multiple of the fit-to-screen scale. */
+		minFitFactor: 0.8,
+		/** Fraction of the viewport the image fills when opened. */
+		fitMargin: 0.92,
+		/** Cap on the initial fit scale so small images don't open blurry. */
+		maxFitScale: 2,
+		/** Wheel sensitivity — higher zooms faster per scroll step. */
+		wheelSpeed: 0.0015,
+		/** Zoom level double-click jumps to, as a multiple of the fit scale. */
+		doubleClickFactor: 2.5,
+	};
+
+	function openLightbox(img: HTMLImageElement) {
+		const overlay = document.createElement('div');
+		overlay.className = 'pb-lightbox';
+		const pic = new Image();
+		pic.src = img.currentSrc || img.src;
+		pic.alt = img.alt;
+		pic.className = 'pb-lightbox__img';
+		pic.draggable = false;
+		const close = document.createElement('button');
+		close.className = 'pb-lightbox__close';
+		close.setAttribute('aria-label', 'Close image');
+		close.textContent = '✕';
+		const hint = document.createElement('p');
+		hint.className = 'pb-lightbox__hint';
+		hint.textContent = 'scroll to zoom · drag to pan · esc to close';
+		overlay.append(pic, close, hint);
+		document.body.append(overlay);
+		document.body.style.overflow = 'hidden';
+
+		let scale = 1;
+		let fit = 1;
+		let tx = 0;
+		let ty = 0;
+		const apply = () => {
+			pic.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+		};
+		pic.onload = () => {
+			fit = Math.min(
+				(innerWidth * ZOOM.fitMargin) / pic.naturalWidth,
+				(innerHeight * ZOOM.fitMargin) / pic.naturalHeight,
+				ZOOM.maxFitScale
+			);
+			scale = Math.max(fit, 1);
+			apply();
+		};
+
+		const zoomAt = (cx: number, cy: number, factor: number) => {
+			const next = Math.min(Math.max(scale * factor, fit * ZOOM.minFitFactor), ZOOM.max);
+			const px = cx - innerWidth / 2;
+			const py = cy - innerHeight / 2;
+			tx = px - ((px - tx) / scale) * next;
+			ty = py - ((py - ty) / scale) * next;
+			scale = next;
+			apply();
+		};
+
+		overlay.addEventListener(
+			'wheel',
+			(e) => {
+				e.preventDefault();
+				zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * ZOOM.wheelSpeed));
+			},
+			{ passive: false }
+		);
+
+		const pointers = new Map<number, { x: number; y: number }>();
+		let pinchDist = 0;
+		overlay.addEventListener('pointerdown', (e) => {
+			pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+			overlay.setPointerCapture(e.pointerId);
+			if (pointers.size === 2) {
+				const [a, b] = [...pointers.values()];
+				pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+			}
+		});
+		overlay.addEventListener('pointermove', (e) => {
+			const prev = pointers.get(e.pointerId);
+			if (!prev) return;
+			if (pointers.size === 1) {
+				tx += e.clientX - prev.x;
+				ty += e.clientY - prev.y;
+				apply();
+			}
+			pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+			if (pointers.size === 2) {
+				const [a, b] = [...pointers.values()];
+				const dist = Math.hypot(a.x - b.x, a.y - b.y);
+				if (pinchDist > 0) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, dist / pinchDist);
+				pinchDist = dist;
+			}
+		});
+		const releasePointer = (e: PointerEvent) => {
+			pointers.delete(e.pointerId);
+			pinchDist = 0;
+		};
+		overlay.addEventListener('pointerup', releasePointer);
+		overlay.addEventListener('pointercancel', releasePointer);
+
+		overlay.addEventListener('dblclick', (e) => {
+			zoomAt(
+				e.clientX,
+				e.clientY,
+				scale > fit * 1.5 ? fit / scale : (fit * ZOOM.doubleClickFactor) / scale
+			);
+		});
+
+		let moved = { x: 0, y: 0 };
+		overlay.addEventListener('pointerdown', (e) => (moved = { x: e.clientX, y: e.clientY }));
+		const dismiss = () => {
+			overlay.remove();
+			document.body.style.overflow = '';
+			removeEventListener('keydown', onKey);
+		};
+		overlay.addEventListener('click', (e) => {
+			const dragged = Math.hypot(e.clientX - moved.x, e.clientY - moved.y) > 4;
+			if (!dragged && (e.target === overlay || e.target === close)) dismiss();
+		});
+		const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss();
+		addEventListener('keydown', onKey);
+	}
+
+	for (const img of document.querySelectorAll<HTMLImageElement>('.sl-markdown-content img')) {
+		img.classList.add('pb-zoomable');
+		img.addEventListener('click', () => openLightbox(img));
+	}
+</script>

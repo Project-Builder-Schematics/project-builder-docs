@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 Project Builder gives developers — **and the AI agents working alongside them** —
 deterministic code generation. A prompt produces something different every run; a
@@ -51,11 +51,20 @@ in memory by the testing harness — no CLI, no disk — which is what makes sch
 testable like any other code. See [Your first schematic](/getting-started/your-first-schematic/)
 for the end-to-end walkthrough.
 
+<Aside type="caution" title="The golden rule: never improvise a schematic">
+A schematic is an **automation of code that already works**. Have the code running and
+tested first — *then* encode it as a schematic. Premature automation spends time and
+resources on something you may only ever run once: extract a schematic when a pattern has
+proven itself, never before.
+</Aside>
+
 ## How Project Builder mutates files
 
 Mutating files reliably has always been the complicated part of code generation. Project
 Builder makes it simple by splitting the work across three parts with sharply drawn
 responsibilities:
+
+![Diagram of a schematic run: the factory makes typed calls into the SDK, the SDK lowers them to IR (JSON records) consumed by the engine, the engine commits to a staging tree and applies to disk only on success, with a read-back loop from the staging tree to the SDK, and the builder CLI orchestrating everything with JSON output for agents.](../../../assets/sdk-engine-flow.svg)
 
 ### SDK — intermediate records and developer experience
 
@@ -88,9 +97,13 @@ run a schematic and parse the result like any other API.
 
 ## The AST story
 
-Almost every mutation is simple — create, replace, move, copy are plain, declarative
-operations. The exception is `modify`: structural edits made through an **AST** (abstract
-syntax tree).
+Here's an extreme — but useful — simplification: **writing software, day to day, is
+mutating files.** And a file is just text; the extension is what gives that text meaning.
+
+Seen that way, most mutations are simple: create, replace, move, copy treat the file as
+text and never need to know what it means. The exception is `modify`. To change a file
+programmatically you first have to **understand** it — and the way a program understands a
+file is through an **AST** (abstract syntax tree).
 
 Here's the problem: every file type has its own parser library, and the ASTs they produce
 are never similar — none of them follow a shared convention. Left alone, every schematic

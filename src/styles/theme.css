@@ -161,6 +161,60 @@
 	border-bottom: 1px solid var(--sl-color-hairline);
 }
 
+/* Pan-and-zoom lightbox for content images */
+.pb-zoomable {
+	cursor: zoom-in;
+}
+
+.pb-lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	background: color-mix(in srgb, var(--sl-color-black) 94%, transparent);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	touch-action: none;
+}
+
+.pb-lightbox__img {
+	max-width: none;
+	cursor: grab;
+	will-change: transform;
+	user-select: none;
+}
+
+.pb-lightbox__img:active {
+	cursor: grabbing;
+}
+
+.pb-lightbox__close {
+	position: fixed;
+	top: 1rem;
+	right: 1rem;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--sl-color-hairline);
+	background: var(--pb-surface-1);
+	color: var(--sl-color-white);
+	font-size: 0.875rem;
+	cursor: pointer;
+}
+
+.pb-lightbox__hint {
+	position: fixed;
+	bottom: 1rem;
+	left: 50%;
+	transform: translateX(-50%);
+	margin: 0;
+	font-family: var(--sl-font-mono);
+	font-size: 0.6875rem;
+	color: var(--sl-color-gray-3);
+	pointer-events: none;
+}
+
 /* Header: surface-1 bar over the canvas */
 header.header {
 	background-color: var(--sl-color-bg-nav);
