@@ -9,6 +9,11 @@ const ogImageUrl = new URL(`/open-graph/${id || "index"}.png`, Astro.site);
 <script is:inline>
 	// Default first-time visitors to dark; the theme switcher still offers both.
 	if (!localStorage.getItem('starlight-theme')) localStorage.setItem('starlight-theme', 'dark');
+	// Restore hidden side panels before first paint to avoid layout flash.
+	if (localStorage.getItem('pb-hide-sidebar'))
+		document.documentElement.setAttribute('data-pb-hide-sidebar', '');
+	if (localStorage.getItem('pb-hide-toc'))
+		document.documentElement.setAttribute('data-pb-hide-toc', '');
 </script>
 
 <Default><slot /></Default>
@@ -148,5 +153,33 @@ const ogImageUrl = new URL(`/open-graph/${id || "index"}.png`, Astro.site);
 	for (const img of document.querySelectorAll<HTMLImageElement>('.sl-markdown-content img')) {
 		img.classList.add('pb-zoomable');
 		img.addEventListener('click', () => openLightbox(img));
+	}
+
+	// Edge toggles to hide/show the side panels; state persists across pages.
+	const PANELS = [
+		{ attr: 'data-pb-hide-sidebar', key: 'pb-hide-sidebar', side: 'left', label: 'navigation', el: 'nav.sidebar' },
+		{ attr: 'data-pb-hide-toc', key: 'pb-hide-toc', side: 'right', label: 'page outline', el: '.right-sidebar-container' },
+	] as const;
+	for (const panel of PANELS) {
+		if (!document.querySelector(panel.el)) continue;
+		const btn = document.createElement('button');
+		btn.className = `pb-panel-toggle pb-panel-toggle--${panel.side}`;
+		const render = () => {
+			const hidden = document.documentElement.hasAttribute(panel.attr);
+			btn.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} ${panel.label}`);
+			btn.setAttribute('aria-expanded', String(!hidden));
+			const chevrons = panel.side === 'left' ? ['‹', '›'] : ['›', '‹'];
+			btn.textContent = hidden ? chevrons[1] : chevrons[0];
+		};
+		btn.addEventListener('click', () => {
+			document.documentElement.toggleAttribute(panel.attr);
+			localStorage.setItem(
+				panel.key,
+				document.documentElement.hasAttribute(panel.attr) ? '1' : ''
+			);
+			render();
+		});
+		render();
+		document.body.append(btn);
 	}
 </script>

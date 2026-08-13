@@ -161,6 +161,66 @@
 	border-bottom: 1px solid var(--sl-color-hairline);
 }
 
+/* Hideable side panels: edge toggles + collapsed states */
+.pb-panel-toggle {
+	display: none;
+	position: fixed;
+	top: 50%;
+	transform: translateY(-50%);
+	z-index: 60;
+	width: 1.25rem;
+	height: 3.5rem;
+	padding: 0;
+	border: 1px solid var(--sl-color-hairline);
+	background: var(--pb-surface-1);
+	color: var(--sl-color-gray-3);
+	font-size: 0.875rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.pb-panel-toggle:hover {
+	color: var(--sl-color-white);
+	background: var(--pb-surface-2);
+}
+
+.pb-panel-toggle--left {
+	left: 0;
+	border-left: none;
+	border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.pb-panel-toggle--right {
+	right: 0;
+	border-right: none;
+	border-radius: 0.5rem 0 0 0.5rem;
+}
+
+/* Show each toggle only at viewports where its panel exists */
+@media (min-width: 50rem) {
+	.pb-panel-toggle--left {
+		display: block;
+	}
+}
+
+@media (min-width: 72rem) {
+	.pb-panel-toggle--right {
+		display: block;
+	}
+}
+
+html[data-pb-hide-sidebar] {
+	--sl-sidebar-width: 0rem;
+}
+
+html[data-pb-hide-sidebar] nav.sidebar {
+	display: none;
+}
+
+html[data-pb-hide-toc] .right-sidebar-container {
+	display: none;
+}
+
 /* Collapsible "On this page" panel (open by default) */
 .pb-toc summary {
 	list-style: none;
@@ -259,6 +319,13 @@
 header.header {
 	background-color: var(--sl-color-bg-nav);
 	border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+/* Wordmark matches the bolt's exact purple in both themes */
+.site-title {
+	color: #7f56d9;
+	font-weight: 600;
+	letter-spacing: -0.01em;
 }
 
 /* Sidebar: quiet by default, purple only marks the current page */
