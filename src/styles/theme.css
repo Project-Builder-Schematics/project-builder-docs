@@ -105,14 +105,23 @@
 	font-weight: 500;
 }
 
+/* Brand purple is one color everywhere: bolt, wordmark, CTA, social icons */
 .sl-link-button.primary {
-	background: var(--sl-color-accent);
+	background: #7f56d9;
 	border-color: transparent;
 	color: #ffffff;
 }
 
 .sl-link-button.primary:hover {
 	background: #926ce3;
+}
+
+.social-icons a {
+	color: #7f56d9;
+}
+
+.social-icons a:hover {
+	color: #926ce3;
 }
 
 /* Cards: surface lift + hairline, no shadows */
