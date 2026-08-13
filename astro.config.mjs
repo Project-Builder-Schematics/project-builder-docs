@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLlmsTxt from 'starlight-llms-txt';
 import favicons from 'astro-favicons';
 
 // https://astro.build/config
@@ -41,6 +42,15 @@ export default defineConfig({
 						content: '-OlG3l1BfQuKpnSEE8eYLs9xbqFBoZxt2cPpiFUMMoo',
 					},
 				},
+			],
+			plugins: [
+				starlightLlmsTxt({
+					projectName: 'Project Builder',
+					description:
+						'Deterministic code generation through typed, testable schematics — CLI, SDK, and engine.',
+					details:
+						'Schematics are typed file-mutation programs: seven mutation verbs, Go text/template templating with {= =} delimiters, AST-aware TypeScript/React dialects, and an in-memory testing harness.',
+				}),
 			],
 			components: {
 				Head: './src/components/Head.astro',
