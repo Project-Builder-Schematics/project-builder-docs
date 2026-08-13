@@ -161,6 +161,20 @@
 	border-bottom: 1px solid var(--sl-color-hairline);
 }
 
+/* Landing terminal demo under the hero */
+.pb-hero-demo {
+	max-width: 46rem;
+	margin-inline: auto;
+	margin-top: 1rem;
+}
+
+.pb-hero-demo__caption {
+	margin-top: 1rem;
+	text-align: center;
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-gray-3);
+}
+
 /* Hideable side panels: edge toggles + collapsed states */
 .pb-panel-toggle {
 	display: none;

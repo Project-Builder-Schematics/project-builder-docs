@@ -6,7 +6,7 @@ hero:
   title: Code generation you can trust
   tagline: Project Builder turns code generation into a deterministic program. Write a schematic once — typed, testable, idempotent — and every run produces exactly the same result.
   image:
-    file: ../../assets/leo.webp
+    file: ../../assets/leo-hero.webp
   actions:
     - text: Get started
       link: /getting-started/overview/
@@ -16,3 +16,23 @@ hero:
       icon: github
       variant: minimal
 ---
+
+<div class="pb-hero-demo">
+
+```sh frame="terminal" title="deterministic by design"
+builder execute default:hello --name=payments
+```
+
+```txt
+~ services.txt
+~ src/services/payments.ts
+✓ done — 2 modified
+```
+
+<p class="pb-hero-demo__caption">
+	Run it again with <code>--name=orders</code> and <code>services.txt</code> grows by one
+	line. Re-run the <em>same</em> name and it fails closed — nothing is ever written twice.
+	Same schematic, same input, same bytes.
+</p>
+
+</div>
