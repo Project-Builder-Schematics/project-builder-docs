@@ -69,12 +69,12 @@ export default defineConfig({
 				},
 				{
 					label: 'Guides',
-					collapsed: true,
+					collapsed: false,
 					items: [{ autogenerate: { directory: 'guides' } }],
 				},
 				{
 					label: 'Reference',
-					collapsed: true,
+					collapsed: false,
 					items: [{ autogenerate: { directory: 'reference' } }],
 				},
 			],

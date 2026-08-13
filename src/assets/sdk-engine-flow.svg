@@ -1,4 +1,4 @@
-<svg width="1160" height="640" viewBox="0 0 1160 640" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif">
+<svg width="1160" height="800" viewBox="0 0 1160 800" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif">
   <defs>
     <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="#62666d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -9,72 +9,83 @@
   </defs>
 
   <!-- panel -->
-  <rect x="0.5" y="0.5" width="1159" height="639" rx="16" fill="#0f1011" stroke="#23252a"/>
+  <rect x="0.5" y="0.5" width="1159" height="799" rx="16" fill="#0f1011" stroke="#23252a"/>
   <line x1="24" y1="1.5" x2="1136" y2="1.5" stroke="#ffffff" stroke-opacity="0.05"/>
 
-  <!-- eyebrow + brand -->
-  <text x="48" y="54" font-family="ui-monospace, Menlo, monospace" font-size="11" letter-spacing="2" fill="#8a8f98">HOW A SCHEMATIC RUN FLOWS</text>
+  <text x="48" y="54" font-family="ui-monospace, Menlo, monospace" font-size="11" letter-spacing="2" fill="#8a8f98">THE SDK ↔ ENGINE CONVERSATION</text>
   <g transform="translate(1088, 36) scale(1.2)">
     <path d="M11.2039 1.36914C11.2906 0.67556 10.419 0.297219 9.97151 0.834191L0.956775 11.6519C0.576834 12.1078 0.901043 12.8 1.49453 12.8H9.55705C9.9781 12.8 10.3039 13.169 10.2516 13.5868L9.49614 19.6309C9.40945 20.3244 10.281 20.7028 10.7285 20.1658L19.7432 9.34813C20.1232 8.8922 19.799 8.2 19.2055 8.2H11.1429C10.7219 8.2 10.3961 7.83097 10.4484 7.41318L11.2039 1.36914Z" fill="#7F56D9"/>
   </g>
 
-  <!-- factory box -->
-  <rect x="48.5" y="120.5" width="232" height="230" rx="12" fill="#141516" stroke="#23252a"/>
-  <text x="72" y="158" font-size="16" font-weight="600" fill="#f7f8f8">Your factory</text>
-  <text x="72" y="180" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#8a8f98">factory.ts</text>
-  <rect x="72.5" y="204.5" width="184" height="30" rx="6" fill="#18191a" stroke="#23252a"/>
-  <text x="88" y="224" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#d0d6e0">mutation verbs</text>
-  <rect x="72.5" y="244.5" width="184" height="30" rx="6" fill="#18191a" stroke="#23252a"/>
-  <text x="88" y="264" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#d0d6e0">templates</text>
-  <rect x="72.5" y="284.5" width="184" height="30" rx="6" fill="#18191a" stroke="#23252a"/>
-  <text x="88" y="304" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#d0d6e0">dialects (AST)</text>
+  <!-- actors -->
+  <rect x="240.5" y="84.5" width="280" height="56" rx="10" fill="#141516" stroke="#23252a"/>
+  <text x="380" y="108" font-size="15" font-weight="600" fill="#f7f8f8" text-anchor="middle">SDK runner</text>
+  <text x="380" y="127" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#8a8f98" text-anchor="middle">TypeScript · your factory runs here</text>
+  <rect x="700.5" y="84.5" width="280" height="56" rx="10" fill="#141516" stroke="#23252a"/>
+  <text x="840" y="108" font-size="15" font-weight="600" fill="#f7f8f8" text-anchor="middle">Engine</text>
+  <text x="840" y="127" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#8a8f98" text-anchor="middle">Go · the only writer</text>
 
-  <!-- factory -> sdk -->
-  <line x1="280" y1="236" x2="336" y2="236" stroke="#62666d" stroke-width="1.6" marker-end="url(#arrow-gray)"/>
-  <text x="308" y="222" font-size="11" fill="#8a8f98" text-anchor="middle">typed calls</text>
+  <!-- cli feeds the engine -->
+  <line x1="1050" y1="65" x2="905" y2="82" stroke="#62666d" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#arrow-gray)"/>
+  <text x="1052" y="68" font-size="11" fill="#8a8f98">builder CLI: validated input, then starts the engine</text>
 
-  <!-- sdk box -->
-  <rect x="340.5" y="120.5" width="300" height="230" rx="12" fill="#141516" stroke="#23252a"/>
-  <text x="364" y="158" font-size="16" font-weight="600" fill="#f7f8f8">SDK</text>
-  <text x="364" y="180" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#8a8f98">@pbuilder/sdk</text>
-  <text x="364" y="212" font-size="12.5" fill="#8a8f98">Owns the developer experience.</text>
-  <text x="364" y="232" font-size="12.5" fill="#8a8f98">Lowers every call to an</text>
-  <text x="364" y="250" font-size="12.5" fill="#8a8f98">intermediate record:</text>
-  <rect x="364.5" y="268.5" width="252" height="58" rx="8" fill="#0a0a0c" stroke="#34343a"/>
-  <text x="382" y="292" font-family="ui-monospace, Menlo, monospace" font-size="11.5" fill="#d0d6e0">{ "verb": "create",</text>
-  <text x="382" y="310" font-family="ui-monospace, Menlo, monospace" font-size="11.5" fill="#d0d6e0">  "path": "src/…" }</text>
-  <rect x="576.5" y="258.5" width="40" height="20" rx="10" fill="#2c1c5f" stroke="#7f56d9" stroke-opacity="0.5"/>
-  <text x="596" y="272" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#b692f6" text-anchor="middle">IR</text>
+  <!-- lifelines -->
+  <line x1="380" y1="140" x2="380" y2="700" stroke="#23252a" stroke-width="1.5"/>
+  <line x1="840" y1="140" x2="840" y2="700" stroke="#23252a" stroke-width="1.5"/>
 
-  <!-- sdk -> engine (the accent arrow) -->
-  <line x1="640" y1="236" x2="756" y2="236" stroke="#7f56d9" stroke-width="2" marker-end="url(#arrow-purple)"/>
-  <text x="698" y="222" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#b692f6" text-anchor="middle">IR · JSON records</text>
+  <!-- 1: spawn -->
+  <line x1="836" y1="172" x2="384" y2="172" stroke="#62666d" stroke-width="1.4" stroke-dasharray="5 5" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="160" font-size="12" fill="#c2c7d1" text-anchor="middle">spawns the runner — your factory + the user's input</text>
 
-  <!-- engine box -->
-  <rect x="760.5" y="120.5" width="352" height="230" rx="12" fill="#141516" stroke="#23252a"/>
-  <text x="784" y="158" font-size="16" font-weight="600" fill="#f7f8f8">Engine</text>
-  <text x="784" y="180" font-size="12.5" fill="#8a8f98">Never parses code — only applies records.</text>
-  <rect x="784.5" y="200.5" width="304" height="52" rx="8" fill="#18191a" stroke="#23252a"/>
-  <text x="802" y="222" font-size="13" font-weight="600" fill="#f7f8f8">1 · Commit</text>
-  <text x="802" y="241" font-size="12" fill="#8a8f98">every record lands in a staging tree</text>
-  <rect x="784.5" y="262.5" width="304" height="52" rx="8" fill="#18191a" stroke="#23252a"/>
-  <text x="802" y="284" font-size="13" font-weight="600" fill="#f7f8f8">2 · Apply</text>
-  <text x="802" y="303" font-size="12" fill="#8a8f98">writes to disk only if the factory succeeded</text>
-  <text x="784" y="338" font-size="11.5" fill="#62666d">fail-closed: a failed run writes nothing</text>
+  <!-- 2: ready -->
+  <line x1="836" y1="212" x2="384" y2="212" stroke="#62666d" stroke-width="1.4" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="200" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#c2c7d1" text-anchor="middle">ready · protocol v1</text>
+  <text x="610" y="230" font-size="10.5" fill="#62666d" text-anchor="middle">the only message the engine ever initiates — from here on, the SDK asks</text>
 
-  <!-- read-back loop -->
-  <path d="M 830 120 C 800 66, 610 66, 582 116" fill="none" stroke="#62666d" stroke-width="1.4" stroke-dasharray="5 5" marker-end="url(#arrow-gray)"/>
-  <text x="706" y="78" font-family="ui-monospace, Menlo, monospace" font-size="11.5" fill="#8a8f98" text-anchor="middle">read-back · find(path).read()</text>
+  <!-- 3: buffer activity -->
+  <rect x="252.5" y="252.5" width="256" height="96" rx="10" fill="#18191a" stroke="#23252a"/>
+  <text x="268" y="276" font-size="12.5" font-weight="600" fill="#f7f8f8">factory chains mutations</text>
+  <rect x="268.5" y="288.5" width="70" height="22" rx="5" fill="#0a0a0c" stroke="#34343a"/>
+  <text x="303" y="303" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#d0d6e0" text-anchor="middle">create</text>
+  <rect x="346.5" y="288.5" width="58" height="22" rx="5" fill="#0a0a0c" stroke="#34343a"/>
+  <text x="375" y="303" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#d0d6e0" text-anchor="middle">copy</text>
+  <rect x="412.5" y="288.5" width="70" height="22" rx="5" fill="#0a0a0c" stroke="#34343a"/>
+  <text x="447" y="303" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#d0d6e0" text-anchor="middle">modify</text>
+  <text x="268" y="332" font-size="11" fill="#8a8f98">buffered as directives — nothing on the wire yet</text>
 
-  <!-- cli bar -->
-  <line x1="164" y1="350" x2="164" y2="470" stroke="#34343a" stroke-width="1.2" stroke-dasharray="4 5"/>
-  <line x1="936" y1="350" x2="936" y2="470" stroke="#34343a" stroke-width="1.2" stroke-dasharray="4 5"/>
-  <rect x="48.5" y="470.5" width="1064" height="88" rx="12" fill="#141516" stroke="#23252a"/>
-  <text x="72" y="508" font-size="15" font-weight="600" fill="#f7f8f8">builder CLI</text>
-  <text x="72" y="532" font-size="12.5" fill="#8a8f98">Orchestrates the run and ships the engine. Built for AI agents: structured JSON output on every command.</text>
-  <rect x="964.5" y="490.5" width="124" height="30" rx="6" fill="#0a0a0c" stroke="#34343a"/>
-  <text x="1026" y="510" font-family="ui-monospace, Menlo, monospace" font-size="11.5" fill="#d0d6e0" text-anchor="middle">--output=json</text>
+  <!-- 4: flush 1 (read-triggered) -->
+  <line x1="384" y1="384" x2="836" y2="384" stroke="#7f56d9" stroke-width="2" marker-end="url(#arrow-purple)"/>
+  <text x="610" y="372" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#b692f6" text-anchor="middle">ir.emit · Batch{ instructions[] }</text>
+  <text x="610" y="402" font-size="10.5" fill="#62666d" text-anchor="middle">flush — a read needs the latest tree, so the buffer drains first</text>
+  <rect x="856.5" y="368.5" width="240" height="30" rx="6" fill="#18191a" stroke="#23252a"/>
+  <text x="976" y="388" font-size="11" fill="#8a8f98" text-anchor="middle">applied eagerly to the staging tree</text>
+
+  <!-- 5: tree.read -->
+  <line x1="384" y1="440" x2="836" y2="440" stroke="#62666d" stroke-width="1.4" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="428" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#c2c7d1" text-anchor="middle">tree.read { path }</text>
+  <line x1="836" y1="478" x2="384" y2="478" stroke="#62666d" stroke-width="1.4" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="466" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#c2c7d1" text-anchor="middle">response { content }</text>
+  <text x="610" y="496" font-size="10.5" fill="#62666d" text-anchor="middle">answered from the staging tree overlaid on the real project tree</text>
+
+  <!-- 6: more buffering -->
+  <rect x="252.5" y="516.5" width="256" height="34" rx="10" fill="#18191a" stroke="#23252a"/>
+  <text x="380" y="538" font-size="11.5" fill="#8a8f98" text-anchor="middle">more mutations buffer…</text>
+
+  <!-- 7: final flush -->
+  <line x1="384" y1="586" x2="836" y2="586" stroke="#7f56d9" stroke-width="2" marker-end="url(#arrow-purple)"/>
+  <text x="610" y="574" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#b692f6" text-anchor="middle">ir.emit — final flush</text>
+  <text x="610" y="604" font-size="10.5" fill="#62666d" text-anchor="middle">the factory returned</text>
+
+  <!-- 8: commit -->
+  <line x1="384" y1="640" x2="836" y2="640" stroke="#62666d" stroke-width="1.4" marker-end="url(#arrow-gray)"/>
+  <text x="610" y="628" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#c2c7d1" text-anchor="middle">ir.commit</text>
+  <text x="610" y="658" font-size="10.5" fill="#62666d" text-anchor="middle">on any throw the SDK sends ir.discard instead — nothing is written</text>
+
+  <!-- 9: apply phase -->
+  <rect x="700.5" y="688.5" width="340" height="64" rx="10" fill="#141516" stroke="#7f56d9" stroke-opacity="0.55"/>
+  <text x="870" y="714" font-size="13" font-weight="600" fill="#f7f8f8" text-anchor="middle">Apply phase</text>
+  <text x="870" y="736" font-size="11.5" fill="#8a8f98" text-anchor="middle">the staged result is written to disk — exit 0</text>
 
   <!-- footnote -->
-  <text x="48" y="602" font-size="11.5" fill="#62666d">ASTs live in the SDK — by the time an edit reaches the engine it is already a plain record.</text>
+  <text x="48" y="774" font-size="11.5" fill="#62666d">flush: buffered directives leave as one batch — when a read needs the tree, and when the factory ends. All-or-nothing is the commit/discard pair, not the batch.</text>
 </svg>

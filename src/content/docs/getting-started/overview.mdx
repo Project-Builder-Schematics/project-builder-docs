@@ -1,6 +1,6 @@
 ---
 title: What is Project Builder?
-description: Deterministic code generation designed to complement AI — and the SDK, engine, and CLI architecture that makes file mutation simple.
+description: Deterministic code generation designed to complement AI — consistent software, saved time, and patterns that grow with your team.
 sidebar:
   order: 1
 ---
@@ -58,65 +58,8 @@ resources on something you may only ever run once: extract a schematic when a pa
 proven itself, never before.
 </Aside>
 
-## How Project Builder mutates files
-
-Mutating files reliably has always been the complicated part of code generation. Project
-Builder makes it simple by splitting the work across three parts with sharply drawn
-responsibilities:
-
-![Diagram of a schematic run: the factory makes typed calls into the SDK, the SDK lowers them to IR (JSON records) consumed by the engine, the engine commits to a staging tree and applies to disk only on success, with a read-back loop from the staging tree to the SDK, and the builder CLI orchestrating everything with JSON output for agents.](../../../assets/sdk-engine-flow.svg)
-
-### SDK — intermediate records and developer experience
-
-The **SDK** (`@pbuilder/sdk`) has two responsibilities. First, it produces **IR —
-intermediate records**: JSON documents that describe *what should happen* ("create this
-file with this content", "move this one there"). Your factory never touches disk; it emits
-intent. Second, it owns the **developer experience**: typed
-[mutation verbs](/guides/mutation-verbs/), [templates](/guides/templates/),
-[dialects](/guides/typescript-and-react/), and the testing harness — all so that something
-as historically painful as file mutation feels simple.
-
-### Engine — applying the records
-
-The **engine** receives those intermediate records and applies them, with several
-mechanisms for doing so safely: everything is committed to a staging tree while your
-factory runs, and only after the factory returns successfully is the staged result written
-to disk. The engine is the only component that ever writes — and a failed run writes
-nothing.
-
-The engine **knows nothing about the SDK**. It doesn't know what a verb, a template, or a
-dialect is — it only receives instructions that are already final and ready to apply. That
-ignorance is a feature: the SDK surface can grow richer without the execution contract ever
-changing.
-
-### CLI — the agent-facing surface
-
-The **`builder` CLI** wires it together: `init`, `new`, `execute`. It is deliberately
-designed for AI agents to drive — output comes back as structured JSON, so an agent can
-run a schematic and parse the result like any other API.
-
-## The AST story
-
-Here's an extreme — but useful — simplification: **writing software, day to day, is
-mutating files.** And a file is just text; the extension is what gives that text meaning.
-
-Seen that way, most mutations are simple: create, replace, move, copy treat the file as
-text and never need to know what it means. The exception is `modify`. To change a file
-programmatically you first have to **understand** it — and the way a program understands a
-file is through an **AST** (abstract syntax tree).
-
-Here's the problem: every file type has its own parser library, and the ASTs they produce
-are never similar — none of them follow a shared convention. Left alone, every schematic
-author would have to pick libraries, install them, and learn each one's tree shape.
-
-The SDK solves this by **centralizing the ASTs**: it builds on those libraries and exposes
-them as ready-to-use dialects — TypeScript and React today, with more file types (HTML,
-CSS) and framework dialects (Angular, Vue, Svelte) planned. You install nothing extra;
-they're already part of the SDK.
-
-The boundary stays clean: **ASTs belong to the SDK.** By the time an AST edit reaches the
-engine, it has already been lowered to a plain, ready-to-apply record — the engine never
-parses code.
+Curious about the machinery — the SDK–engine conversation, instruction records, and the
+AST story? That has [a page of its own](/getting-started/how-it-works/).
 
 ## Design principles you'll feel as a user
 
@@ -133,6 +76,10 @@ parses code.
 ## Where next
 
 <CardGrid>
+  <Card title="How it works" icon="puzzle">
+    The SDK–engine conversation, flush, and the language-agnostic bridge —
+    [How it works](/getting-started/how-it-works/).
+  </Card>
   <Card title="Install it" icon="down-caret">
     Get the `builder` CLI and Bun set up in a couple of commands —
     [Installation](/getting-started/installation/).

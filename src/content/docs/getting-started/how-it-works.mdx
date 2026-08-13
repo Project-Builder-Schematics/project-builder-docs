@@ -1,0 +1,90 @@
+---
+title: How it works
+description: The SDK–engine conversation, instruction records, the AST story, and the language-agnostic bridge that make deterministic file mutation possible.
+sidebar:
+  order: 2
+---
+
+Mutating files reliably has always been the complicated part of code generation. Project
+Builder makes it simple by splitting the work across three parts with sharply drawn
+responsibilities — and letting two of them hold a conversation.
+
+## The SDK–engine conversation
+
+![Sequence diagram of the SDK–engine conversation: the engine spawns the SDK runner with the factory and the user's input and sends a single ready message; the factory chains mutations that buffer as directives; on a read the buffer flushes to the engine as an ir.emit batch applied eagerly to the staging tree, followed by tree.read and its response; when the factory returns, a final flush and ir.commit close the run and the engine's apply phase writes the staged result to disk.](../../../assets/sdk-engine-flow.svg)
+
+### SDK — instruction records and developer experience
+
+The **SDK** (`@pbuilder/sdk`) has two responsibilities. First, it produces **IR —
+instruction records**: JSON directives that describe *what should happen* ("create this
+file with this content", "move this one there"). Your factory never writes to your
+project; it emits intent. Second, it owns the **developer experience**: typed
+[mutation verbs](/guides/mutation-verbs/), [templates](/guides/templates/),
+[dialects](/guides/typescript-and-react/), and the testing harness — all so that something
+as historically painful as file mutation feels simple.
+
+The SDK and the engine hold a **conversation**. Directives don't cross one by one: as your
+factory chains mutations they buffer inside the SDK, and the buffer **flushes** to the
+engine as a single batch at exactly two moments — when the factory finishes, or the moment
+you read a file, so a read always sees your own pending writes first.
+
+### Engine — applying the records
+
+The **engine** receives those instruction records and applies them, with several
+mechanisms for doing so safely: everything lands in a staging tree while your factory
+runs, and only after the factory returns successfully is the staged result written to
+disk. The engine is the only component that ever writes — and a failed run writes nothing.
+
+The engine is **AST-blind and author-API-blind**. It doesn't know what a verb or a dialect
+is — code edits arrive as final file content, ready to apply. Its one authoring job is
+rendering [`{= =}` templates](/guides/templates/) against your inputs. That ignorance is a
+feature: the SDK surface can grow richer without the execution contract ever changing.
+
+### CLI — the agent-facing surface
+
+The **`builder` CLI** is the front door: `init`, `new`, `execute`. It validates your
+input, resolves the schematic, and starts the engine — which owns the run from there. The
+CLI is deliberately designed for AI agents to drive: output comes back as structured JSON,
+so an agent can run a schematic and parse the result like any other API.
+
+## The AST story
+
+Here's an extreme — but useful — simplification: **writing software, day to day, is
+mutating files.** And a file is just text; the extension is what gives that text meaning.
+
+Seen that way, most mutations are simple: create, replace, move, copy treat the file as
+text and never need to know what it means. The exception is `modify`. To change a file
+programmatically you first have to **understand** it — and the way a program understands a
+file is through an **AST** (abstract syntax tree).
+
+Here's the problem: every file type has its own parser library, and the ASTs they produce
+are never similar — none of them follow a shared convention. Left alone, every schematic
+author would have to pick libraries, install them, and learn each one's tree shape.
+
+The SDK solves this by **centralizing the ASTs**: it builds on those libraries and exposes
+them as ready-to-use dialects — TypeScript and React today, with more file types (HTML,
+CSS) and framework dialects (Angular, Vue, Svelte) planned. You install nothing extra;
+they're already part of the SDK.
+
+The boundary stays clean: **ASTs belong to the SDK.** By the time an AST edit reaches the
+engine, it has already been lowered to a plain, ready-to-apply record — the engine never
+parses code.
+
+## Under the hood: an engine that speaks wire, not language
+
+The SDK is TypeScript; the engine is Go. They talk through a deliberately thin bridge: the
+engine runs a **Bun sidecar** through an adapter, and that sidecar starts the SDK's
+**runner** — the entry point that loads your factory and opens the conversation. From
+there, everything that crosses between them is **framed JSON** on the wire: `ir.emit`,
+`tree.read`, `ir.commit`, `ir.discard`.
+
+![Diagram of the language bridge: the builder CLI starts the Go engine, which talks framed JSON over stdin/stdout through a Bun adapter to the TypeScript SDK runner where the factory and ASTs live; ghosted boxes show future SDKs in Python or any language plugging into the same wire with a new adapter, and a bottom panel notes that the SDK is self-contained so tests run with no CLI, no engine, and no disk.](../../../assets/sdk-engine-bridge.svg)
+
+Two properties fall out of this design:
+
+- **The engine is language-agnostic.** It doesn't speak TypeScript — it speaks the wire.
+  An SDK in Python, Rust, or any other language only needs a new adapter; the engine, the
+  staging tree, and the safety guarantees stay exactly the same.
+- **The SDK is self-contained.** Everything a factory produces is IR, so the testing
+  harness can stand in for the entire engine side and run factories completely in memory —
+  no CLI, no engine, no disk. That's why schematics are testable like any other code.

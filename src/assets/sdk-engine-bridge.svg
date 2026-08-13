@@ -1,0 +1,85 @@
+<svg width="1160" height="620" viewBox="0 0 1160 620" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <marker id="b-arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="#62666d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="b-arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="#7f56d9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- panel -->
+  <rect x="0.5" y="0.5" width="1159" height="619" rx="16" fill="#0f1011" stroke="#23252a"/>
+  <line x1="24" y1="1.5" x2="1136" y2="1.5" stroke="#ffffff" stroke-opacity="0.05"/>
+
+  <text x="48" y="54" font-family="ui-monospace, Menlo, monospace" font-size="11" letter-spacing="2" fill="#8a8f98">AN ENGINE THAT SPEAKS WIRE, NOT LANGUAGE</text>
+  <g transform="translate(1088, 36) scale(1.2)">
+    <path d="M11.2039 1.36914C11.2906 0.67556 10.419 0.297219 9.97151 0.834191L0.956775 11.6519C0.576834 12.1078 0.901043 12.8 1.49453 12.8H9.55705C9.9781 12.8 10.3039 13.169 10.2516 13.5868L9.49614 19.6309C9.40945 20.3244 10.281 20.7028 10.7285 20.1658L19.7432 9.34813C20.1232 8.8922 19.799 8.2 19.2055 8.2H11.1429C10.7219 8.2 10.3961 7.83097 10.4484 7.41318L11.2039 1.36914Z" fill="#7F56D9"/>
+  </g>
+
+  <!-- cli -->
+  <rect x="48.5" y="96.5" width="180" height="150" rx="12" fill="#141516" stroke="#23252a"/>
+  <text x="72" y="130" font-size="15" font-weight="600" fill="#f7f8f8">builder CLI</text>
+  <rect x="72.5" y="142.5" width="36" height="20" rx="10" fill="#18191a" stroke="#34343a"/>
+  <text x="90" y="156" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#8a8f98" text-anchor="middle">Go</text>
+  <text x="72" y="188" font-size="11.5" fill="#8a8f98">validates input,</text>
+  <text x="72" y="206" font-size="11.5" fill="#8a8f98">resolves the schematic,</text>
+  <text x="72" y="224" font-size="11.5" fill="#8a8f98">starts the engine</text>
+
+  <line x1="228" y1="170" x2="266" y2="170" stroke="#62666d" stroke-width="1.4" marker-end="url(#b-arrow-gray)"/>
+
+  <!-- engine -->
+  <rect x="270.5" y="96.5" width="240" height="150" rx="12" fill="#141516" stroke="#23252a"/>
+  <text x="294" y="130" font-size="15" font-weight="600" fill="#f7f8f8">Engine</text>
+  <rect x="294.5" y="142.5" width="36" height="20" rx="10" fill="#18191a" stroke="#34343a"/>
+  <text x="312" y="156" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#8a8f98" text-anchor="middle">Go</text>
+  <text x="294" y="188" font-size="11.5" fill="#8a8f98">owns the run · staging tree ·</text>
+  <text x="294" y="206" font-size="11.5" fill="#8a8f98">renders templates · writes disk.</text>
+  <text x="294" y="224" font-size="11.5" fill="#c2c7d1">Language-agnostic by design.</text>
+
+  <!-- wire strip -->
+  <rect x="550.5" y="96.5" width="180" height="150" rx="12" fill="#0a0a0c" stroke="#7f56d9" stroke-opacity="0.45"/>
+  <text x="640" y="126" font-size="12.5" font-weight="600" fill="#f7f8f8" text-anchor="middle">the wire</text>
+  <text x="640" y="146" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#8a8f98" text-anchor="middle">length-prefixed JSON</text>
+  <text x="640" y="162" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#8a8f98" text-anchor="middle">over stdin/stdout</text>
+  <text x="640" y="190" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#b692f6" text-anchor="middle">ir.emit · tree.read</text>
+  <text x="640" y="206" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#b692f6" text-anchor="middle">ir.commit · ir.discard</text>
+  <text x="640" y="232" font-size="10.5" fill="#62666d" text-anchor="middle">the contract is JSON —</text>
+  <text x="640" y="246" font-size="10.5" fill="#62666d" text-anchor="middle">not a language</text>
+
+  <line x1="510" y1="150" x2="546" y2="150" stroke="#7f56d9" stroke-width="1.8" marker-end="url(#b-arrow-purple)"/>
+  <line x1="546" y1="190" x2="510" y2="190" stroke="#7f56d9" stroke-width="1.8" marker-end="url(#b-arrow-purple)"/>
+
+  <!-- today: bun adapter + ts sdk -->
+  <line x1="730" y1="150" x2="766" y2="150" stroke="#7f56d9" stroke-width="1.8" marker-end="url(#b-arrow-purple)"/>
+  <line x1="766" y1="190" x2="730" y2="190" stroke="#7f56d9" stroke-width="1.8" marker-end="url(#b-arrow-purple)"/>
+  <rect x="770.5" y="96.5" width="342" height="150" rx="12" fill="#141516" stroke="#23252a"/>
+  <text x="794" y="130" font-size="15" font-weight="600" fill="#f7f8f8">Bun adapter → SDK runner</text>
+  <rect x="794.5" y="142.5" width="88" height="20" rx="10" fill="#18191a" stroke="#34343a"/>
+  <text x="838" y="156" font-family="ui-monospace, Menlo, monospace" font-size="10.5" fill="#8a8f98" text-anchor="middle">TypeScript</text>
+  <text x="794" y="188" font-size="11.5" fill="#8a8f98">the engine's sidecar runs the SDK's</text>
+  <text x="794" y="206" font-size="11.5" fill="#8a8f98"><tspan font-family="ui-monospace, Menlo, monospace" fill="#d0d6e0">pbuilder-runner</tspan> — your factory and</text>
+  <text x="794" y="224" font-size="11.5" fill="#8a8f98">the ts-morph ASTs all live in here</text>
+
+  <!-- future adapters (ghosts) -->
+  <rect x="770.5" y="270.5" width="162" height="64" rx="12" fill="none" stroke="#34343a" stroke-dasharray="6 5"/>
+  <text x="851" y="298" font-size="12.5" fill="#8a8f98" text-anchor="middle">Python SDK</text>
+  <text x="851" y="318" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#62666d" text-anchor="middle">future</text>
+  <rect x="950.5" y="270.5" width="162" height="64" rx="12" fill="none" stroke="#34343a" stroke-dasharray="6 5"/>
+  <text x="1031" y="298" font-size="12.5" fill="#8a8f98" text-anchor="middle">any language</text>
+  <text x="1031" y="318" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#62666d" text-anchor="middle">same wire</text>
+  <path d="M 690 250 C 690 300, 730 302, 766 302" fill="none" stroke="#34343a" stroke-width="1.3" stroke-dasharray="5 5" marker-end="url(#b-arrow-gray)"/>
+  <text x="626" y="300" font-size="10.5" fill="#62666d">a new SDK only needs</text>
+  <text x="626" y="314" font-size="10.5" fill="#62666d">a new adapter</text>
+
+  <!-- self-contained testing panel -->
+  <rect x="48.5" y="390.5" width="1064 " height="130" rx="12" fill="#141516" stroke="#23252a"/>
+  <text x="72" y="424" font-size="14" font-weight="600" fill="#f7f8f8">Self-contained by design</text>
+  <text x="72" y="450" font-size="12" fill="#8a8f98">The SDK never writes to your project — everything it produces is IR. So in tests, a contract fake stands in for the</text>
+  <text x="72" y="468" font-size="12" fill="#8a8f98">entire engine side and factories run completely in memory:</text>
+  <rect x="72.5" y="482.5" width="420" height="26" rx="6" fill="#0a0a0c" stroke="#34343a"/>
+  <text x="88" y="500" font-family="ui-monospace, Menlo, monospace" font-size="11.5" fill="#d0d6e0">runFactoryForTest → no CLI · no engine · no disk</text>
+
+  <!-- footnote -->
+  <text x="48" y="580" font-size="11.5" fill="#62666d">Every box on the right can be swapped: the engine only ever sees framed JSON — ir.emit, tree.read, ir.commit, ir.discard.</text>
+</svg>

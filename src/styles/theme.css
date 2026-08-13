@@ -161,6 +161,46 @@
 	border-bottom: 1px solid var(--sl-color-hairline);
 }
 
+/* Collapsible "On this page" panel (open by default) */
+.pb-toc summary {
+	list-style: none;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-weight: 600;
+	font-size: var(--sl-text-h5);
+	color: var(--sl-color-white);
+}
+
+.pb-toc summary::-webkit-details-marker {
+	display: none;
+}
+
+.pb-toc summary::after {
+	content: '';
+	width: 0.4rem;
+	height: 0.4rem;
+	border-right: 1.5px solid var(--sl-color-gray-3);
+	border-bottom: 1.5px solid var(--sl-color-gray-3);
+	transform: rotate(45deg) translateY(-15%);
+	transition: transform 0.2s;
+}
+
+.pb-toc:not([open]) summary::after {
+	transform: rotate(-45deg);
+}
+
+/* The default component's own heading stays for aria wiring, visually hidden */
+.pb-toc #starlight__on-this-page {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
 /* Pan-and-zoom lightbox for content images */
 .pb-zoomable {
 	cursor: zoom-in;

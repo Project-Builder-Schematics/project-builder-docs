@@ -6,7 +6,10 @@ import CoffeeButton from "./CoffeeButton.astro";
 const repo = "https://github.com/Project-Builder-Schematics/project-builder-docs";
 ---
 
-<Default><slot /></Default>
+<details open class="pb-toc">
+	<summary>On this page</summary>
+	<Default><slot /></Default>
+</details>
 
 <div class="community">
   <h2 class="contribute">Contribute</h2>
