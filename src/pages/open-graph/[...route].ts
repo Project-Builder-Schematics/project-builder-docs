@@ -13,15 +13,18 @@ export const { getStaticPaths, GET } = await OGImageRoute({
     return {
       title: wrapText(data.title, 18),
       description: wrapText(data.description ?? "", 30),
-      border: { width: 32, side: "inline-start" as const },
+      border: { width: 32, side: "inline-start" as const, color: [127, 86, 217] as [number, number, number] },
       padding: 60,
       logo: {
-        path: "./src/pages/open-graph/_images/docs-logo.png",
+        path: "./src/pages/open-graph/_images/og-logo.png",
         size: [300],
       },
-      bgImage: {
-        path: "./src/pages/open-graph/_images/background-ltr.png",
-      },
+      // Programmatic near-black gradient with a faint purple tint: renders to a
+      // ~10x smaller PNG than the old raster background (messengers cap preview weight).
+      bgGradient: [
+        [10, 10, 12],
+        [26, 20, 42],
+      ] as [number, number, number][],
       font: {
         title: {
           size: 72,
