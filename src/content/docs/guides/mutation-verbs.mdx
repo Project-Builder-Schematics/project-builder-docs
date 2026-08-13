@@ -120,7 +120,7 @@ replaceContent("src/config.json", '{ "version": "2.0.0" }');
 <Aside type="note">
 A rejected `.replaceContent()` reports `verb: "modify"` on its `AuthoringError`, not
 `"replaceContent"` — it lowers to the same wire mutation as a dialect handle's `.modify(fn)`
-escape hatch (see [TypeScript and React dialects](/guides/typescript-and-react/)). This is
+escape hatch (see [the Modify guide](/guides/modify/)). This is
 deliberate, not a stale rename — details in the
 [error handling guide](/guides/error-handling/).
 </Aside>
@@ -234,7 +234,7 @@ can chain over) is deliberate.
 The eighth mutation is the one that doesn't come from `@pbuilder/sdk/commons` — and that's
 by design. Every verb above treats a file as **text**; `modify` is a **structural** edit,
 and to edit a file structurally you first have to understand it, which means parsing it
-into an AST. That understanding lives in the [dialects](/guides/typescript-and-react/):
+into an AST. That understanding lives in the [dialects](/guides/modify/):
 
 ```ts
 import * as ts from "@pbuilder/sdk/typescript";
@@ -251,7 +251,7 @@ the whole chain coalesces and reaches the engine as **one `modify` instruction c
 final file content**. The engine never sees the AST. `replaceContent` lowers to the same
 wire mutation, which is why its errors report `verb: "modify"`.
 
-See [TypeScript & React Dialects](/guides/typescript-and-react/) for the full authoring
+See [Modify](/guides/modify/) for the full authoring
 surface.
 
 ## Package-local sources

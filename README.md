@@ -1,49 +1,50 @@
-# Starlight Starter Kit: Basics
+# Project Builder Documentation
 
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
 
+The documentation site for [Project Builder](https://github.com/Project-Builder-Schematics/project-builder-sdk) — deterministic code generation through typed, testable schematics.
+
+**Live at [schematics.pbuilder.dev](https://schematics.pbuilder.dev)** · English and [Spanish](https://schematics.pbuilder.dev/es/) · [Roadmap](https://schematics.pbuilder.dev/roadmap/)
+
+## Stack
+
+- [Astro 7](https://astro.build) + [Starlight](https://starlight.astro.build) with a Linear-inspired custom theme (dark by default, light supported)
+- Per-page Open Graph images generated at build time (`astro-og-canvas`)
+- [`llms.txt`](https://schematics.pbuilder.dev/llms.txt) / [`llms-full.txt`](https://schematics.pbuilder.dev/llms-full.txt) so AI agents can consume the whole documentation in one fetch (`starlight-llms-txt`)
+- Pagefind full-text search, favicons pipeline, pan-and-zoom lightbox for diagrams
+
+## Structure
+
 ```
-npm create astro@latest -- --template starlight
+src/
+├── assets/            logos, mascot, hand-drawn SVG architecture diagrams
+├── components/        Head (OG + theme default + lightbox), TableOfContents, CoffeeButton
+├── content/docs/      English content (getting-started/, guides/, reference/, roadmap)
+│   └── es/            Spanish translations, same tree
+└── styles/theme.css   the entire theme: tokens, panels, lightbox, side-panel toggles
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Content pages are Markdown/MDX; each file maps to a route. Spanish lives under `src/content/docs/es/` mirroring the English tree — untranslated pages fall back to English automatically.
 
-## 🚀 Project Structure
+## Development
 
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```sh
+npm install
+npm run dev        # http://localhost:4321
+npm run build      # production build to ./dist/
+npx astro check    # type-check content and components
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Deployment
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+Every push to `main` builds and deploys to GitHub Pages via `.github/workflows/deploy.yml`, served on the custom domain `schematics.pbuilder.dev`.
 
-Static assets, like favicons, can be placed in the `public/` directory.
+## Contributing
 
-## 🧞 Commands
+Found an issue or want to improve a page? [Open an issue](https://github.com/Project-Builder-Schematics/project-builder-docs/issues/new) or [start a discussion](https://github.com/Project-Builder-Schematics/project-builder-docs/discussions/new/choose).
 
-All commands are run from the root of the project, from a terminal:
+## Related repositories
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+- [`project-builder-sdk`](https://github.com/Project-Builder-Schematics/project-builder-sdk) — the TypeScript authoring SDK
+- [`project-builder-cli`](https://github.com/Project-Builder-Schematics/project-builder-cli) — the `builder` CLI and engine
+- [Workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/) — real projects proving schematics in the field

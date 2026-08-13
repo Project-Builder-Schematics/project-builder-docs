@@ -123,7 +123,7 @@ replaceContent("src/config.json", '{ "version": "2.0.0" }');
 <Aside type="note">
 Un `.replaceContent()` rechazado reporta `verb: "modify"` en su `AuthoringError`, no
 `"replaceContent"` — se traduce a la misma mutación de wire que el escape `.modify(fn)` de un
-handle de dialecto (consulta [Dialectos de TypeScript y React](/es/guides/typescript-and-react/)).
+handle de dialecto (consulta [Modify](/es/guides/modify/)).
 Es deliberado, no un renombrado obsoleto — los detalles están en la
 [guía de manejo de errores](/es/guides/error-handling/).
 </Aside>
@@ -239,7 +239,7 @@ La octava mutación es la que no viene de `@pbuilder/sdk/commons` — y es así 
 Todos los verbos anteriores tratan un archivo como **texto**; `modify` es una edición
 **estructural**, y para editar un archivo estructuralmente primero hay que entenderlo, lo
 que significa parsearlo a un AST. Ese entendimiento vive en los
-[dialectos](/es/guides/typescript-and-react/):
+[dialectos](/es/guides/modify/):
 
 ```ts
 import * as ts from "@pbuilder/sdk/typescript";
@@ -256,7 +256,7 @@ Sea cual sea la forma en que lo escribas — una op con nombre como `addImport` 
 `modify` con el contenido final del archivo**. El engine nunca ve el AST. `replaceContent`
 baja a la misma mutación de wire, y por eso sus errores reportan `verb: "modify"`.
 
-Consulta [Dialectos de TypeScript y React](/es/guides/typescript-and-react/) para la
+Consulta [Modify](/es/guides/modify/) para la
 superficie completa.
 
 ## Fuentes locales del paquete
