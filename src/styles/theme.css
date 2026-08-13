@@ -232,12 +232,14 @@
 	}
 }
 
-html[data-pb-hide-sidebar] {
-	--sl-sidebar-width: 0rem;
-}
-
+/* Hide the nav pane without touching --sl-sidebar-width — the right
+   rail derives its own width from that same variable. */
 html[data-pb-hide-sidebar] nav.sidebar {
 	display: none;
+}
+
+html[data-pb-hide-sidebar] .main-frame {
+	padding-inline-start: 0;
 }
 
 html[data-pb-hide-toc] .right-sidebar-container {
