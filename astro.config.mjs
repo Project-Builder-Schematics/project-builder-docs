@@ -8,13 +8,11 @@ export default defineConfig({
 	site: 'https://schematics.pbuilder.dev',
 	integrations: [
 		starlight({
-			title: 'Project Builder Documentation',
+			title: 'Project Builder',
 			description:
 				'Documentation for Project Builder — build, extend, and automate project scaffolding with schematics.',
 			logo: {
-				light: './src/assets/logo-light.svg',
-				dark: './src/assets/logo-dark.svg',
-				replacesTitle: true,
+				src: './src/assets/logo.svg',
 			},
 			social: [
 				{
@@ -26,7 +24,12 @@ export default defineConfig({
 			],
 			expressiveCode: {
 				styleOverrides: {
-					borderRadius: '0.5rem',
+					borderRadius: '0.75rem',
+					borderColor: 'var(--sl-color-hairline, #23252a)',
+					codeFontFamily: "'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace",
+					frames: {
+						shadowColor: 'transparent',
+					},
 				},
 			},
 			head: [
@@ -43,8 +46,13 @@ export default defineConfig({
 				Head: './src/components/Head.astro',
 				TableOfContents: './src/components/TableOfContents.astro',
 			},
-			customCss: ['./src/styles/colors.css', './src/styles/theme.css', './src/styles/custom.css'],
+			customCss: [
+				'@fontsource-variable/inter',
+				'@fontsource-variable/jetbrains-mono',
+				'./src/styles/theme.css',
+			],
 			sidebar: [
+				{ label: 'Start Here', items: [{ autogenerate: { directory: 'getting-started' } }] },
 				{ label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
 				{ label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
 			],

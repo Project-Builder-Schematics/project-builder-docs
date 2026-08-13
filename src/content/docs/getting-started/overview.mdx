@@ -1,0 +1,75 @@
+---
+title: What is Project Builder?
+description: Why deterministic, schematic-based code generation beats one-shot AI output, and how the CLI, SDK, and engine divide the work.
+sidebar:
+  order: 1
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+Project Builder exists to give developers — **and the AI agents working alongside them** —
+deterministic code generation. A prompt produces something different every run; a
+**schematic** — a typed, testable file-mutation program — produces the same files, byte for
+byte, every time. You (or your agent) encode the change once, and from then on generation
+is a program you run, not an output you review.
+
+## What is a schematic?
+
+A schematic is a small package that lives in your repository. It has three files:
+
+- `schema.json` — the schematic's typed inputs, the contract with whoever runs it.
+- `schema.generated.ts` — an `Input` type generated from the schema, so your code is typed
+  against the contract rather than a hand-written shape.
+- `factory.ts` — your authoring logic: a function that receives the typed input and
+  schedules file mutations — creating files, editing content, scaffolding whole folders of
+  templates.
+
+Once registered, you run it with `builder execute <collection>:<schematic>`, passing inputs
+as CLI flags. Because a factory is just a typed function, it can also be executed entirely
+in memory by the testing harness — no CLI, no disk — which is what makes schematics
+testable like any other code. See [Your first schematic](/getting-started/your-first-schematic/)
+for the end-to-end walkthrough.
+
+## The three pieces
+
+Three components cooperate, each with a sharply drawn responsibility:
+
+- The **`builder` CLI** owns every user- and agent-facing interaction: initialising a
+  workspace, scaffolding schematics, and executing them (`init` / `new` / `execute`). It
+  also drops an AI skill into your repo so coding agents can drive it, and it ships the
+  engine, starting it on every run.
+- The **SDK** (`@pbuilder/sdk`) owns the developer experience — typed
+  [mutation verbs](/guides/mutation-verbs/), [templates](/guides/templates/), dialects, and
+  the testing harness. It never writes to disk.
+- The **engine** owns execution. While your factory runs, everything it does is committed
+  to a staging tree; only after the factory returns successfully is the staged result
+  written to disk. The engine is the only component that ever writes — and a failed run
+  writes nothing.
+
+That staging tree is also what lets a factory *read files back* mid-run and react to what
+it finds — idempotent, content-aware edits instead of blind overwrites.
+
+## Design principles you'll feel as a user
+
+- **Idempotency.** Factories re-run against already-generated projects, so mutations are
+  written to be safe on repeat: read the tree first, then create or update — and skip the
+  edit when your marker, import, or entry is already present.
+- **Fail-closed.** Verbs that write to a new path (`create`, `rename`, `move`, `copy`,
+  `copyIn`, `scaffold`) reject on a collision with an existing path; overwriting is always
+  a deliberate opt-in via `force: true`.
+- **All-or-nothing runs.** Nothing touches disk while your factory runs — a thrown error
+  before it returns means nothing is written at all, and your tree is left exactly as it
+  was.
+
+## Where next
+
+<CardGrid>
+  <Card title="Install it" icon="down-caret">
+    Get the `builder` CLI and Bun set up in a couple of commands —
+    [Installation](/getting-started/installation/).
+  </Card>
+  <Card title="Build your first schematic" icon="rocket">
+    From `builder init` to a running, idempotent generator —
+    [Your first schematic](/getting-started/your-first-schematic/).
+  </Card>
+</CardGrid>

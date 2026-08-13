@@ -1,0 +1,64 @@
+---
+title: Installation
+description: Install the builder CLI with Homebrew or a tarball, add Bun as the schematics runtime, and get the SDK into your project.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Two things need to be on your machine: the **`builder` CLI** (which ships the engine) and
+**[Bun](https://bun.sh)**, the runtime schematics execute in. The SDK itself is added per
+project — usually automatically.
+
+This guide was verified against CLI **0.6.0** and SDK **0.2.x**.
+
+## macOS / Linux
+
+With [Homebrew](https://brew.sh) installed, grab the CLI (the `builder` binary) from the
+tap:
+
+```sh
+brew install project-builder-schematics/tap/pbuilder
+```
+
+<Aside type="caution" title="Linux / WSL2">
+This needs a recent Homebrew — the cask install is verified on Homebrew 6.x; older
+versions refuse casks on Linux.
+</Aside>
+
+No Homebrew at all? Download the per-platform tarball from the
+[tap's releases](https://github.com/Project-Builder-Schematics/homebrew-tap/releases)
+(`pbuilder_<version>_linux_amd64.tar.gz` and friends) and put `builder` on your `PATH` —
+no brew required.
+
+Schematics execute through a [Bun](https://bun.sh) sidecar, so Bun must be installed too:
+
+```sh
+brew install oven-sh/bun/bun   # or: curl -fsSL https://bun.sh/install | bash
+```
+
+<Aside type="note">
+Bun is only the schematics' runtime — your project itself keeps whatever package manager
+and tooling it already uses (npm, pnpm, yarn, …).
+</Aside>
+
+## Windows
+
+<Aside type="caution" title="Not yet supported">
+Windows builds of the CLI are on the roadmap; in the meantime the supported path on
+Windows is WSL2 (Ubuntu), using the Linux instructions above.
+</Aside>
+
+## The SDK itself
+
+You normally don't install it by hand — `builder init` adds `@pbuilder/sdk` to your
+project's `devDependencies` automatically. To add it manually, use whichever package
+manager your project already uses:
+
+```sh
+npm install -D @pbuilder/sdk    # or: pnpm add -D / yarn add -D / bun add -d
+```
+
+With the CLI and Bun in place, you're ready for
+[your first schematic](/getting-started/your-first-schematic/).

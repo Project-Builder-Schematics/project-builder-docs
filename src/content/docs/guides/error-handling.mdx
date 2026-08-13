@@ -1,0 +1,147 @@
+---
+title: Error handling
+description: The AuthoringError contract every rejected verb throws — its verb, path, and reason fields, the fail-closed guarantee behind it, and how to write factories that fail well.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An authoring verb that gets rejected — by the engine, or by the SDK itself before any
+round-trip — throws `AuthoringError`. It carries everything you need to recover, in author
+vocabulary: no engine-internal terminology.
+
+## Fail-closed by design
+
+A failed run writes **nothing**. Verbs only schedule directives against the engine's staging
+tree; disk writes happen in the apply phase, after your factory returns — so a thrown
+`AuthoringError` (or any error) before return leaves the target project exactly as it was.
+There is no partial-write state to clean up, which is why the verbs themselves are strict:
+`create` rejects an existing path, `replaceContent` rejects a missing one, and overwrites
+require an explicit `{ force: true }` — see
+[Mutation verbs](/guides/mutation-verbs/) for each verb's exact semantics.
+
+## How errors surface
+
+Calling the runner directly throws; `runFactoryForTest` captures the same `AuthoringError`
+on `result.error`:
+
+```ts
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { AuthoringError } from "@pbuilder/sdk/commons";
+
+const result = await runFactoryForTest(run, input);
+if (result.error instanceof AuthoringError) {
+  switch (result.error.reason) {
+    case "path-collision":
+      console.error(`${result.error.verb} collided at ${result.error.path}`);
+      break;
+    default:
+      console.error(result.error.message);
+  }
+}
+```
+
+The [testing guide](/getting-started/testing/) covers the harness itself.
+
+## Fields
+
+- **`verb`** — the author-facing verb whose call was rejected: `"create"`, `"modify"`,
+  `"remove"`, `"rename"`, `"move"`, `"copy"`, or `"copyIn"`. `undefined` for batch-level
+  rejections that have no single offending call.
+- **`path`** — the author-declared, source-side path for the failing call. `undefined` when
+  `verb` is `undefined`.
+- **`reason`** — the closed cause of the rejection (see below).
+- **`origin`** — derived from `reason`: `"write-rejected"` (the engine refused a write) or
+  `"authoring-rejected"` (the SDK caught a misuse before any engine round-trip).
+- **`appliedCount`** — how many directives applied within the failing run before the
+  offender. A diagnostic only — a rejected run discards everything, so this is never a
+  partial-persistence promise.
+
+<Aside type="note">
+**The `"modify"` label quirk.** `"modify"` labels the underlying wire mutation, and is
+shared by BOTH `.replaceContent()` calls (the commons/dialect wholesale replace) and a
+dialect handle's `.modify(fn)` AST escape hatch — the two calls lower to the same wire
+directive, so a rejection on either surfaces as `verb: "modify"`. This is deliberate, not a
+stale name left over from a rename. Assert against `"modify"`, never `"replaceContent"`.
+</Aside>
+
+## `reason` values
+
+`reason` is a closed union — exhaustive `switch` blocks are expected and get a compile
+error if a value is missed:
+
+| `reason` | Meaning |
+|---|---|
+| `path-collision` | The target path already exists and `{ force: true }` was not passed. |
+| `path-not-found` | The target path does not exist. |
+| `unrepresentable-content` | The content could not be represented in the engine's format. |
+| `changes-too-large` | The run's total change size exceeds the engine's cap. |
+| `outside-run` | An authoring verb was called outside an active run. |
+| `unknown` | The rejection could not be classified. |
+| `invalid-input` | The SDK rejected a call's arguments before any engine round-trip. |
+| `reserved-name` | The call used a name reserved by the SDK or engine. |
+| `source-not-found` | A package-local source (`scaffold`/`copyIn`/`create({ templateFile })`) does not exist. |
+| `source-not-regular-file` | A package-local source is not a regular file. |
+| `source-unreadable` | A package-local source exists but could not be read. |
+
+<Aside type="caution">
+`source-outside-package` was removed in `@pbuilder/sdk` `0.2.0` — the SDK no longer
+re-derives a containment ceiling for package-local sources. Migration: drop the
+`case "source-outside-package":` arm from any exhaustive `switch (err.reason)` — TypeScript
+will point at it.
+</Aside>
+
+## Catching and recovering
+
+Same shape as above, now exhaustive — every `reason` value gets a case:
+
+```ts
+switch (err.reason) {
+  case "path-collision":
+    console.error(`${err.verb} collided at ${err.path}`);
+    break;
+  case "path-not-found":
+  case "unrepresentable-content":
+  case "changes-too-large":
+  case "outside-run":
+  case "unknown":
+  case "invalid-input":
+  case "reserved-name":
+  case "source-not-found":
+  case "source-not-regular-file":
+  case "source-unreadable":
+    console.error(err.message);
+    break;
+}
+```
+
+## Writing good failure paths
+
+The error contract rewards factories that treat rejection as a designed outcome, not a
+surprise:
+
+- **Prevent `path-collision` by reading first.** The most common rejection is a re-run
+  hitting a file the previous run created. Branch on
+  [`find().read()`'s trichotomy](/guides/mutation-verbs/#reading-files-findpathread) —
+  create when absent, update when present — instead of reaching for `{ force: true }`, which
+  turns every re-run into a silent overwrite.
+- **Pass `force: true` only when overwriting is the intent.** Fail-closed collisions are the
+  SDK protecting earlier output; forcing them away removes that protection for every future
+  run, not just this one.
+- **Let unexpected states fail loud.** Because a rejected run discards everything, throwing
+  is always safe — the tree is untouched. A factory that detects a state it doesn't
+  understand should throw rather than guess.
+- **Switch exhaustively on `reason`.** The closed union means the compiler tells you when a
+  new SDK version adds (or removes) a rejection cause — the `source-outside-package` removal
+  above is exactly that mechanism working as intended.
+- **In tests, assert on the structured fields.** `result.error.verb`, `.path`, and `.reason`
+  pin down *which* directive failed and *why* — far more mutation-resistant than matching on
+  `message` text. Remember the `"modify"` label quirk when the failing call is a
+  `replaceContent`.
+
+## Next steps
+
+- [Mutation verbs](/guides/mutation-verbs/) — the seven authoring verbs and the
+  read-trichotomy rule.
+- [Dry-run](/guides/dry-run/) — preview a factory's planned changes before anything commits.

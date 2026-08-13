@@ -6,6 +6,11 @@ const { id } = Astro.locals.starlightRoute;
 const ogImageUrl = new URL(`/open-graph/${id || "index"}.png`, Astro.site);
 ---
 
+<script is:inline>
+	// Default first-time visitors to dark; the theme switcher still offers both.
+	if (!localStorage.getItem('starlight-theme')) localStorage.setItem('starlight-theme', 'dark');
+</script>
+
 <Default><slot /></Default>
 
 <meta property="og:image" content={ogImageUrl} />

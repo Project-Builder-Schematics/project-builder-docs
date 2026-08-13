@@ -1,14 +1,41 @@
 ---
-title: We're rebuilding
-description: The Project Builder documentation is being rebuilt. New content is on its way.
+title: Code generation you can trust
+description: Deterministic code generation through typed, testable schematics — encode a change once, run it forever.
 template: splash
 hero:
-  title: We're rebuilding 🚧
-  tagline: The Project Builder documentation is getting a fresh start. New content will be here in just a moment — thanks for your patience!
+  title: Code generation you can trust
+  tagline: Project Builder turns code generation into a deterministic program. Write a schematic once — typed, testable, idempotent — and every run produces exactly the same result.
   image:
     file: ../../assets/leo.webp
   actions:
-    - text: Follow the progress on GitHub
-      link: https://github.com/Project-Builder-Schematics/project-builder-docs
+    - text: Get started
+      link: /getting-started/overview/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/Project-Builder-Schematics/project-builder-sdk
       icon: github
+      variant: minimal
 ---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Start building
+
+<CardGrid stagger>
+	<Card title="Your first schematic" icon="rocket">
+		Install the CLI and generate your first files in minutes. [Follow the
+		quickstart](/getting-started/your-first-schematic/).
+	</Card>
+	<Card title="Mutation verbs" icon="pencil">
+		Create, replace, move, copy — seven typed verbs to mutate a project
+		safely. [Learn the verbs](/guides/mutation-verbs/).
+	</Card>
+	<Card title="Templates & scaffolding" icon="document">
+		Generate whole file trees from templates with dynamic names and
+		transforms. [Master templates](/guides/templates/).
+	</Card>
+	<Card title="CLI reference" icon="seti:powershell">
+		Every `builder` command, flag, and exit code in one place. [Browse the
+		catalog](/reference/cli-commands/).
+	</Card>
+</CardGrid>

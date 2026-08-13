@@ -1,0 +1,159 @@
+---
+title: Your first schematic
+description: Go from an empty workspace to a running, idempotent code generator in six commands.
+sidebar:
+  order: 3
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Every step below is runnable exactly as written. You'll initialise a workspace, scaffold a
+schematic, declare its typed inputs, write the factory, and execute it — twice, to see
+idempotency at work. [Install the CLI and Bun](/getting-started/installation/) first if
+you haven't.
+
+<Steps>
+
+1. **Initialise a workspace** (inside any project — new or existing):
+
+   ```sh
+   builder init
+   ```
+
+   This creates `project-builder.json` (the workspace config), a `schematics/` folder, and
+   an AI skill under `.claude/skills/pbuilder/` — a command reference your coding agent
+   picks up automatically, no wiring needed. It also installs `@pbuilder/sdk` as a dev
+   dependency, creating a `package.json` first if the folder doesn't have one.
+
+2. **Scaffold a schematic:**
+
+   ```sh
+   builder new schematic hello
+   ```
+
+   You get a registered, ready-to-edit package:
+
+   ```txt
+   schematics/hello/
+   ├── schema.json           # typed inputs — the contract with the user
+   ├── schema.generated.ts   # generated from schema.json — never edit
+   └── factory.ts            # your authoring logic
+   ```
+
+   `project-builder.json` now lists it under `collections.default.hello`.
+
+3. **Declare the inputs** — replace the generated `schema.json`'s contents with the
+   following; every property needs a `label` (codegen fails without it):
+
+   ```json title="schematics/hello/schema.json"
+   {
+     "properties": {
+       "name": { "type": "string", "label": "Service name", "required": true }
+     }
+   }
+   ```
+
+   Property types are `string`, `number`, `boolean`, and `enum` (which requires a
+   non-empty `choices` array); `default` and `description` are optional.
+
+4. **Regenerate the input types:**
+
+   ```sh
+   bunx pbuilder-codegen schematics/hello
+   ```
+
+   This rewrites `schema.generated.ts` with an `Input` type derived from your schema —
+   your factory is typed against the schema, never against a hand-written shape.
+
+5. **Write the factory:**
+
+   ```ts title="schematics/hello/factory.ts"
+   import { create, find, replaceContent } from "@pbuilder/sdk/commons";
+   import type { Input } from "./schema.generated.ts";
+
+   export default async (input: Input) => {
+     // create a new file
+     create(`src/services/${input.name}.ts`, {
+       template: `export const serviceName = "${input.name}";`,
+       options: {},
+     });
+
+     // content-aware edit: read the tree, then create or update
+     const existing = await find("services.txt").read();
+     if (existing === undefined) {
+       create("services.txt", { template: input.name, options: {} });
+     } else {
+       replaceContent("services.txt", `${existing}\n${input.name}`);
+     }
+   };
+   ```
+
+   The engine invokes the module's **default export** — that's the factory. This one
+   builds its output strings in TypeScript; the [template language](/guides/templates/)
+   is the declarative alternative.
+
+6. **Execute it** — `default:hello` is `<collection>:<schematic>` as registered in
+   `project-builder.json`; inputs are passed as CLI flags:
+
+   ```sh
+   builder execute default:hello --name=payments
+   ```
+
+   ```txt
+   ~ services.txt
+   ~ src/services/payments.ts
+   ✓ done — 2 modified
+   ```
+
+   (`~` marks a path the run wrote.)
+
+</Steps>
+
+## Run it again
+
+Now run it again **with a different input**:
+
+```sh
+builder execute default:hello --name=orders
+```
+
+`services.txt` grows by one line instead of being clobbered — that's the read-back loop
+from step 5 doing its job. Re-running with the **same** name, on the other hand, rejects
+with `path-collision`: `create` is fail-closed on an existing path (pass `force: true` to
+overwrite deliberately), and since a failed run writes nothing, your tree is left exactly
+as it was.
+
+<Aside type="tip">
+Make mutations idempotent. Factories re-run against already-generated projects — check
+whether your marker, import, or entry is already present before inserting it. The factory
+above shows the read-back mechanics; a production factory would also skip the append when
+the name is already listed.
+</Aside>
+
+<Aside type="note">
+If your editor flags the `.ts`-extension import or `bun:test`, that's just missing
+tsconfig settings — see [Testing schematics](/getting-started/testing/); Bun itself runs
+fine without them.
+</Aside>
+
+## Two rules that save debugging time
+
+- **Always pass `options: {}` to `create`**, even when the template has no tokens. The
+  type requires it — and in untyped call sites (plain JS, `any`) omitting it puts
+  `undefined` in the directive batch, rejecting the write as unrepresentable.
+- **`find().read()` is a trichotomy**: `undefined` means the file is absent, `""` means it
+  exists and is empty. Branch on `=== undefined` — never `if (!content)`, which conflates
+  the two.
+
+## Next steps
+
+- **Test it** without the CLI or a running engine —
+  [Testing schematics](/getting-started/testing/).
+- [Mutation verbs](/guides/mutation-verbs/) — everything a factory can do to the tree.
+- [Templates](/guides/templates/) — the declarative template language inside `create()`.
+- [Scaffolding](/guides/scaffolding/) — mirror a whole folder of templates instead of
+  writing one `create()` per file.
+- [Dry-run](/guides/dry-run/) — preview a factory's planned changes before anything
+  commits.
+- [Error handling](/guides/error-handling/) — the structured `AuthoringError` contract of
+  a rejected run.

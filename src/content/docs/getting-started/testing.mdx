@@ -1,0 +1,106 @@
+---
+title: Testing schematics
+description: Run a factory in memory with the SDK's testing harness and assert on the files it writes — no CLI, no engine, no disk.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@pbuilder/sdk/testing` runs a factory in-memory — no CLI, no engine, no disk. Your factory
+is a plain typed function, so it tests like one: run it through `runFactoryForTest`, then
+assert on the resulting tree.
+
+## A first test
+
+Create `schematics/hello/factory.test.ts` next to the factory:
+
+```ts title="schematics/hello/factory.test.ts"
+import { test, expect } from "bun:test";
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { create } from "@pbuilder/sdk/commons";
+
+// in your schematic this is `import run from "./factory.ts";`
+const run = (input: { name: string }) => {
+  create(`src/services/${input.name}.ts`, {
+    template: `export const serviceName = "${input.name}";`,
+    options: {},
+  });
+};
+
+test("factory creates the service file", async () => {
+  const result = await runFactoryForTest(run, { name: "payments" });
+
+  expect(result.error).toBeUndefined();
+  expect(result.tree.get("src/services/payments.ts"))
+    .toEqual(`export const serviceName = "payments";`);
+});
+```
+
+```sh
+bun test schematics
+```
+
+This runs only your schematic tests under Bun — your app's own test runner (Jest, Vitest,
+whatever you use) stays untouched and the two coexist in one repo.
+
+## Seed files and idempotence
+
+`result.tree` contains **committed writes only**. Files you pre-populate via the `seed`
+option are readable by the factory but never appear in the tree — which is exactly how you
+assert idempotence (an untouched seed is absent from the tree):
+
+```ts
+import { test, expect } from "bun:test";
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { find, replaceContent } from "@pbuilder/sdk/commons";
+
+test("a seeded file is readable; only the write is committed", async () => {
+  const run = async (input: { name: string }) => {
+    const existing = await find("services.txt").read();
+    replaceContent("services.txt", `${existing}\n${input.name}`);
+  };
+
+  const seed = { "services.txt": "payments" };
+  const result = await runFactoryForTest(run, { name: "orders" }, { seed });
+
+  expect(result.error).toBeUndefined();
+  expect(result.tree.get("services.txt")).toEqual("payments\norders");
+});
+```
+
+## `packageDir` — anchoring package-local verbs
+
+The options bag's other field, `packageDir` (pass `import.meta.dir`), anchors the
+package-local verbs (`scaffold`, `copyIn`, `create({ templateFile })`) and opts the run
+into schema-derived input validation against the adjacent `schema.json`. Without it those
+verbs have nothing to resolve against. (When the CLI runs your schematic, it passes the
+package location automatically — this is only a testing concern. See
+[Scaffolding](/guides/scaffolding/) for the verbs themselves.)
+
+## What the harness does — and doesn't — fake
+
+Templates are stored **verbatim** in the test tree — rendering happens in the engine at
+`builder execute` time, and the harness doesn't fake it. So asserting on a templated
+`create` means asserting on the raw `{= .name =}` text, not rendered output.
+
+<Aside type="caution">
+`@pbuilder/sdk/testing` ships `0.x`, semver-exempt, until real use validates the result
+shape.
+</Aside>
+
+## Editor errors on `bun:test`?
+
+`bun test` strips types rather than checking them, so it runs fine either way — but your
+editor needs a few tsconfig settings to resolve the imports. Add `typescript` and
+`@types/bun` as dev dependencies, then make sure your `tsconfig.json` has:
+
+- `moduleResolution: "NodeNext"` (or `"bundler"`) — TypeScript's default legacy resolution
+  cannot read a package's `exports` map, which is the only route to `@pbuilder/sdk`'s
+  subpaths (`./testing`, `./commons`, and friends). Without this, your editor reports
+  `Cannot find module '@pbuilder/sdk/commons'` even though the import is correct.
+- `allowImportingTsExtensions: true` — factories import the generated types with an
+  explicit `.ts` extension (`./schema.generated.ts`), which TypeScript rejects by default.
+- `types: ["bun"]` — leaving `types` empty or unset hides the `bun:test` ambient module
+  even with `@types/bun` installed; naming it explicitly is what makes
+  `Cannot find module 'bun:test'` go away.
