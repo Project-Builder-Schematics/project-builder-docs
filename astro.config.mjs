@@ -62,9 +62,21 @@ export default defineConfig({
 				'./src/styles/theme.css',
 			],
 			sidebar: [
-				{ label: 'Start Here', items: [{ autogenerate: { directory: 'getting-started' } }] },
-				{ label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
-				{ label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
+				{
+					label: 'Start Here',
+					collapsed: false,
+					items: [{ autogenerate: { directory: 'getting-started' } }],
+				},
+				{
+					label: 'Guides',
+					collapsed: true,
+					items: [{ autogenerate: { directory: 'guides' } }],
+				},
+				{
+					label: 'Reference',
+					collapsed: true,
+					items: [{ autogenerate: { directory: 'reference' } }],
+				},
 			],
 		}),
 		favicons(),
