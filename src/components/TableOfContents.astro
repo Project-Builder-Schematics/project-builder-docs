@@ -1,0 +1,75 @@
+---
+import Default from "@astrojs/starlight/components/TableOfContents.astro";
+import { Icon } from "@astrojs/starlight/components";
+import CoffeeButton from "./CoffeeButton.astro";
+
+const repo = "https://github.com/Project-Builder-Schematics/project-builder-docs";
+---
+
+<Default><slot /></Default>
+
+<div class="community">
+  <h2 class="contribute">Contribute</h2>
+  <ul>
+    <li>
+      <a href={`${repo}/blob/main/CONTRIBUTING.md`} target="_blank">
+        <Icon name="open-book" /> Contribute
+      </a>
+    </li>
+    <li>
+      <a href={`${repo}/discussions/new/choose`} target="_blank">
+        <Icon name="external" /> Start a discussion
+      </a>
+    </li>
+  </ul>
+  <a href={`${repo}/issues/new`} class="btn__mistake" target="_blank">
+    Did you find an issue?
+  </a>
+</div>
+
+<div class="coffee-me_button">
+  <CoffeeButton />
+</div>
+
+<style>
+  ul {
+    padding: 0;
+    list-style: none;
+  }
+
+  .community a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .contribute {
+    margin-top: 1rem;
+    font-size: var(--sl-text-h5);
+  }
+
+  .btn__mistake {
+    display: inline-block;
+    margin-top: 0.5rem;
+    border: 1px solid var(--sl-color-gray-1);
+    border-radius: 1rem;
+    background-color: transparent;
+    cursor: pointer;
+    font-size: var(--sl-text-xs);
+    padding: 0.25rem 0.75rem;
+    width: fit-content;
+  }
+
+  .btn__mistake:hover,
+  .btn__mistake:focus {
+    background-color: var(--sl-color-gray-7);
+  }
+
+  .btn__mistake:focus:not(:focus-visible) {
+    background-color: transparent;
+  }
+
+  .coffee-me_button {
+    margin-top: 1.5rem;
+  }
+</style>
