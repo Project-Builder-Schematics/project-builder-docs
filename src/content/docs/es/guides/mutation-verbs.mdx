@@ -30,6 +30,7 @@ directivas `create`/`copyIn` por entrada — tiene [su propia guía](/es/guides/
 | [`move`](#move) | Un movimiento a otro directorio | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
 | [`copy`](#copy) | Una copia de árbol a árbol | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
 | [`copyIn`](#copyin) | Un archivo local del paquete copiado al árbol **tal cual** | `void` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+| [`modify`](#modify--la-mutación-estructural) | Una edición estructural, consciente del AST — se alcanza **a través de los dialectos** | handle de dialecto | El destino debe existir y parsear |
 
 Los verbos que escriben en una ruta nueva son fail-closed ante colisiones (ante la duda,
 rechazan en lugar de sobrescribir) y aceptan `{ force: true }` para una sobrescritura
@@ -231,6 +232,32 @@ staging del contenido árbol-a-árbol sobre el que el fake puede encadenar) es d
 - Una colisión en el destino sin `{ force: true }` rechaza con `reason: "path-collision"`,
   `verb: "copyIn"` — el autor nunca llamó a `copy`, pero la etiqueta igualmente nombra la
   llamada realmente infractora.
+
+## `modify` — la mutación estructural
+
+La octava mutación es la que no viene de `@pbuilder/sdk/commons` — y es así por diseño.
+Todos los verbos anteriores tratan un archivo como **texto**; `modify` es una edición
+**estructural**, y para editar un archivo estructuralmente primero hay que entenderlo, lo
+que significa parsearlo a un AST. Ese entendimiento vive en los
+[dialectos](/es/guides/typescript-and-react/):
+
+```ts
+import * as ts from "@pbuilder/sdk/typescript";
+
+await ts.find("src/index.ts")
+  .addImport("readFileSync", "node:fs")   // op estructural con nombre
+  .modify((ast) => {                       // escape para todo lo demás
+    /* toda la superficie de ts-morph */
+  });
+```
+
+Sea cual sea la forma en que lo escribas — una op con nombre como `addImport` o el escape
+`.modify()` — toda la cadena se fusiona y llega al engine como **una sola instrucción
+`modify` con el contenido final del archivo**. El engine nunca ve el AST. `replaceContent`
+baja a la misma mutación de wire, y por eso sus errores reportan `verb: "modify"`.
+
+Consulta [Dialectos de TypeScript y React](/es/guides/typescript-and-react/) para la
+superficie completa.
 
 ## Fuentes locales del paquete
 

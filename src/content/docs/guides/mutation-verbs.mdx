@@ -29,6 +29,7 @@ entry — it has [its own guide](/guides/scaffolding/).)
 | [`move`](#move) | A move to a different directory | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
 | [`copy`](#copy) | A tree-to-tree copy | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
 | [`copyIn`](#copyin) | A package-local file copied into the tree **verbatim** | `void` | Rejects (`path-collision`) unless `{ force: true }` |
+| [`modify`](#modify--the-structural-mutation) | A structural, AST-aware edit — reached **through dialects** | dialect handle | Target must exist and parse |
 
 The verbs that write to a new path are fail-closed on collision and accept `{ force: true }`
 for a deliberate overwrite — `create` inside its options object, the rest as a trailing
@@ -227,6 +228,31 @@ can chain over) is deliberate.
 - A destination collision without `{ force: true }` rejects `reason: "path-collision"`,
   `verb: "copyIn"` — the author never called `copy`, but the label still names the actual
   offending call.
+
+## `modify` — the structural mutation
+
+The eighth mutation is the one that doesn't come from `@pbuilder/sdk/commons` — and that's
+by design. Every verb above treats a file as **text**; `modify` is a **structural** edit,
+and to edit a file structurally you first have to understand it, which means parsing it
+into an AST. That understanding lives in the [dialects](/guides/typescript-and-react/):
+
+```ts
+import * as ts from "@pbuilder/sdk/typescript";
+
+await ts.find("src/index.ts")
+  .addImport("readFileSync", "node:fs")   // named structural op
+  .modify((ast) => {                       // escape hatch for anything else
+    /* full ts-morph surface */
+  });
+```
+
+Whichever way you author it — a named op like `addImport` or the `.modify()` escape hatch —
+the whole chain coalesces and reaches the engine as **one `modify` instruction carrying the
+final file content**. The engine never sees the AST. `replaceContent` lowers to the same
+wire mutation, which is why its errors report `verb: "modify"`.
+
+See [TypeScript & React Dialects](/guides/typescript-and-react/) for the full authoring
+surface.
 
 ## Package-local sources
 
