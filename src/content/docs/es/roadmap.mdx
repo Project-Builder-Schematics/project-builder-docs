@@ -1,0 +1,44 @@
+---
+title: Roadmap
+description: De schematics locales a un orquestador completo — los cuatro niveles de Project Builder, dónde estamos hoy y cómo los workbenches prueban cada paso.
+sidebar:
+  order: 1
+---
+
+Project Builder se construye por **niveles**, y el orden es deliberado: cada nivel se
+apoya en las garantías del anterior. Primero el determinismo; la composición, la
+distribución y la orquestación solo tienen sentido cuando la base está probada.
+
+![Diagrama del roadmap con cuatro niveles ascendentes: nivel 1, schematics locales, marcado con un pin de "estamos aquí" y una tarjeta de workbenches que indica que se está probando en el campo; nivel 2, schematics interconectados; nivel 3, schematics externos de fuentes privadas o públicas; y nivel 4, Project Builder como orquestador de schematics.](../../../assets/roadmap.svg)
+
+## Nivel 1 — Schematics locales *(estamos aquí)*
+
+Todo lo que esta documentación cubre hoy: crear schematics tipados, testeables y
+deterministas, y ejecutarlos dentro de tu propio repositorio — los siete verbos de
+mutación, las plantillas, los dialectos basados en AST y el harness de testing en
+memoria.
+
+Y aquí está la parte que importa: el nivel 1 no solo está **construido** — se está
+**probando**. Los [workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/)
+son proyectos reales ejecutando schematics reales, midiendo su efectividad en el campo
+antes de que arranque el siguiente nivel. La vara no es "terminado"; es *demostrablemente
+efectivo*.
+
+## Nivel 2 — Schematics interconectados
+
+Schematics que componen: un schematic invocando a otros, encadenando la generación en
+flujos más grandes. La garantía de determinismo se extiende a toda la cadena — una
+ejecución compuesta sigue siendo todo-o-nada, sigue siendo reproducible.
+
+## Nivel 3 — Schematics externos
+
+Consumir schematics más allá de tu propio repositorio — registros privados para tu
+organización, paquetes públicos para el ecosistema. Los patrones probados de tu equipo se
+vuelven bloques instalables.
+
+## Nivel 4 — Project Builder
+
+La visión completa, y el nombre del proyecto por una razón: un **orquestador de
+schematics que es, a su vez, fácil de orquestar**. Pipelines de generación que atraviesan
+proyectos y equipos — con la misma garantía que se sostiene desde el nivel 1: mismo input,
+mismos bytes.

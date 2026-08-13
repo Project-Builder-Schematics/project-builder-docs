@@ -12,6 +12,11 @@ export default defineConfig({
 			title: 'Project Builder',
 			description:
 				'Documentation for Project Builder — build, extend, and automate project scaffolding with schematics.',
+			defaultLocale: 'root',
+			locales: {
+				root: { label: 'English', lang: 'en' },
+				es: { label: 'Español', lang: 'es' },
+			},
 			logo: {
 				src: './src/assets/logo.svg',
 			},
@@ -64,18 +69,31 @@ export default defineConfig({
 			sidebar: [
 				{
 					label: 'Start Here',
+					translations: { es: 'Primeros pasos' },
 					collapsed: false,
 					items: [{ autogenerate: { directory: 'getting-started' } }],
 				},
 				{
 					label: 'Guides',
+					translations: { es: 'Guías' },
 					collapsed: false,
 					items: [{ autogenerate: { directory: 'guides' } }],
 				},
 				{
 					label: 'Reference',
+					translations: { es: 'Referencia' },
 					collapsed: false,
 					items: [{ autogenerate: { directory: 'reference' } }],
+				},
+				{
+					label: 'Roadmap',
+					translations: { es: 'Roadmap' },
+					link: '/roadmap/',
+				},
+				{
+					label: 'Workbenches ↗',
+					link: 'https://hyperxq.github.io/Project-Builder-workbenches-/',
+					attrs: { target: '_blank' },
 				},
 			],
 		}),

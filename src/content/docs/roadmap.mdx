@@ -1,0 +1,42 @@
+---
+title: Roadmap
+description: From local schematics to a full orchestrator — the four levels of Project Builder, where we are today, and how workbenches prove each step.
+sidebar:
+  order: 1
+---
+
+Project Builder is being built in **levels**, and the order is deliberate: each level
+builds on the guarantees of the one before it. Determinism comes first; composition,
+distribution, and orchestration only make sense once the foundation is proven.
+
+![Roadmap diagram with four ascending levels: level 1, local schematics, marked with a "we are here" pin and a workbenches card noting it is being proven in the field; level 2, interconnected schematics; level 3, external schematics from private or public sources; and level 4, Project Builder as an orchestrator of schematics.](../../assets/roadmap.svg)
+
+## Level 1 — Local schematics *(we are here)*
+
+Everything these docs cover today: authoring typed, testable, deterministic schematics
+and running them inside your own repository — the seven mutation verbs, templates,
+AST-aware dialects, and the in-memory testing harness.
+
+And here's the part that matters: level 1 isn't just **built** — it's being **proven**.
+The [workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/) are real
+projects running real schematics, measuring effectiveness in the field before the next
+level starts. Done is not the bar; *demonstrably effective* is.
+
+## Level 2 — Interconnected schematics
+
+Schematics that compose: one schematic invoking others, chaining generation into larger
+flows. The determinism guarantee extends across the chain — a composed run is still
+all-or-nothing, still reproducible.
+
+## Level 3 — External schematics
+
+Consuming schematics beyond your own repository — private registries for your
+organization, public packages for the ecosystem. Your team's proven patterns become
+installable building blocks.
+
+## Level 4 — Project Builder
+
+The full vision, and the name of the project for a reason: an **orchestrator of
+schematics that is, itself, easy to orchestrate**. Pipelines of generation spanning
+projects and teams — with the same guarantee that has held since level 1: same input,
+same bytes.

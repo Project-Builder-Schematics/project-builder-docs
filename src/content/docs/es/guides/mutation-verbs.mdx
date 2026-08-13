@@ -1,0 +1,324 @@
+---
+title: Verbos de mutación
+description: Los siete verbos de autoría con los que un factory muta el árbol, más la lectura con find().read() — firmas, ejemplos y las reglas de idempotencia que hacen seguro re-ejecutar un factory.
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Todos los verbos de autoría viven en `@pbuilder/sdk/commons` — el mismo punto de entrada desde
+el que importa cada schematic. Cada verbo **agenda** una directiva; nada toca el disco hasta que
+el run hace flush (en el siguiente `read()`, o al final del run). Las escrituras a disco ocurren
+solo en la fase de apply del engine, después de que tu factory retorna — un error lanzado antes
+del retorno significa que no se escribe absolutamente nada.
+
+Los siete verbos comparten una única unión cerrada de etiquetas `AuthoringVerb`: `create`,
+`replaceContent`, `remove`, `rename`, `move`, `copy` y `copyIn` — este último un hermano
+por-referencia de `copy` que copia directamente desde el paquete en lugar de renderizar una
+plantilla. (`scaffold` es una octava mutación, distribuida por separado, que se expande en
+directivas `create`/`copyIn` por entrada — tiene [su propia guía](/es/guides/scaffolding/).)
+
+## De un vistazo
+
+| Verbo | Qué agenda | Retorna | Sobre un destino existente |
+|---|---|---|---|
+| [`create`](#create) | Un archivo nuevo, renderizado desde una plantilla | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+| [`replaceContent`](#replacecontent) | Reemplazo total del contenido de un archivo **existente** | `WritableHandle` | El destino **debe** existir — `path-not-found` en caso contrario |
+| [`remove`](#remove) | La eliminación de un archivo | `void` | Idempotente — nunca rechaza |
+| [`rename`](#rename) | Un renombrado solo del basename | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+| [`move`](#move) | Un movimiento a otro directorio | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+| [`copy`](#copy) | Una copia de árbol a árbol | `WritableHandle` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+| [`copyIn`](#copyin) | Un archivo local del paquete copiado al árbol **tal cual** | `void` | Rechaza (`path-collision`) salvo con `{ force: true }` |
+
+Los verbos que escriben en una ruta nueva son fail-closed ante colisiones (ante la duda,
+rechazan en lugar de sobrescribir) y aceptan `{ force: true }` para una sobrescritura
+deliberada — `create` dentro de su objeto de opciones, el resto como argumento final. Los
+rechazos aparecen como un `AuthoringError` estructurado — consulta la
+[guía de manejo de errores](/es/guides/error-handling/).
+
+## `create`
+
+```ts
+function create<S>(
+  path: string,
+  opts: { template: string; options: { [K in keyof S]: S[K] }; force?: boolean }
+): WritableHandle;
+function create(path: string, opts: { template: string; options: JsonValue; force?: boolean }): WritableHandle;
+function create(
+  path: string,
+  opts: { templateFile: string; options: JsonValue; force?: boolean }
+): WritableHandle;
+```
+
+Agenda una directiva de creación de archivo y retorna un `WritableHandle` para encadenar.
+`path` y `template` son ambos **strings de plantilla**, renderizados de forma independiente
+contra el mismo `options`; el mini-lenguaje de plantillas completo (delimitadores, los 7 pipes,
+loops, condicionales) vive en [la guía de plantillas](/es/guides/templates/) — esta página solo
+cubre la llamada en sí. El overload genérico `S` restringe `options` a las claves de un schema
+únicamente a nivel de tipos; el comportamiento en runtime es idéntico al overload plano.
+
+```ts
+import { create } from "@pbuilder/sdk/commons";
+
+create("src/index.ts", {
+  template: "export const version = '{= .version =}';",
+  options: { version: "1.0.0" },
+});
+```
+
+El tercer overload sustituye el string `template` inline por `templateFile` — una ruta local
+del paquete (resuelta contra el `packageDir` del run), leída en el momento de emisión; su
+contenido se convierte en el mismo campo `template` que el engine renderiza:
+
+```ts
+// Overload templateFile — lee la plantilla desde disco en lugar de escribirla inline
+create("src/index.ts", {
+  templateFile: "index.ts.template",
+  options: { version: "1.0.0" },
+});
+```
+
+<Aside type="tip">
+**Pasa siempre `options: {}`**, incluso cuando la plantilla no tiene tokens. El tipo lo exige —
+y en sitios de llamada sin tipar (JS plano, `any`) omitirlo pone `undefined` en el batch de
+directivas, rechazando la escritura como irrepresentable.
+</Aside>
+
+**Semántica de bordes y errores:**
+
+- Una ruta de destino existente rechaza salvo que se pase `{ force: true }` (fail-closed ante
+  sobrescrituras) — `AuthoringError` con `verb: "create"`, `reason: "path-collision"`.
+- `templateFile` solo es usable dentro de un run iniciado con `packageDir` — de lo contrario no
+  hay ancla de resolución (`reason: "invalid-input"`, nunca un fallback silencioso al cwd). El
+  CLI pasa `packageDir` automáticamente; en tests lo pasas tú (consulta
+  [Testing](/es/getting-started/testing/)).
+- Un `templateFile` que es binario (un byte nulo o UTF-8 inválido en cualquier parte del
+  archivo) o mayor que el límite de renderizado inline de 4 MiB falla ruidosamente con
+  `reason: "invalid-input"` — nunca cae silenciosamente a una copia por-referencia.
+- Un `templateFile` que falta, no es un archivo regular o no se puede leer produce
+  `reason: "source-not-found" | "source-not-regular-file" | "source-unreadable"` — las mismas
+  tres razones que `copyIn` y `scaffold` comparten para sus propias lecturas locales del
+  paquete. Un segmento literal `../` o una ruta absoluta en `templateFile` rechaza con
+  `reason: "invalid-input"`, antes de cualquier lectura (consulta la
+  [regla de fuentes locales del paquete](#fuentes-locales-del-paquete) más abajo).
+
+## `replaceContent`
+
+```ts
+function replaceContent(path: string, content: string): WritableHandle;
+```
+
+Agenda un reemplazo total, in-place, del contenido de un archivo **existente** — `content` es
+un string crudo, no una plantilla. Un run rechazado (el destino no existe, `reason:
+"path-not-found"`) lanza `AuthoringError`.
+
+```ts
+import { replaceContent } from "@pbuilder/sdk/commons";
+
+replaceContent("src/config.json", '{ "version": "2.0.0" }');
+```
+
+<Aside type="note">
+Un `.replaceContent()` rechazado reporta `verb: "modify"` en su `AuthoringError`, no
+`"replaceContent"` — se traduce a la misma mutación de wire que el escape `.modify(fn)` de un
+handle de dialecto (consulta [Dialectos de TypeScript y React](/es/guides/typescript-and-react/)).
+Es deliberado, no un renombrado obsoleto — los detalles están en la
+[guía de manejo de errores](/es/guides/error-handling/).
+</Aside>
+
+## `remove`
+
+```ts
+function remove(path: string): void;
+```
+
+Agenda la eliminación de un archivo. Idempotente: eliminar un archivo ausente no es un error —
+en la práctica `remove` nunca rechaza.
+
+```ts
+import { remove } from "@pbuilder/sdk/commons";
+
+remove("src/legacy.ts");
+```
+
+## `rename`
+
+```ts
+function rename(path: string, newName: string, opts?: { force?: boolean }): WritableHandle;
+```
+
+Agenda un renombrado solo del basename, retornando un handle para la nueva ruta (el directorio
+no cambia — solo se reemplaza el último segmento de la ruta). Renombrar sobre una ruta
+existente se rechaza salvo que se pase `{ force: true }` — `reason: "path-collision"`.
+
+```ts
+import { rename } from "@pbuilder/sdk/commons";
+
+rename("src/foo.ts", "bar.ts");
+```
+
+## `move`
+
+```ts
+function move(path: string, toDir: string, opts?: { force?: boolean }): WritableHandle;
+```
+
+Agenda un movimiento a otro directorio, retornando un handle para la nueva ubicación. Mover
+sobre un destino existente se rechaza salvo con `{ force: true }` (`reason:
+"path-collision"`); un movimiento cuyo destino es igual a su origen es un no-op, nunca una
+colisión.
+
+```ts
+import { move } from "@pbuilder/sdk/commons";
+
+move("src/utils/helper.ts", "src/shared");
+```
+
+## `copy`
+
+```ts
+function copy(from: string, to: string, opts?: { force?: boolean }): WritableHandle;
+```
+
+Agenda una copia de árbol a árbol, retornando un handle sobre el que puedes encadenar más
+ediciones — el harness fake de tests hace staging de su contenido, así que un `.read()`
+encadenado sobre el handle retornado lo ve. Copiar sobre un destino existente se rechaza salvo
+con `{ force: true }` (`reason: "path-collision"`).
+
+```ts
+import { copy } from "@pbuilder/sdk/commons";
+
+copy("src/template.ts", "src/generated/output.ts");
+```
+
+## `copyIn`
+
+```ts
+function copyIn(from: string, to: string, opts?: { force?: boolean }): void;
+```
+
+Copia UN archivo local del paquete (`from`, resuelto contra el `packageDir` del run) al árbol,
+siempre por-referencia — nunca se clasifica ni se renderiza, incluso cuando la fuente es texto
+plano que contiene secuencias con aspecto de plantilla. Es el hermano de `copy` para fuentes
+locales del paquete; contrástalo con `create({ templateFile })`, que explícitamente
+**renderiza** una fuente local del paquete.
+
+```ts
+import { copyIn } from "@pbuilder/sdk/commons";
+
+copyIn("assets/logo.svg", "src/generated/logo.svg");
+```
+
+<Aside type="note">
+A diferencia de `copy`, `copyIn` retorna `void`, no un `WritableHandle`: los bytes de un
+destino por-referencia existen solo después de que el engine aplica la directiva — el harness
+fake de tests nunca los materializa, así que un handle encadenando sobre contenido del árbol
+mentiría sobre contenido que nunca pasó por staging. Esta asimetría con `copy` (que *sí* hace
+staging del contenido árbol-a-árbol sobre el que el fake puede encadenar) es deliberada.
+</Aside>
+
+**Semántica de bordes y errores:**
+
+- `from`/`to` son obligatorios — si falta alguno, rechaza con `reason: "invalid-input"` antes
+  de cualquier emisión.
+- Solo es usable dentro de un run iniciado con `packageDir` — de lo contrario
+  `reason: "invalid-input"`, nunca un fallback al cwd.
+- La fuente se filtra léxicamente (`../`/absoluta rechaza `reason: "invalid-input"` antes de
+  leer), luego se valida su existencia y que sea un archivo regular, produciendo `reason:
+  "source-not-found" | "source-not-regular-file" | "source-unreadable"` — las mismas tres
+  razones que comparten `create({ templateFile })` y `scaffold`.
+- Una colisión en el destino sin `{ force: true }` rechaza con `reason: "path-collision"`,
+  `verb: "copyIn"` — el autor nunca llamó a `copy`, pero la etiqueta igualmente nombra la
+  llamada realmente infractora.
+
+## Fuentes locales del paquete
+
+`create({ templateFile })`, `copyIn` y `scaffold` leen cada uno una fuente que vive en el disco
+del propio paquete, resuelta contra el `packageDir` del run. La regla para el autor:
+
+> el SDK rechaza rutas de fuente con `../` léxico o absolutas, siempre; todo lo que un
+> schematic lee vive dentro de su paquete.
+
+El SDK filtra la forma *literal* de la ruta (sin segmento `..`, sin forma absoluta) antes de
+tocar el disco — los symlinks se siguen sin verificar su destino, un residuo deliberado y
+documentado, cubierto en el `SECURITY.md` del SDK, no un descuido.
+
+## Leer archivos: `find(path).read()`
+
+`find(path)` localiza un archivo existente y retorna un handle para leerlo o eliminarlo.
+`read()` se resuelve exactamente a uno de tres estados — nunca un chequeo de truthiness:
+
+- **`absent`** — la ruta no existe. `read()` se resuelve a `undefined`.
+- **`empty`** — el archivo existe pero su contenido es exactamente el string vacío `""`.
+- **`present`** — cualquier otro string, incluidos los de aspecto falsy como `"0"` o `"false"`.
+
+```ts
+import { find, create, replaceContent } from "@pbuilder/sdk/commons";
+
+const content = await find("src/config.ts").read();
+if (content === undefined) {
+  create("src/config.ts", { template, options });
+} else if (content === "") {
+  replaceContent("src/config.ts", seedContent);
+} else {
+  replaceContent("src/config.ts", patch(content));
+}
+```
+
+<Aside type="caution">
+Ramifica sobre los tres resultados con comparaciones estrictas `=== undefined` / `=== ""` —
+nunca `if (!content)`, que fusiona silenciosamente `undefined`, `""`, `"0"` y `"false"`.
+</Aside>
+
+`classifyContent()` (también exportado desde `@pbuilder/sdk/commons`) nombra la tricotomía
+directamente, para un `switch` exhaustivo en lugar de comparaciones manuales:
+
+```ts
+import { classifyContent } from "@pbuilder/sdk/commons";
+
+switch (classifyContent(content)) {
+  case "absent":
+    // ...
+    break;
+  case "empty":
+    // ...
+    break;
+  case "present":
+    // ...
+    break;
+}
+```
+
+Las lecturas vienen del **árbol de staging** del engine, no del disco — así que leer una ruta
+que creaste antes en el mismo run ve el contenido en staging. Esa relectura es lo que convierte
+un schematic en una conversación: ediciones idempotentes y conscientes del contenido en lugar
+de sobrescrituras a ciegas.
+
+## Verifica antes de mutar
+
+Los factories se re-ejecutan contra proyectos ya generados, así que las mutaciones deben ser
+**idempotentes**: comprueba si tu marcador, import o entrada ya está presente antes de
+insertarlo. Los verbos están construidos para esta disciplina —
+
+- `create` es fail-closed sobre una ruta existente (`path-collision`): una re-ejecución nunca
+  pisa silenciosamente la salida anterior. Recurre a `{ force: true }` solo cuando sobrescribir
+  es la intención.
+- `find().read()` te dice exactamente en qué estado está el árbol, para que puedas ramificar:
+  crear cuando está ausente, sembrar cuando está vacío, parchear cuando está presente — el
+  ejemplo de la tricotomía de arriba es la forma canónica.
+- `remove` ya es idempotente; una re-ejecución que elimina un archivo ya eliminado es un no-op.
+
+Un factory de producción que agrega a una lista, por ejemplo, también omitiría el agregado
+cuando la entrada ya está listada — lee el contenido, comprueba la entrada, y solo entonces
+`replaceContent`. La [guía de testing](/es/getting-started/testing/) muestra cómo verificar la
+idempotencia con árboles sembrados.
+
+## Próximos pasos
+
+- [Plantillas](/es/guides/templates/) — el mini-lenguaje `{= =}` con el que `create` renderiza.
+- [Scaffolding](/es/guides/scaffolding/) — replica una carpeta entera de plantillas con `scaffold`.
+- [Dry-run](/es/guides/dry-run/) — previsualiza los cambios planificados de un factory antes de
+  que algo se confirme.
+- [Manejo de errores](/es/guides/error-handling/) — cómo luce `AuthoringError` y cómo escribir
+  aserciones contra él.

@@ -1,0 +1,100 @@
+---
+title: Cómo funciona
+description: La conversación SDK–engine, los registros de instrucciones, la historia de los AST y el puente agnóstico del lenguaje que hacen posible la mutación determinista de archivos.
+sidebar:
+  order: 2
+---
+
+Mutar archivos de forma confiable siempre ha sido la parte complicada de la generación de
+código. Project Builder lo vuelve simple repartiendo el trabajo entre tres partes con
+responsabilidades claramente delimitadas — y dejando que dos de ellas mantengan una
+conversación.
+
+## La conversación SDK–engine
+
+![Diagrama de secuencia de la conversación SDK–engine: el engine lanza el runner del SDK con el factory y la entrada del usuario y envía un único mensaje ready; el factory encadena mutaciones que se acumulan en el buffer como directivas; ante una lectura, el buffer hace flush hacia el engine como un lote ir.emit que se aplica de inmediato al árbol de staging, seguido de tree.read y su respuesta; cuando el factory retorna, un flush final e ir.commit cierran la ejecución y la fase de aplicación del engine escribe el resultado preparado en disco.](../../../../assets/sdk-engine-flow.svg)
+
+### SDK — registros de instrucciones y experiencia de desarrollo
+
+El **SDK** (`@pbuilder/sdk`) tiene dos responsabilidades. Primero, produce **IR —
+registros de instrucciones**: directivas JSON que describen *qué debe suceder* («crea este
+archivo con este contenido», «mueve este otro allá»). Tu factory nunca escribe en tu
+proyecto; emite intención. Segundo, es dueño de la **experiencia de desarrollo**:
+[verbos de mutación](/es/guides/mutation-verbs/) tipados, [plantillas](/es/guides/templates/),
+[dialectos](/es/guides/typescript-and-react/) y el harness de testing — todo para que algo
+históricamente tan doloroso como la mutación de archivos se sienta simple.
+
+El SDK y el engine mantienen una **conversación**. Las directivas no cruzan una por una: a
+medida que tu factory encadena mutaciones, estas se acumulan en un buffer dentro del SDK,
+y el buffer hace **flush** (vaciado del buffer) hacia el engine como un único lote en
+exactamente dos momentos — cuando el factory termina, o en el instante en que lees un
+archivo, de modo que una lectura siempre ve primero tus propias escrituras pendientes.
+
+### Engine — aplicar los registros
+
+El **engine** recibe esos registros de instrucciones y los aplica, con varios mecanismos
+para hacerlo de forma segura: todo aterriza en un árbol de staging mientras tu factory
+corre, y solo después de que el factory retorna con éxito se escribe en disco el resultado
+preparado. El engine es el único componente que escribe — y una ejecución fallida no
+escribe nada.
+
+El engine es **ciego a los AST y a la API de autoría**. No sabe qué es un verbo ni un
+dialecto — las ediciones de código le llegan como contenido final de archivo, listo para
+aplicar. Su única tarea de autoría es renderizar las [plantillas `{= =}`](/es/guides/templates/)
+contra tus entradas. Esa ignorancia es una virtud: la superficie del SDK puede
+enriquecerse sin que el contrato de ejecución cambie jamás.
+
+### CLI — la superficie orientada a agentes
+
+La **CLI `builder`** es la puerta de entrada: `init`, `new`, `execute`. Valida tu entrada,
+resuelve el schematic y arranca el engine — que es dueño de la ejecución desde ahí. La CLI
+está diseñada deliberadamente para que la manejen agentes de IA: la salida regresa como
+JSON estructurado, así que un agente puede ejecutar un schematic y parsear el resultado
+como cualquier otra API.
+
+## La historia de los AST
+
+He aquí una simplificación extrema — pero útil —: **escribir software, en el día a día, es
+mutar archivos.** Y un archivo es solo texto; la extensión es lo que le da significado a
+ese texto.
+
+Visto así, la mayoría de las mutaciones son simples: crear, reemplazar, mover y copiar
+tratan el archivo como texto y nunca necesitan saber qué significa. La excepción es
+`modify`. Para cambiar un archivo programáticamente primero tienes que **entenderlo** — y
+la manera en que un programa entiende un archivo es a través de un **AST** (árbol de
+sintaxis abstracta).
+
+Aquí está el problema: cada tipo de archivo tiene su propia librería de parsing, y los AST
+que producen nunca se parecen entre sí — ninguno sigue una convención compartida. Sin
+ayuda, cada autor de schematics tendría que elegir librerías, instalarlas y aprender la
+forma del árbol de cada una.
+
+El SDK lo resuelve **centralizando los AST**: se apoya en esas librerías y las expone como
+dialectos listos para usar — TypeScript y React hoy, con más tipos de archivo (HTML, CSS)
+y dialectos de frameworks (Angular, Vue, Svelte) en el plan. No instalas nada extra; ya
+forman parte del SDK.
+
+La frontera se mantiene limpia: **los AST pertenecen al SDK.** Para cuando una edición de
+AST llega al engine, ya fue reducida a un registro plano y listo para aplicar — el engine
+nunca parsea código.
+
+## Bajo el capó: un engine que habla el protocolo, no el lenguaje
+
+El SDK es TypeScript; el engine es Go. Se comunican a través de un puente deliberadamente
+delgado: el engine ejecuta un **sidecar de Bun** mediante un adaptador, y ese sidecar
+arranca el **runner** del SDK — el punto de entrada que carga tu factory y abre la
+conversación. A partir de ahí, todo lo que cruza entre ambos es **JSON enmarcado** (framed
+JSON) por el cable: `ir.emit`, `tree.read`, `ir.commit`, `ir.discard`.
+
+![Diagrama del puente entre lenguajes: la CLI builder arranca el engine en Go, que habla JSON enmarcado por stdin/stdout a través de un adaptador de Bun con el runner del SDK en TypeScript, donde viven el factory y los AST; unas cajas atenuadas muestran futuros SDK en Python o cualquier otro lenguaje conectándose al mismo protocolo con un adaptador nuevo, y un panel inferior señala que el SDK es autocontenido, de modo que las pruebas corren sin CLI, sin engine y sin disco.](../../../../assets/sdk-engine-bridge.svg)
+
+De este diseño se desprenden dos propiedades:
+
+- **El engine es agnóstico del lenguaje.** No habla TypeScript — habla el protocolo del
+  cable. Un SDK en Python, Rust o cualquier otro lenguaje solo necesita un adaptador
+  nuevo; el engine, el árbol de staging y las garantías de seguridad se mantienen
+  exactamente iguales.
+- **El SDK es autocontenido.** Todo lo que un factory produce es IR, así que el harness de
+  testing puede sustituir por completo al lado del engine y ejecutar factories enteramente
+  en memoria — sin CLI, sin engine, sin disco. Por eso los schematics son testeables como
+  cualquier otro código.

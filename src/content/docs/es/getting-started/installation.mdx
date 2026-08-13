@@ -1,0 +1,65 @@
+---
+title: Instalación
+description: Instala la CLI builder con Homebrew o un tarball, agrega Bun como runtime de los schematics e incorpora el SDK a tu proyecto.
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Necesitas dos cosas en tu máquina: la **CLI `builder`** (que incluye el engine) y
+**[Bun](https://bun.sh)**, el runtime en el que se ejecutan los schematics. El SDK en sí
+se agrega por proyecto — normalmente de forma automática.
+
+Esta guía fue verificada contra la CLI **0.6.0** y el SDK **0.2.x**.
+
+## macOS / Linux
+
+Con [Homebrew](https://brew.sh) instalado, obtén la CLI (el binario `builder`) desde el
+tap:
+
+```sh
+brew install project-builder-schematics/tap/pbuilder
+```
+
+<Aside type="caution" title="Linux / WSL2">
+Esto requiere un Homebrew reciente — la instalación del cask está verificada en Homebrew
+6.x; las versiones anteriores rechazan casks en Linux.
+</Aside>
+
+¿No tienes Homebrew? Descarga el tarball de tu plataforma desde los
+[releases del tap](https://github.com/Project-Builder-Schematics/homebrew-tap/releases)
+(`pbuilder_<version>_linux_amd64.tar.gz` y compañía) y coloca `builder` en tu `PATH` —
+sin necesidad de brew.
+
+Los schematics se ejecutan a través de un sidecar de [Bun](https://bun.sh), así que Bun
+también debe estar instalado:
+
+```sh
+brew install oven-sh/bun/bun   # o bien: curl -fsSL https://bun.sh/install | bash
+```
+
+<Aside type="note">
+Bun es únicamente el runtime de los schematics — tu proyecto conserva el gestor de
+paquetes y las herramientas que ya usa (npm, pnpm, yarn, …).
+</Aside>
+
+## Windows
+
+<Aside type="caution" title="Aún sin soporte">
+Las builds de la CLI para Windows están en el roadmap; mientras tanto, la vía soportada en
+Windows es WSL2 (Ubuntu), usando las instrucciones de Linux de arriba.
+</Aside>
+
+## El SDK en sí
+
+Normalmente no lo instalas a mano — `builder init` agrega `@pbuilder/sdk` a las
+`devDependencies` de tu proyecto automáticamente. Para agregarlo manualmente, usa el
+gestor de paquetes que tu proyecto ya utilice:
+
+```sh
+npm install -D @pbuilder/sdk    # o bien: pnpm add -D / yarn add -D / bun add -d
+```
+
+Con la CLI y Bun en su lugar, estás listo para
+[tu primer schematic](/es/getting-started/your-first-schematic/).

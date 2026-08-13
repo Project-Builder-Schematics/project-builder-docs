@@ -1,0 +1,206 @@
+---
+title: Dialectos de TypeScript y React
+description: Haz ediciones conscientes del AST sobre archivos TypeScript y TSX con los dialectos incorporados — imports idempotentes, ops estructuradas y el escape .modify().
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Cuando la mutación a nivel de string no alcanza — "agrega un import a este módulo", "asigna una
+prop a este elemento JSX" — los **dialectos** proveen operaciones estructuradas y conscientes
+del AST para un tipo de archivo. Un dialecto nunca edita texto con buscar-y-reemplazar: parsea
+el archivo a un **AST**, muta el árbol e imprime el resultado de vuelta. Cada tipo de archivo
+recibe la librería de AST que mejor le calza — los dos dialectos que se distribuyen hoy,
+`@pbuilder/sdk/typescript` y `@pbuilder/sdk/react`, están ambos construidos sobre el AST propio
+de TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática.
+
+## Cómo funciona un handle de dialecto
+
+El punto de entrada de un dialecto es su propio `find(path)`: abre un **handle coalescente y
+awaitable**. Cada op que encadenas muta el mismo AST vivo, y el handle se serializa a
+exactamente **una** directiva estilo `replaceContent` cuando hace flush — encadenar tres ops no
+produce tres escrituras.
+
+```ts
+import * as ts from "@pbuilder/sdk/typescript";
+
+await ts.find("src/index.ts")
+  .addImport("readFileSync", "node:fs")
+  .addFunction("hi", "(): void {}", { export: true });
+```
+
+Una lectura (`.read()` sobre el handle, o cualquier lectura sobre cualquier ruta) drena primero
+la directiva abierta; una cadena con una lectura a mitad de cadena produce exactamente dos
+directivas, acumulativas — ninguna edición se pierde.
+
+El handle es un **thenable** — la única desviación asíncrona respecto de los verbos, por lo
+demás síncronos, del SDK. `await` no es requisito para la corrección: el límite del run drena
+todos los handles pendientes antes de que el run haga flush, así que un `await` olvidado
+igualmente confirma su edición, y una cadena que lanza igualmente hace aflorar su error
+contenido en el límite del run — nunca como un unhandled rejection. Haz `await` de la cadena tú
+mismo cuando necesites secuenciar una lectura después de tu propia escritura, o para observar un
+fallo localmente en tu propio `try`/`catch`.
+
+## El dialecto de TypeScript
+
+```ts
+import * as ts from "@pbuilder/sdk/typescript";
+
+await ts.find("src/index.ts")
+  .addImport("readFileSync", "node:fs")
+  .addFunction("hi", "(): void {}", { export: true });
+```
+
+| Op | Qué hace |
+|---|---|
+| `addImport(name, from)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente — llamarla dos veces nunca duplica el import. |
+| `removeImport(name, from)` | Elimina el binding nombrado; borra la sentencia completa cuando era el último. Idempotente sobre un binding ausente. |
+| `addFunction(name, source, opts?)` | Agrega una función de nivel superior al final. `source` **incluye** las llaves (`"(): void {}"`). |
+| `addVariable(name, initializer, opts?)` | Agrega una variable de nivel superior al final (`kind` por defecto es `const`). |
+| `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves — la op las agrega. |
+| `.modify(fn)` | El escape universal: acceso directo a [ts-morph](https://ts-morph.com) sobre el AST del archivo para todo lo que las ops nombradas no cubren. |
+
+Nota el contraste deliberado entre las dos convenciones de `source`:
+
+```ts
+// addFunction: source INCLUYE las llaves
+await ts.find("src/index.ts").addFunction("hi", "(): void {}", { export: true });
+// -> export function hi(): void {}
+
+// addClass: source EXCLUYE las llaves (la op las agrega)
+await ts.find("src/index.ts").addClass("Point", "  x = 0;");
+// -> class Point {\n  x = 0;\n}
+```
+
+`addVariable` emite `{export }{kind} {name} = {initializer};` — `kind` acepta `"const"` (por
+defecto), `"let"` o `"var"`:
+
+```ts
+await ts.find("src/index.ts").addVariable("counter", "0", { export: true, kind: "let" });
+// -> export let counter = 0;
+```
+
+**Reglas de colisión.** Las ops `add*` fallan ruidosamente ante una colisión de nombre con una
+declaración de valor o un binding de import existente — dos declaraciones de valor compartiendo
+un nombre es TypeScript inválido. Un `type`/`interface` que comparte el nombre **no** colisiona
+(TypeScript permite legalmente que un valor y un tipo compartan identificador).
+
+<Aside type="caution" title="Strings de source insertados tal cual">
+Los strings de `source`/`initializer` se insertan **tal cual** — nunca se validan ni se
+sanitizan — así que el autor es dueño de su sintaxis, y cualquier cosa derivada de entrada no
+confiable (opciones de schema, respuestas del CLI, datos de red) es responsabilidad del autor
+sanitizarla.
+</Aside>
+
+## El dialecto de React
+
+`@pbuilder/sdk/react` muta archivos `.tsx` — `find()` requiere la extensión `.tsx` explícita
+(las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El paquete de ops de la
+v1 es deliberadamente mínimo: dos ops estructuradas, con `.modify(fn)` como escape para todo lo
+demás:
+
+```ts
+import * as react from "@pbuilder/sdk/react";
+
+// src/Button.tsx antes: const el = <Button />;
+await react
+  .find("src/Button.tsx")
+  .addImport("handleClick", "./handlers")
+  .setJsxProp("Button", "onClick", "{handleClick}");
+// -> import { handleClick } from "./handlers";
+// -> const el = <Button onClick={handleClick} />;
+```
+
+| Op | Qué hace |
+|---|---|
+| `addImport(name, from)` | El mismo contrato que la del dialecto de TypeScript — idempotente, solo bindings nombrados (sin imports default ni de namespace en la v1). |
+| `setJsxProp(element, prop, value?)` | Asigna una prop en **el único** elemento con ese nombre de tag — cero o múltiples coincidencias rechazan ruidosamente. `value` toma tres formas: `'"hi"'` (string), `'{count}'` (expresión), u omitido (shorthand booleano). |
+
+Como `addImport` es solo de bindings nombrados, `addImport("React", "react")` siempre imprime
+`import { React } from "react"`, nunca `import React from "react"` — los imports default y de
+namespace son alcance futuro, no un descuido.
+
+Dos sutilezas específicas de React:
+
+- **Precedencia sobre spreads.** Una prop insertada aterriza después de un `{...spread}` final,
+  así que **gana** en runtime bajo la precedencia por posición posterior de React:
+  `<Button {...rest} />` más `setJsxProp("Button", "onClick", "{safe}")` imprime
+  `<Button {...rest} onClick={safe} />`, y `safe` gana incluso si `rest` también provee un
+  `onClick`.
+- **Rechazo por colisión.** `addImport` rechaza cuando `name` ya está ligado en otra parte del
+  archivo bajo un binding distinto — otro módulo, un alias del mismo módulo o un specifier
+  type-only, o una declaración de valor de nivel superior (`function`/`const`/`class`/…) que
+  comparte el nombre. No hay argumento de alias para esquivarlo; renombrar el binding existente
+  o elegir otro `name` corre por tu cuenta.
+
+<Aside type="caution" title="El límite de confianza de value">
+El `value` de `setJsxProp` se emite tal cual dentro de código ejecutable — el mismo límite de
+confianza que los strings `source` de TypeScript. El SDK no realiza validación, escapado ni
+sanitización sobre él. En contraste, `element` y `prop` son argumentos de nombre validados y no
+son un canal de código confiable.
+</Aside>
+
+## Idempotencia: seguro de re-ejecutar
+
+Los factories se re-ejecutan contra proyectos ya generados, y las ops de import están
+construidas para eso: `addImport` llamada dos veces con el mismo nombre y módulo nunca duplica
+la línea de import, y `removeImport` sobre un binding ausente es un no-op (cero directivas
+emitidas). Obtienes gestión de imports re-ejecutable sin escribir tu propio chequeo de "¿ya está
+ahí?".
+
+## `.modify()` — el escape universal
+
+Todo handle de dialecto lleva una op universal junto a sus ops nombradas: `.modify(ast => …)`.
+Tu callback recibe la **misma instancia viva del AST que mutan las ops nombradas** — un
+`SourceFile` de ts-morph — así que cualquier cosa que una op nombrada pueda hacer, `.modify()`
+también puede, sin esperar a que exista una op estructurada:
+
+```ts
+import * as ts from "@pbuilder/sdk/typescript";
+
+await ts.find("src/app.module.ts")
+  .addImport("BooksModule", "./books/books.module")
+  .modify((ast) => {
+    // toda la superficie de ts-morph disponible aquí — decoradores, argumentos de llamada, lo que sea
+    const imports = ast
+      .getClassOrThrow("AppModule")
+      .getDecoratorOrThrow("Module")
+      .getArguments()[0];
+    // …ediciones estructuradas que las ops nombradas aún no cubren
+  });
+```
+
+Como se une a la misma cadena coalescente, mezclar ops nombradas y `.modify()` en un mismo
+handle igualmente hace flush como una **única** escritura. Dos cosas a respetar:
+
+- **Opera solo sobre el `ast` que el callback te entrega.** Si tu schematic depende de ts-morph
+  directamente, ese es un *realm separado* del ts-morph interno del SDK — un `Node` o
+  `SourceFile` de tu propio import no es intercambiable con el AST del callback, incluso con la
+  versión idéntica de ts-morph. Nunca pases objetos de ts-morph a través de ese límite.
+- **`.modify()` corre con privilegio total del proceso — no es un sandbox.** Tus propios
+  callbacks son tu propia confianza; trata a los dialectos o paquetes de ops de terceros
+  construidos sobre él en consecuencia.
+
+<Aside type="note" title="Mezclar ops de AST con replaceContent">
+El `.replaceContent(content)` de un handle de dialecto rechaza mientras una op de AST (nombrada
+o `.modify()`) sigue pendiente en el mismo handle — la sobrescritura total perdería
+silenciosamente la edición en buffer. El escape documentado es `.read()`, que drena primero la
+edición pendiente:
+
+```ts
+const handle = ts.find("src/index.ts").addImport("readFileSync", "node:fs");
+await handle.read(); // drena la edición pendiente de addImport
+handle.replaceContent("new content"); // funciona — una edición secuencial legítima
+```
+</Aside>
+
+## Para ir más lejos
+
+Si no existe una op nombrada para lo que necesitas, recurre a `.modify()` — para eso está.
+
+La familia de dialectos está diseñada para crecer: está planificado el soporte para más tipos de
+archivo como **HTML y CSS** (cada uno respaldado por su propia librería de parser/AST), y
+dialectos conscientes del framework para **Angular, Vue y Svelte**. Construir un dialecto propio
+(nuevos tipos de archivo, paquetes de ops personalizados) es una superficie a nivel de
+contribuidor y se cubrirá en una futura sección avanzada de estos docs.

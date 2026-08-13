@@ -1,0 +1,96 @@
+---
+title: ¿Qué es Project Builder?
+description: Generación de código determinista diseñada para complementar a la IA — software consistente, tiempo ahorrado y patrones que crecen con tu equipo.
+sidebar:
+  order: 1
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Project Builder les da a los desarrolladores — **y a los agentes de IA que trabajan junto a
+ellos** — generación de código determinista. Un prompt produce algo distinto en cada
+ejecución; un **schematic** — un programa de mutación de archivos tipado y testeable —
+produce los mismos archivos, byte por byte, cada vez. Tú (o tu agente) codificas el cambio
+una vez, y a partir de ahí la generación es un programa que ejecutas, no una salida que
+revisas.
+
+## Construido para complementar a la IA
+
+Como artesanos del software queremos construir software de calidad — y la calidad empieza
+con código **predecible y repetible**. La IA es una colaboradora fenomenal, pero es
+inherentemente *variable*: la misma petición produce código distinto en cada ejecución.
+Project Builder está diseñado como el complemento de esa variabilidad: deja que la IA
+decida **qué** construir, y deja que un schematic haga determinista el **cómo**.
+
+Ese determinismo rinde frutos de dos maneras:
+
+- **Consistencia.** Cada servicio, componente o módulo generado por un schematic sigue la
+  misma estructura y las mismas convenciones — sin desvíos entre lo que la IA produjo el
+  lunes y lo que produjo el viernes.
+- **Tiempo y dinero.** Un cambio codificado una vez se ejecuta en milisegundos, para
+  siempre, sin gastar tokens en regenerar — y sin ciclos de revisión dedicados a volver a
+  validar una salida que nunca debió cambiar.
+
+Y el efecto se acumula: los schematics **crecen con tu base de código y con tu equipo**.
+Cada patrón que codificas se convierte en un bloque de construcción reutilizable y
+versionado que los nuevos integrantes del equipo — humanos o agentes — pueden ejecutar
+desde el primer día.
+
+## ¿Qué es un schematic?
+
+Un schematic es un paquete pequeño que vive en tu repositorio. Tiene tres archivos:
+
+- `schema.json` — las entradas tipadas del schematic, el contrato con quien lo ejecuta.
+- `schema.generated.ts` — un tipo `Input` generado a partir del schema, para que tu código
+  quede tipado contra el contrato y no contra una forma escrita a mano.
+- `factory.ts` — tu lógica de autoría: una función que recibe la entrada tipada y programa
+  mutaciones de archivos — crear archivos, editar contenido, generar carpetas enteras de
+  plantillas.
+
+Una vez registrado, lo ejecutas con `builder execute <collection>:<schematic>`, pasando las
+entradas como flags de la CLI. Como un factory es simplemente una función tipada, también
+puede ejecutarse por completo en memoria con el harness de testing — sin CLI, sin disco —
+y eso es lo que hace que los schematics sean testeables como cualquier otro código.
+Consulta [Tu primer schematic](/es/getting-started/your-first-schematic/)
+para el recorrido de punta a punta.
+
+<Aside type="caution" title="La regla de oro: nunca improvises un schematic">
+Un schematic es la **automatización de código que ya funciona**. Primero ten el código
+corriendo y probado — *después* codifícalo como schematic. La automatización prematura
+gasta tiempo y recursos en algo que quizá solo ejecutes una vez: extrae un schematic
+cuando un patrón ya se haya probado a sí mismo, nunca antes.
+</Aside>
+
+¿Te intriga la maquinaria — la conversación SDK–engine, los registros de instrucciones y
+la historia de los AST? Eso tiene [una página propia](/es/getting-started/how-it-works/).
+
+## Principios de diseño que sentirás como usuario
+
+- **Idempotencia.** Los factories se vuelven a ejecutar contra proyectos ya generados, así
+  que las mutaciones se escriben para ser seguras al repetirse: lee el árbol primero y
+  luego crea o actualiza — y omite la edición cuando tu marcador, import o entrada ya está
+  presente.
+- **Fail-closed** (ante un conflicto, se rechaza la escritura en lugar de sobrescribir).
+  Los verbos que escriben en una ruta nueva (`create`, `rename`, `move`, `copy`,
+  `copyIn`, `scaffold`) rechazan la operación al colisionar con una ruta existente;
+  sobrescribir es siempre una decisión deliberada mediante `force: true`.
+- **Ejecuciones de todo o nada.** Nada toca el disco mientras tu factory corre — un error
+  lanzado antes de que retorne significa que no se escribe absolutamente nada, y tu árbol
+  queda exactamente como estaba.
+
+## Por dónde seguir
+
+<CardGrid>
+  <Card title="Cómo funciona" icon="puzzle">
+    La conversación SDK–engine, el flush y el puente agnóstico del lenguaje —
+    [Cómo funciona](/es/getting-started/how-it-works/).
+  </Card>
+  <Card title="Instálalo" icon="down-caret">
+    Deja listos la CLI `builder` y Bun en un par de comandos —
+    [Instalación](/es/getting-started/installation/).
+  </Card>
+  <Card title="Crea tu primer schematic" icon="rocket">
+    De `builder init` a un generador idempotente en funcionamiento —
+    [Tu primer schematic](/es/getting-started/your-first-schematic/).
+  </Card>
+</CardGrid>

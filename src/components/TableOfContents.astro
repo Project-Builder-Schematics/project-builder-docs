@@ -4,29 +4,35 @@ import { Icon } from "@astrojs/starlight/components";
 import CoffeeButton from "./CoffeeButton.astro";
 
 const repo = "https://github.com/Project-Builder-Schematics/project-builder-docs";
+const es = Astro.locals.starlightRoute.locale === "es";
+const t = {
+  contribute: es ? "Contribuye" : "Contribute",
+  discussion: es ? "Inicia una discusión" : "Start a discussion",
+  issue: es ? "¿Encontraste un problema?" : "Did you find an issue?",
+};
 ---
 
 <details open class="pb-toc">
-	<summary>On this page</summary>
+	<summary>{Astro.locals.t("tableOfContents.onThisPage")}</summary>
 	<Default><slot /></Default>
 </details>
 
 <div class="community">
-  <h2 class="contribute">Contribute</h2>
+  <h2 class="contribute">{t.contribute}</h2>
   <ul>
     <li>
       <a href={`${repo}/blob/main/CONTRIBUTING.md`} target="_blank">
-        <Icon name="open-book" /> Contribute
+        <Icon name="open-book" /> {t.contribute}
       </a>
     </li>
     <li>
       <a href={`${repo}/discussions/new/choose`} target="_blank">
-        <Icon name="external" /> Start a discussion
+        <Icon name="external" /> {t.discussion}
       </a>
     </li>
   </ul>
   <a href={`${repo}/issues/new`} class="btn__mistake" target="_blank">
-    Did you find an issue?
+    {t.issue}
   </a>
 </div>
 

@@ -1,0 +1,163 @@
+---
+title: Tu primer schematic
+description: Pasa de un espacio de trabajo vacío a un generador de código idempotente en funcionamiento con seis comandos.
+sidebar:
+  order: 4
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Cada paso de abajo es ejecutable exactamente como está escrito. Inicializarás un
+workspace, generarás el esqueleto de un schematic, declararás sus entradas tipadas,
+escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia en acción.
+[Instala la CLI y Bun](/es/getting-started/installation/) primero si aún no lo has hecho.
+
+<Steps>
+
+1. **Inicializa un workspace** (dentro de cualquier proyecto — nuevo o existente):
+
+   ```sh
+   builder init
+   ```
+
+   Esto crea `project-builder.json` (la configuración del workspace), una carpeta
+   `schematics/` y una skill de IA en `.claude/skills/pbuilder/` — una referencia de
+   comandos que tu agente de código detecta automáticamente, sin configuración adicional.
+   También instala `@pbuilder/sdk` como dependencia de desarrollo, creando primero un
+   `package.json` si la carpeta no tiene uno.
+
+2. **Genera el esqueleto de un schematic:**
+
+   ```sh
+   builder new schematic hello
+   ```
+
+   Obtienes un paquete registrado y listo para editar:
+
+   ```txt
+   schematics/hello/
+   ├── schema.json           # entradas tipadas — el contrato con el usuario
+   ├── schema.generated.ts   # generado a partir de schema.json — nunca lo edites
+   └── factory.ts            # tu lógica de autoría
+   ```
+
+   `project-builder.json` ahora lo lista bajo `collections.default.hello`.
+
+3. **Declara las entradas** — reemplaza el contenido del `schema.json` generado con lo
+   siguiente; toda propiedad necesita un `label` (el codegen falla sin él):
+
+   ```json title="schematics/hello/schema.json"
+   {
+     "properties": {
+       "name": { "type": "string", "label": "Service name", "required": true }
+     }
+   }
+   ```
+
+   Los tipos de propiedad son `string`, `number`, `boolean` y `enum` (que requiere un
+   array `choices` no vacío); `default` y `description` son opcionales.
+
+4. **Regenera los tipos de entrada:**
+
+   ```sh
+   bunx pbuilder-codegen schematics/hello
+   ```
+
+   Esto reescribe `schema.generated.ts` con un tipo `Input` derivado de tu schema — tu
+   factory queda tipado contra el schema, nunca contra una forma escrita a mano.
+
+5. **Escribe el factory:**
+
+   ```ts title="schematics/hello/factory.ts"
+   import { create, find, replaceContent } from "@pbuilder/sdk/commons";
+   import type { Input } from "./schema.generated.ts";
+
+   export default async (input: Input) => {
+     // crea un archivo nuevo
+     create(`src/services/${input.name}.ts`, {
+       template: `export const serviceName = "${input.name}";`,
+       options: {},
+     });
+
+     // edición consciente del contenido: lee el árbol y luego crea o actualiza
+     const existing = await find("services.txt").read();
+     if (existing === undefined) {
+       create("services.txt", { template: input.name, options: {} });
+     } else {
+       replaceContent("services.txt", `${existing}\n${input.name}`);
+     }
+   };
+   ```
+
+   El engine invoca el **export por defecto** del módulo — ese es el factory. Este
+   construye sus cadenas de salida en TypeScript; el
+   [lenguaje de plantillas](/es/guides/templates/) es la alternativa declarativa.
+
+6. **Ejecútalo** — `default:hello` es `<collection>:<schematic>` tal como quedó registrado
+   en `project-builder.json`; las entradas se pasan como flags de la CLI:
+
+   ```sh
+   builder execute default:hello --name=payments
+   ```
+
+   ```txt
+   ~ services.txt
+   ~ src/services/payments.ts
+   ✓ done — 2 modified
+   ```
+
+   (`~` marca una ruta que la ejecución escribió.)
+
+</Steps>
+
+## Ejecútalo de nuevo
+
+Ahora ejecútalo otra vez **con una entrada distinta**:
+
+```sh
+builder execute default:hello --name=orders
+```
+
+`services.txt` crece una línea en lugar de ser aplastado — ese es el bucle de relectura
+del paso 5 haciendo su trabajo. Volver a ejecutarlo con el **mismo** nombre, en cambio, se
+rechaza con `path-collision`: `create` es fail-closed sobre una ruta existente (pasa
+`force: true` para sobrescribir deliberadamente), y como una ejecución fallida no escribe
+nada, tu árbol queda exactamente como estaba.
+
+<Aside type="tip">
+Haz que las mutaciones sean idempotentes. Los factories se vuelven a ejecutar contra
+proyectos ya generados — comprueba si tu marcador, import o entrada ya está presente antes
+de insertarlo. El factory de arriba muestra la mecánica de relectura; un factory de
+producción también omitiría el append cuando el nombre ya está en la lista.
+</Aside>
+
+<Aside type="note">
+Si tu editor marca el import con extensión `.ts` o `bun:test`, solo son ajustes de
+tsconfig que faltan — consulta [Probar schematics](/es/getting-started/testing/); Bun por
+sí solo corre bien sin ellos.
+</Aside>
+
+## Dos reglas que ahorran tiempo de depuración
+
+- **Pasa siempre `options: {}` a `create`**, incluso cuando la plantilla no tiene tokens.
+  El tipo lo exige — y en sitios de llamada sin tipos (JS plano, `any`) omitirlo pone
+  `undefined` en el lote de directivas, y la escritura se rechaza por no ser
+  representable.
+- **`find().read()` es una tricotomía**: `undefined` significa que el archivo no existe,
+  `""` significa que existe y está vacío. Ramifica con `=== undefined` — nunca con
+  `if (!content)`, que confunde ambos casos.
+
+## Próximos pasos
+
+- **Pruébalo** sin la CLI ni un engine en ejecución —
+  [Probar schematics](/es/getting-started/testing/).
+- [Verbos de mutación](/es/guides/mutation-verbs/) — todo lo que un factory puede hacerle
+  al árbol.
+- [Plantillas](/es/guides/templates/) — el lenguaje de plantillas declarativo dentro de
+  `create()`.
+- [Scaffolding](/es/guides/scaffolding/) — replica una carpeta completa de plantillas en
+  lugar de escribir un `create()` por archivo.
+- [Dry-run](/es/guides/dry-run/) — previsualiza los cambios planeados de un factory antes
+  de que algo se confirme.
+- [Manejo de errores](/es/guides/error-handling/) — el contrato estructurado
+  `AuthoringError` de una ejecución rechazada.

@@ -1,0 +1,38 @@
+---
+title: Generación de código en la que puedes confiar
+description: Generación de código determinista mediante schematics tipados y testeables — codifica un cambio una vez, ejecútalo para siempre.
+template: splash
+hero:
+  title: Generación de código en la que puedes confiar
+  tagline: Project Builder convierte la generación de código en un programa determinista. Escribe un schematic una vez — tipado, testeable, idempotente — y cada ejecución produce exactamente el mismo resultado.
+  image:
+    file: ../../../assets/leo-hero.webp
+  actions:
+    - text: Comienza ahora
+      link: /es/getting-started/overview/
+      icon: right-arrow
+    - text: Ver en GitHub
+      link: https://github.com/Project-Builder-Schematics/project-builder-sdk
+      icon: github
+      variant: minimal
+---
+
+<div class="pb-hero-demo">
+
+```sh frame="terminal" title="determinista por diseño"
+builder execute default:hello --name=payments
+```
+
+```txt
+~ services.txt
+~ src/services/payments.ts
+✓ done — 2 modified
+```
+
+<p class="pb-hero-demo__caption">
+	Ejecútalo de nuevo con <code>--name=orders</code> y <code>services.txt</code> crece una
+	línea. Vuelve a ejecutarlo con el <em>mismo</em> nombre y la ejecución se rechaza (fail-closed) — nada
+	se escribe dos veces. Mismo schematic, misma entrada, mismos bytes.
+</p>
+
+</div>

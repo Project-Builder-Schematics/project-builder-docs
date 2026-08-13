@@ -1,0 +1,133 @@
+<svg width="1160" height="720" viewBox="0 0 1160 720" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', system-ui, sans-serif">
+  <defs>
+    <pattern id="rm-dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1" fill="#ffffff" fill-opacity="0.035"/>
+    </pattern>
+    <radialGradient id="rm-glow-vision" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7f56d9" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#7f56d9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rm-glow-here" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7f56d9" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7f56d9" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rm-spark" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7f56d9"/>
+      <stop offset="100%" stop-color="#27a644"/>
+    </linearGradient>
+    <marker id="rm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9" fill="none" stroke="#62666d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- panel + texture -->
+  <rect x="0.5" y="0.5" width="1159" height="719" rx="16" fill="#0f1011" stroke="#23252a"/>
+  <rect x="1" y="1" width="1158" height="718" rx="16" fill="url(#rm-dots)"/>
+  <line x1="24" y1="1.5" x2="1136" y2="1.5" stroke="#ffffff" stroke-opacity="0.05"/>
+
+  <text x="48" y="56" font-family="ui-monospace, Menlo, monospace" font-size="11" letter-spacing="2" fill="#8a8f98">ROADMAP — FROM LOCAL SCHEMATICS TO AN ORCHESTRATOR</text>
+  <g transform="translate(1088, 38) scale(1.2)">
+    <path d="M11.2039 1.36914C11.2906 0.67556 10.419 0.297219 9.97151 0.834191L0.956775 11.6519C0.576834 12.1078 0.901043 12.8 1.49453 12.8H9.55705C9.9781 12.8 10.3039 13.169 10.2516 13.5868L9.49614 19.6309C9.40945 20.3244 10.281 20.7028 10.7285 20.1658L19.7432 9.34813C20.1232 8.8922 19.799 8.2 19.2055 8.2H11.1429C10.7219 8.2 10.3961 7.83097 10.4484 7.41318L11.2039 1.36914Z" fill="#7F56D9"/>
+  </g>
+
+  <!-- glows -->
+  <ellipse cx="984" cy="176" rx="220" ry="150" fill="url(#rm-glow-vision)"/>
+  <ellipse cx="150" cy="420" rx="150" ry="110" fill="url(#rm-glow-here)"/>
+
+  <!-- ascending path: travelled (purple) then future (dashed) -->
+  <path d="M 70 620 C 110 560, 130 510, 176 486" stroke="#7f56d9" stroke-width="2.5" fill="none"/>
+  <circle cx="176" cy="486" r="5" fill="#7f56d9"/>
+  <path d="M 176 486 C 300 430, 320 400, 452 372 C 590 342, 610 300, 740 262 C 860 228, 890 200, 972 176" stroke="#34343a" stroke-width="1.6" stroke-dasharray="7 7" fill="none" marker-end="url(#rm-arrow)"/>
+  <circle cx="452" cy="372" r="4" fill="#0f1011" stroke="#62666d" stroke-width="1.5"/>
+  <circle cx="740" cy="262" r="4" fill="#0f1011" stroke="#62666d" stroke-width="1.5"/>
+
+  <!-- ═══ LEVEL 1 ═══ -->
+  <text x="292" y="486" font-family="ui-monospace, Menlo, monospace" font-size="88" font-weight="600" fill="#ffffff" fill-opacity="0.045" text-anchor="end">01</text>
+  <rect x="48.5" y="428.5" width="272" height="158" rx="12" fill="#141516" stroke="#7f56d9" stroke-opacity="0.7" stroke-width="1.2"/>
+  <line x1="64" y1="430" x2="304" y2="430" stroke="#b692f6" stroke-opacity="0.25"/>
+  <!-- status chip -->
+  <rect x="72.5" y="448.5" width="128" height="22" rx="11" fill="#2c1c5f"/>
+  <circle cx="86" cy="459.5" r="3.5" fill="#27a644"/>
+  <text x="96" y="463.5" font-family="ui-monospace, Menlo, monospace" font-size="9.5" letter-spacing="0.5" fill="#b692f6">SHIPPED · PROVING</text>
+  <!-- glyph: terminal -->
+  <rect x="72.5" y="484.5" width="30" height="26" rx="6" fill="#0a0a0c" stroke="#34343a"/>
+  <text x="87" y="502" font-family="ui-monospace, Menlo, monospace" font-size="11" fill="#b692f6" text-anchor="middle">&gt;_</text>
+  <text x="112" y="502" font-size="15" font-weight="600" fill="#f7f8f8">Local schematics</text>
+  <text x="72" y="534" font-size="11.5" fill="#8a8f98">Author, test, and run deterministic</text>
+  <text x="72" y="551" font-size="11.5" fill="#8a8f98">schematics inside your own repo —</text>
+  <text x="72" y="568" font-size="11.5" fill="#8a8f98">everything these docs cover today.</text>
+
+  <!-- we are here pin with pulse rings -->
+  <circle cx="176" cy="486" r="12" fill="none" stroke="#7f56d9" stroke-opacity="0.4"/>
+  <circle cx="176" cy="486" r="20" fill="none" stroke="#7f56d9" stroke-opacity="0.15"/>
+  <g>
+    <rect x="116.5" y="374.5" width="120" height="30" rx="15" fill="#7f56d9"/>
+    <text x="176" y="394" font-family="ui-monospace, Menlo, monospace" font-size="11" font-weight="500" fill="#ffffff" text-anchor="middle">WE ARE HERE</text>
+    <path d="M 168 404 L 176 420 L 184 404 Z" fill="#7f56d9"/>
+  </g>
+
+  <!-- workbenches proof card -->
+  <path d="M 190 586 C 200 620, 230 634, 260 638" stroke="#34343a" stroke-width="1.3" stroke-dasharray="5 5" fill="none"/>
+  <rect x="264.5" y="614.5" width="420" height="52" rx="10" fill="#0a0a0c" stroke="#34343a"/>
+  <circle cx="288" cy="640" r="4.5" fill="#27a644"/>
+  <circle cx="288" cy="640" r="8.5" fill="none" stroke="#27a644" stroke-opacity="0.3"/>
+  <text x="304" y="636" font-size="12" font-weight="600" fill="#d0d6e0">workbenches — proving it in the field</text>
+  <text x="304" y="653" font-size="10.5" fill="#62666d">not just built: real projects measuring its effectiveness</text>
+  <polyline points="596,652 608,644 618,648 630,636 642,640 654,628 666,630" stroke="url(#rm-spark)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ═══ LEVEL 2 ═══ -->
+  <text x="568" y="372" font-family="ui-monospace, Menlo, monospace" font-size="88" font-weight="600" fill="#ffffff" fill-opacity="0.04" text-anchor="end">02</text>
+  <rect x="324.5" y="314.5" width="272" height="158" rx="12" fill="#141516" stroke="#23252a"/>
+  <rect x="348.5" y="334.5" width="52" height="22" rx="11" fill="#18191a" stroke="#34343a"/>
+  <text x="374" y="349.5" font-family="ui-monospace, Menlo, monospace" font-size="9.5" letter-spacing="0.5" fill="#8a8f98" text-anchor="middle">NEXT</text>
+  <!-- glyph: linked nodes -->
+  <g stroke="#8a8f98" stroke-width="1.5">
+    <circle cx="358" cy="383" r="5" fill="#0a0a0c"/>
+    <circle cx="382" cy="375" r="5" fill="#0a0a0c"/>
+    <line x1="363" y1="381" x2="377" y2="377"/>
+  </g>
+  <text x="398" y="386" font-size="15" font-weight="600" fill="#f7f8f8">Interconnected</text>
+  <text x="348" y="418" font-size="11.5" fill="#8a8f98">Schematics that compose: one</text>
+  <text x="348" y="435" font-size="11.5" fill="#8a8f98">schematic invoking others, chaining</text>
+  <text x="348" y="452" font-size="11.5" fill="#8a8f98">generation into bigger flows.</text>
+
+  <!-- ═══ LEVEL 3 ═══ -->
+  <text x="856" y="262" font-family="ui-monospace, Menlo, monospace" font-size="88" font-weight="600" fill="#ffffff" fill-opacity="0.035" text-anchor="end">03</text>
+  <rect x="612.5" y="204.5" width="272" height="158" rx="12" fill="#101112" stroke="#34343a" stroke-dasharray="6 5"/>
+  <rect x="636.5" y="224.5" width="76" height="22" rx="11" fill="#18191a" stroke="#34343a"/>
+  <text x="674" y="239.5" font-family="ui-monospace, Menlo, monospace" font-size="9.5" letter-spacing="0.5" fill="#8a8f98" text-anchor="middle">PLANNED</text>
+  <!-- glyph: package -->
+  <g stroke="#8a8f98" stroke-width="1.5" fill="#0a0a0c">
+    <path d="M 658 265 L 670 259 L 682 265 L 682 279 L 670 285 L 658 279 Z"/>
+    <line x1="658" y1="265" x2="670" y2="271"/>
+    <line x1="682" y1="265" x2="670" y2="271"/>
+    <line x1="670" y1="271" x2="670" y2="285"/>
+  </g>
+  <text x="694" y="276" font-size="15" font-weight="600" fill="#d0d6e0">External schematics</text>
+  <text x="636" y="308" font-size="11.5" fill="#8a8f98">Consume schematics beyond your</text>
+  <text x="636" y="325" font-size="11.5" fill="#8a8f98">repo — private registries or</text>
+  <text x="636" y="342" font-size="11.5" fill="#8a8f98">public packages.</text>
+
+  <!-- ═══ LEVEL 4 ═══ -->
+  <text x="1088" y="176" font-family="ui-monospace, Menlo, monospace" font-size="88" font-weight="600" fill="#ffffff" fill-opacity="0.03" text-anchor="end">04</text>
+  <rect x="844.5" y="118.5" width="272" height="158" rx="12" fill="#101112" stroke="#34343a" stroke-dasharray="6 5" stroke-opacity="0.8"/>
+  <rect x="868.5" y="138.5" width="60" height="22" rx="11" fill="#18191a" stroke="#7f56d9" stroke-opacity="0.35"/>
+  <text x="898" y="153.5" font-family="ui-monospace, Menlo, monospace" font-size="9.5" letter-spacing="0.5" fill="#b692f6" text-anchor="middle">VISION</text>
+  <!-- glyph: orchestrator constellation -->
+  <g stroke="#8a8f98" stroke-width="1.3">
+    <circle cx="892" cy="184" r="5.5" fill="#2c1c5f" stroke="#7f56d9"/>
+    <circle cx="876" cy="172" r="3" fill="#0a0a0c"/>
+    <circle cx="908" cy="172" r="3" fill="#0a0a0c"/>
+    <circle cx="892" cy="202" r="3" fill="#0a0a0c"/>
+    <line x1="888" y1="180" x2="879" y2="174"/>
+    <line x1="896" y1="180" x2="905" y2="174"/>
+    <line x1="892" y1="190" x2="892" y2="199"/>
+  </g>
+  <text x="922" y="189" font-size="15" font-weight="600" fill="#f7f8f8">Project Builder</text>
+  <text x="868" y="222" font-size="11.5" fill="#8a8f98">The full vision: an orchestrator of</text>
+  <text x="868" y="239" font-size="11.5" fill="#8a8f98">schematics that is, itself, easy</text>
+  <text x="868" y="256" font-size="11.5" fill="#8a8f98">to orchestrate.</text>
+
+  <!-- footnote -->
+  <text x="48" y="700" font-size="11.5" fill="#62666d">Each level builds on the guarantees of the one before it: determinism first, composition later — never the other way around.</text>
+</svg>

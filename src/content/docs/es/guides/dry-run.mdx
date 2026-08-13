@@ -1,0 +1,71 @@
+---
+title: Dry-run
+description: Previsualiza las directivas que un run de factory aún tiene pendientes — verbo por verbo, ruta por ruta — antes de que algo se confirme en el árbol.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`dryRun()` previsualiza lo que un run todavía va a emitir — antes de que nada de eso se
+confirme. Es una función plana de `@pbuilder/sdk/commons`, importada de la misma manera que
+cualquier otro verbo de autoría — nunca su propio subpath.
+
+```ts
+import { dryRun } from "@pbuilder/sdk/commons";
+```
+
+## Qué retorna
+
+`dryRun()` retorna `DryRunEntry[]`: el plan de directivas aún pendientes en el buffer del run
+activo, expresado en vocabulario de autor. Cada entrada lleva un `verb` y un `path`, más un
+`kind` opcional (`"rendered" | "copied"`) presente solo en los verbos de lectura local del
+paquete cuyo transporte se clasifica — `create` (`kind: "rendered"`) y `copyIn`
+(`kind: "copied"`).
+
+```ts
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { create, find, dryRun } from "@pbuilder/sdk/commons";
+
+const run = () => {
+  create("src/index.ts", { template: "export const version = '1.0.0';", options: {} });
+  find("src/legacy.ts").remove();
+
+  for (const entry of dryRun()) {
+    console.log(entry.verb, entry.path); // "create src/index.ts", luego "remove src/legacy.ts"
+  }
+};
+
+await runFactoryForTest(run, undefined, { seed: { "src/legacy.ts": "" } });
+```
+
+<Aside type="note">
+`verb` reutiliza la etiqueta de mutación de wire `"modify"` tanto para las llamadas a
+`.replaceContent()` como para las `.modify(fn)` de un dialecto — las dos llamadas se traducen a
+la misma directiva, así que `dryRun()` no puede (ni necesita) distinguirlas. Es deliberado, no
+una inconsistencia de nombres — la misma etiqueta aparece en
+[`AuthoringError`](/es/guides/error-handling/).
+</Aside>
+
+## Llámalo antes de cualquier lectura
+
+El plan refleja solo lo que sigue **pendiente** — la respuesta honesta a "qué va a emitir
+todavía este run", no a "qué ha emitido este run en total". Un `read()` (o cualquier flush)
+vacía el buffer de pendientes, así que las directivas ya volcadas dejan de aparecer en el
+resultado de `dryRun()`.
+
+<Aside type="caution">
+Llama a `dryRun()` antes de que se abra cualquier `read()` o `find()` de dialecto, si quieres
+que vea todo lo que el run ha agendado hasta el momento.
+</Aside>
+
+`dryRun()` solo puede llamarse dentro de un run activo — llamarlo fuera de uno lanza el mismo
+error "authoring verbs can only be used while a schematic is running" que lanza cualquier otro
+verbo de `@pbuilder/sdk/commons`.
+
+## Próximos pasos
+
+- [Verbos de mutación](/es/guides/mutation-verbs/) — los siete verbos de autoría y la regla de
+  la tricotomía de lectura.
+- [Manejo de errores](/es/guides/error-handling/) — cómo luce `AuthoringError` y cómo escribir
+  aserciones contra él.

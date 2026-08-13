@@ -1,0 +1,151 @@
+---
+title: Manejo de errores
+description: El contrato AuthoringError que lanza todo verbo rechazado — sus campos verb, path y reason, la garantía fail-closed que lo respalda, y cómo escribir factories que fallan bien.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Un verbo de autoría que resulta rechazado — por el engine, o por el propio SDK antes de
+cualquier ida y vuelta — lanza `AuthoringError`. Lleva todo lo que necesitas para recuperarte,
+en vocabulario de autor: nada de terminología interna del engine.
+
+## Fail-closed por diseño
+
+Un run fallido no escribe **nada**. Los verbos solo agendan directivas contra el árbol de
+staging del engine; las escrituras a disco ocurren en la fase de apply, después de que tu
+factory retorna — así que un `AuthoringError` lanzado (o cualquier error) antes del retorno deja
+el proyecto de destino exactamente como estaba. No hay estado de escritura parcial que limpiar,
+y por eso los verbos mismos son estrictos: `create` rechaza una ruta existente,
+`replaceContent` rechaza una faltante, y las sobrescrituras requieren un `{ force: true }`
+explícito — consulta [Verbos de mutación](/es/guides/mutation-verbs/) para la semántica exacta
+de cada verbo.
+
+## Cómo aparecen los errores
+
+Llamar al runner directamente lanza; `runFactoryForTest` captura el mismo `AuthoringError` en
+`result.error`:
+
+```ts
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { AuthoringError } from "@pbuilder/sdk/commons";
+
+const result = await runFactoryForTest(run, input);
+if (result.error instanceof AuthoringError) {
+  switch (result.error.reason) {
+    case "path-collision":
+      console.error(`${result.error.verb} collided at ${result.error.path}`);
+      break;
+    default:
+      console.error(result.error.message);
+  }
+}
+```
+
+La [guía de testing](/es/getting-started/testing/) cubre el harness en sí.
+
+## Campos
+
+- **`verb`** — el verbo de cara al autor cuya llamada fue rechazada: `"create"`, `"modify"`,
+  `"remove"`, `"rename"`, `"move"`, `"copy"` o `"copyIn"`. `undefined` para rechazos a nivel de
+  batch que no tienen una única llamada infractora.
+- **`path`** — la ruta del lado origen, declarada por el autor, de la llamada fallida.
+  `undefined` cuando `verb` es `undefined`.
+- **`reason`** — la causa cerrada del rechazo (ver abajo).
+- **`origin`** — derivado de `reason`: `"write-rejected"` (el engine rechazó una escritura) o
+  `"authoring-rejected"` (el SDK atrapó un mal uso antes de cualquier ida y vuelta al engine).
+- **`appliedCount`** — cuántas directivas se aplicaron dentro del run fallido antes del
+  infractor. Solo un diagnóstico — un run rechazado descarta todo, así que esto nunca es una
+  promesa de persistencia parcial.
+
+<Aside type="note">
+**La peculiaridad de la etiqueta `"modify"`.** `"modify"` etiqueta la mutación de wire
+subyacente, y la comparten TANTO las llamadas a `.replaceContent()` (el reemplazo total de
+commons/dialectos) COMO el escape de AST `.modify(fn)` de un handle de dialecto — las dos
+llamadas se traducen a la misma directiva de wire, así que un rechazo en cualquiera de las dos
+aparece como `verb: "modify"`. Es deliberado, no un nombre obsoleto que sobrevivió a un
+renombrado. Escribe tus aserciones contra `"modify"`, nunca contra `"replaceContent"`.
+</Aside>
+
+## Valores de `reason`
+
+`reason` es una unión cerrada — se espera que los bloques `switch` sean exhaustivos, y obtienen
+un error de compilación si falta un valor:
+
+| `reason` | Significado |
+|---|---|
+| `path-collision` | La ruta de destino ya existe y no se pasó `{ force: true }`. |
+| `path-not-found` | La ruta de destino no existe. |
+| `unrepresentable-content` | El contenido no pudo representarse en el formato del engine. |
+| `changes-too-large` | El tamaño total de cambios del run excede el tope del engine. |
+| `outside-run` | Se llamó a un verbo de autoría fuera de un run activo. |
+| `unknown` | El rechazo no pudo clasificarse. |
+| `invalid-input` | El SDK rechazó los argumentos de una llamada antes de cualquier ida y vuelta al engine. |
+| `reserved-name` | La llamada usó un nombre reservado por el SDK o el engine. |
+| `source-not-found` | Una fuente local del paquete (`scaffold`/`copyIn`/`create({ templateFile })`) no existe. |
+| `source-not-regular-file` | Una fuente local del paquete no es un archivo regular. |
+| `source-unreadable` | Una fuente local del paquete existe pero no pudo leerse. |
+
+<Aside type="caution">
+`source-outside-package` se eliminó en `@pbuilder/sdk` `0.2.0` — el SDK ya no re-deriva un techo
+de contención para las fuentes locales del paquete. Migración: elimina el brazo
+`case "source-outside-package":` de cualquier `switch (err.reason)` exhaustivo — TypeScript te
+lo va a señalar.
+</Aside>
+
+## Capturar y recuperarse
+
+La misma forma que arriba, ahora exhaustiva — cada valor de `reason` recibe un case:
+
+```ts
+switch (err.reason) {
+  case "path-collision":
+    console.error(`${err.verb} collided at ${err.path}`);
+    break;
+  case "path-not-found":
+  case "unrepresentable-content":
+  case "changes-too-large":
+  case "outside-run":
+  case "unknown":
+  case "invalid-input":
+  case "reserved-name":
+  case "source-not-found":
+  case "source-not-regular-file":
+  case "source-unreadable":
+    console.error(err.message);
+    break;
+}
+```
+
+## Escribir buenos caminos de fallo
+
+El contrato de errores premia a los factories que tratan el rechazo como un resultado diseñado,
+no una sorpresa:
+
+- **Previene `path-collision` leyendo primero.** El rechazo más común es una re-ejecución que
+  choca con un archivo creado por el run anterior. Ramifica sobre
+  [la tricotomía de `find().read()`](/es/guides/mutation-verbs/#leer-archivos-findpathread) —
+  crear cuando está ausente, actualizar cuando está presente — en lugar de recurrir a
+  `{ force: true }`, que convierte cada re-ejecución en una sobrescritura silenciosa.
+- **Pasa `force: true` solo cuando sobrescribir es la intención.** Las colisiones fail-closed
+  son el SDK protegiendo la salida anterior; forzarlas elimina esa protección para todas las
+  ejecuciones futuras, no solo esta.
+- **Deja que los estados inesperados fallen ruidosamente.** Como un run rechazado descarta
+  todo, lanzar siempre es seguro — el árbol queda intacto. Un factory que detecta un estado que
+  no entiende debería lanzar en lugar de adivinar.
+- **Haz `switch` exhaustivo sobre `reason`.** La unión cerrada implica que el compilador te
+  avisa cuando una nueva versión del SDK agrega (o elimina) una causa de rechazo — la
+  eliminación de `source-outside-package` de arriba es exactamente ese mecanismo funcionando
+  como se pretende.
+- **En tests, escribe aserciones sobre los campos estructurados.** `result.error.verb`, `.path`
+  y `.reason` fijan *cuál* directiva falló y *por qué* — mucho más resistente a mutaciones que
+  hacer matching sobre el texto de `message`. Recuerda la peculiaridad de la etiqueta
+  `"modify"` cuando la llamada fallida es un `replaceContent`.
+
+## Próximos pasos
+
+- [Verbos de mutación](/es/guides/mutation-verbs/) — los siete verbos de autoría y la regla de
+  la tricotomía de lectura.
+- [Dry-run](/es/guides/dry-run/) — previsualiza los cambios planificados de un factory antes de
+  que algo se confirme.

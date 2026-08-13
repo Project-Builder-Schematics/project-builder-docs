@@ -1,0 +1,109 @@
+---
+title: Probar schematics
+description: Ejecuta un factory en memoria con el harness de testing del SDK y haz aserciones sobre los archivos que escribe — sin CLI, sin engine, sin disco.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@pbuilder/sdk/testing` ejecuta un factory en memoria — sin CLI, sin engine, sin disco. Tu
+factory es una función tipada común y corriente, así que se prueba como tal: ejecútala con
+`runFactoryForTest` y luego haz aserciones sobre el árbol resultante.
+
+## Un primer test
+
+Crea `schematics/hello/factory.test.ts` junto al factory:
+
+```ts title="schematics/hello/factory.test.ts"
+import { test, expect } from "bun:test";
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { create } from "@pbuilder/sdk/commons";
+
+// en tu schematic esto es `import run from "./factory.ts";`
+const run = (input: { name: string }) => {
+  create(`src/services/${input.name}.ts`, {
+    template: `export const serviceName = "${input.name}";`,
+    options: {},
+  });
+};
+
+test("factory creates the service file", async () => {
+  const result = await runFactoryForTest(run, { name: "payments" });
+
+  expect(result.error).toBeUndefined();
+  expect(result.tree.get("src/services/payments.ts"))
+    .toEqual(`export const serviceName = "payments";`);
+});
+```
+
+```sh
+bun test schematics
+```
+
+Esto ejecuta con Bun únicamente los tests de tus schematics — el test runner de tu propia
+aplicación (Jest, Vitest, el que uses) queda intacto y ambos conviven en un mismo repo.
+
+## Archivos seed e idempotencia
+
+`result.tree` contiene **únicamente las escrituras confirmadas**. Los archivos que
+prepueblas mediante la opción `seed` son legibles por el factory pero nunca aparecen en el
+árbol — que es exactamente cómo se verifica la idempotencia (un seed intacto está ausente
+del árbol):
+
+```ts
+import { test, expect } from "bun:test";
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { find, replaceContent } from "@pbuilder/sdk/commons";
+
+test("a seeded file is readable; only the write is committed", async () => {
+  const run = async (input: { name: string }) => {
+    const existing = await find("services.txt").read();
+    replaceContent("services.txt", `${existing}\n${input.name}`);
+  };
+
+  const seed = { "services.txt": "payments" };
+  const result = await runFactoryForTest(run, { name: "orders" }, { seed });
+
+  expect(result.error).toBeUndefined();
+  expect(result.tree.get("services.txt")).toEqual("payments\norders");
+});
+```
+
+## `packageDir` — anclar los verbos locales al paquete
+
+El otro campo de la bolsa de opciones, `packageDir` (pasa `import.meta.dir`), ancla los
+verbos locales al paquete (`scaffold`, `copyIn`, `create({ templateFile })`) y activa en la
+ejecución la validación de entradas derivada del schema contra el `schema.json` adyacente.
+Sin él, esos verbos no tienen contra qué resolverse. (Cuando la CLI ejecuta tu schematic,
+pasa la ubicación del paquete automáticamente — esto solo importa al testear. Consulta
+[Scaffolding](/es/guides/scaffolding/) para conocer los verbos en sí.)
+
+## Qué simula el harness — y qué no
+
+Las plantillas se guardan **tal cual** en el árbol de prueba — el renderizado ocurre en el
+engine al momento de `builder execute`, y el harness no lo simula. Así que hacer
+aserciones sobre un `create` con plantilla significa hacerlas sobre el texto crudo
+`{= .name =}`, no sobre la salida renderizada.
+
+<Aside type="caution">
+`@pbuilder/sdk/testing` se publica como `0.x`, exento de semver, hasta que el uso real
+valide la forma del resultado.
+</Aside>
+
+## ¿Errores del editor con `bun:test`?
+
+`bun test` elimina los tipos en lugar de verificarlos, así que corre bien de cualquier
+manera — pero tu editor necesita algunos ajustes de tsconfig para resolver los imports.
+Agrega `typescript` y `@types/bun` como dependencias de desarrollo y asegúrate de que tu
+`tsconfig.json` tenga:
+
+- `moduleResolution: "NodeNext"` (o `"bundler"`) — la resolución legada por defecto de
+  TypeScript no puede leer el mapa `exports` de un paquete, que es la única vía hacia los
+  subpaths de `@pbuilder/sdk` (`./testing`, `./commons` y compañía). Sin esto, tu editor
+  reporta `Cannot find module '@pbuilder/sdk/commons'` aunque el import sea correcto.
+- `allowImportingTsExtensions: true` — los factories importan los tipos generados con una
+  extensión `.ts` explícita (`./schema.generated.ts`), que TypeScript rechaza por defecto.
+- `types: ["bun"]` — dejar `types` vacío o sin definir oculta el módulo ambiente
+  `bun:test` incluso con `@types/bun` instalado; nombrarlo explícitamente es lo que hace
+  desaparecer `Cannot find module 'bun:test'`.

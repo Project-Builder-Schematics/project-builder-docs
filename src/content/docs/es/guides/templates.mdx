@@ -1,0 +1,341 @@
+---
+title: Plantillas
+description: El lenguaje de plantillas detrás de create() y scaffold() — sintaxis de text/template de Go con delimitadores {= =}, siete pipes de string y condicionales con el operador primero.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+El `path` y el `template` de `create()` son ambos **strings de plantilla**, renderizados contra
+el mismo y único objeto `options`. Esta página cubre el lenguaje que escribes dentro de ellos.
+
+<Aside type="caution" title="Esto no es JavaScript">
+La sintaxis viene del `text/template` de Go, **no** de los template literals de JavaScript.
+`{= .name =}` no es `${name}`; los loops son `range`, no `.map()`; las comparaciones se escriben
+con el operador primero (`eq a b`), no infijas (`a === b`). Los `===`, `&&`, `||`, `!`, `<`, `>`
+de JavaScript **no existen** en una plantilla. Adivinar desde los hábitos de JS te va a
+despistar — las secciones de abajo mapean cada patrón de JS a su forma en plantilla.
+</Aside>
+
+## Dónde ocurre el renderizado
+
+El renderizado ocurre en el engine en el momento de `builder execute`, nunca en el SDK. Tu
+factory envía la plantilla y las opciones tal cual — así que los errores de plantilla (un nombre
+de opción con un typo, un tipo que no coincide) aparecen en tiempo de ejecución, y el harness de
+tests almacena el texto crudo `{= .name =}`, no la salida renderizada.
+
+```ts title="schematics/hello/factory.ts"
+import { create } from "@pbuilder/sdk/commons";
+
+create("src/{= .name | dasherize =}.ts", {
+  template: "export const {= .name | classify =} = 1;\n",
+  options: { name: "myThing" },
+});
+```
+
+renderiza a la ruta `src/my-thing.ts` con el contenido:
+
+```ts
+export const MyThing = 1;
+```
+
+Tres piezas están en juego:
+
+| Tú pasas | Qué hace |
+|---|---|
+| `path` (primer argumento) | Un **string de plantilla**, renderizado para producir la ruta del archivo de salida. |
+| `template` | Un string de plantilla, renderizado para producir el **contenido en bytes del archivo**. |
+| `options` | El **contexto de datos** — el único conjunto de valores compartido por ambos renderizados. |
+
+El overload `templateFile` — `create(path, { templateFile, options })` — lee un archivo local
+del paquete en lugar de un string `template` inline; todo lo de esta página le aplica sin
+cambios.
+
+## Variables y acceso anidado
+
+Las plantillas usan los delimitadores `{=` y `=}` — **no** los más familiares `{{ }}`. Dentro de
+los delimitadores referencias tus opciones a través de un punto inicial:
+
+| Escribes | Significa |
+|---|---|
+| `{= .name =}` | la opción `name` |
+| `{= .user.address.city =}` | recorrer objetos anidados: `user` → `address` → `city` |
+| `{= . =}` | el contexto actual en sí (útil dentro de `range`/`with`) |
+
+Las opciones con valores de array u objeto se pasan como valores nativos planos — nunca las
+codificas a mano.
+
+Dos detalles menores:
+
+- **Emitir un `{=` literal.** No hay escape con backslash. Para imprimir el delimitador en sí,
+  envuélvelo en una acción de string entre comillas: `{= "{=" =}` renderiza el texto literal `{=`.
+- **Comentarios.** `{= /* una nota para ti mismo */ =}` nunca produce salida.
+
+<Aside type="note">
+Una clave que está **presente pero es `null`** no se renderiza en blanco — falla con un error
+tipado. Es deliberado: un null en tu salida es casi siempre un error, así que el engine se
+detiene en lugar de escribir `<no value>`.
+</Aside>
+
+## Los siete pipes
+
+Los pipes transforman un valor de tipo **string**. Aplicas uno con `|`:
+
+| Pipe | `"userProfile"` se convierte en | Regla |
+|---|---|---|
+| `upper` | `USERPROFILE` | pone en mayúscula cada letra |
+| `lower` | `userprofile` | pone en minúscula cada letra |
+| `capitalize` | `UserProfile` | pone en mayúscula solo la primera letra |
+| `dasherize` | `user-profile` | separa en palabras, minúsculas, une con `-` |
+| `underscore` | `user_profile` | separa en palabras, minúsculas, une con `_` |
+| `camelize` | `userProfile` | PascalCase, con la primera palabra en minúscula |
+| `classify` | `UserProfile` | PascalCase incluyendo la primera palabra |
+
+**Encadena pipes de izquierda a derecha** — el orden es observable:
+
+```
+{= .name | underscore | upper =}
+```
+
+`"MyComponent"` → `my_component` → `MY_COMPONENT`.
+
+Tres reglas para recordar:
+
+- **Los pipes son un conjunto cerrado** — estos 7 y ningún otro; un nombre de pipe desconocido
+  es un error que lista los nombres válidos.
+- **Los pipes solo aceptan strings.** Aplicar un pipe a un número (o cualquier no-string) es un
+  error que nombra el pipe y el tipo infractor — el engine nunca convierte un valor a string
+  silenciosamente.
+- **`classify` no singulariza.** A diferencia del `classify` de Rails o Angular, un plural sigue
+  siendo plural — `users` se convierte en `Users`, no en `User`. Si necesitas el singular, pasa
+  el singular en tus opciones. Tampoco existe un pipe `pluralize`.
+
+## Loops: `range`, no `for` ni `.map()`
+
+Los bloques se abren con una palabra clave y se cierran con `{= end =}` — no hay llaves `{}`. No
+hay `for`, ni `.map()`, ni `.forEach()`, ni arrow functions:
+
+```js
+// JavaScript
+methods.map(m => `  ${m.name}() {}\n`).join("")
+```
+
+```
+{= range .methods =}  {= .name =}() {}
+{= end =}
+```
+
+con `methods: [{ "name": "load" }, { "name": "save" }]` esto emite una línea por elemento. El
+orden del array se preserva exactamente — el engine nunca reordena tu lista.
+
+**Dentro del bloque, el punto `.` _se convierte_ en el elemento actual.** No hay nombre de
+parámetro salvo que pidas uno — `.` es el ítem, y `.name` lee el campo `name` del ítem actual:
+
+```
+{= range .items =}[{= . =}]{= end =}
+```
+
+sobre `["x", "y"]` → `[x][y]`.
+
+**¿Quieres el índice y el valor?** Declara ambos con variables `$` y `:=`:
+
+```
+{= range $i, $v := .items =}{= $i =}:{= $v =} {= end =}
+```
+
+sobre `["a", "b"]` → `0:a 1:b `.
+
+| JavaScript | Plantilla |
+|---|---|
+| `for (const m of methods) { … }` | `{= range .methods =} … {= end =}` (el ítem es `.`) |
+| `items.map(x => …)` | `{= range .items =} … {= end =}` |
+| `items.forEach((v, i) => …)` | `{= range $i, $v := .items =} … {= end =}` |
+| `Object.entries(obj).map(([k, v]) => …)` | `{= range $k, $v := .obj =} … {= end =}` |
+
+Hacer `range` sobre un **objeto** itera sus claves en **orden ordenado** (determinístico); hacer
+`range` sobre un **array** mantiene el orden propio del array.
+
+Juntando las piezas — un solo objeto `options` alimentando tanto la ruta como un loop en el
+contenido:
+
+```ts
+create("src/{= .name | dasherize =}/{= .name | dasherize =}.component.ts", {
+  template:
+    "export class {= .name | classify =}Component {\n" +
+    "{= range .methods =}  {= .name =}() {}\n{= end =}}\n",
+  options: {
+    name: "userProfile",
+    methods: [{ name: "load" }, { name: "save" }],
+  },
+});
+```
+
+Ruta — `src/user-profile/user-profile.component.ts`
+
+```ts
+export class UserProfileComponent {
+  load() {}
+  save() {}
+}
+```
+
+## Condicionales: `if`, pero los operadores van primero
+
+La sorpresa más grande de todas. Una comparación es una **llamada a función con el nombre del
+operador primero**, y luego sus operandos — lo opuesto al estilo infijo de JavaScript:
+
+| JavaScript | Plantilla |
+|---|---|
+| `a === b` | `eq a b` |
+| `a !== b` | `ne a b` |
+| `a < b` | `lt a b` |
+| `a > b` | `gt a b` |
+| `a && b` | `and a b` |
+| `a \|\| b` | `or a b` |
+| `!a` | `not a` |
+
+Así que un chequeo de igualdad es:
+
+```js
+if (kind === "primary") { … }              // JavaScript
+```
+```
+{= if eq .kind "primary" =}…{= end =}       // plantilla — "eq" primero, luego los dos operandos
+```
+
+**Combina condiciones anidando las llamadas entre paréntesis** — no hay `&&` / `||`:
+
+```js
+if (a > 1 && b < 5) { … }                            // JavaScript
+```
+```
+{= if and (gt .a 1.0) (lt .b 5.0) =}…{= end =}       // plantilla
+```
+
+**`else` y `else if`:**
+
+```
+{= if eq .kind "primary" =}main
+{= else if eq .kind "secondary" =}alt
+{= else =}other
+{= end =}
+```
+
+Dos helpers de datos completan el conjunto de operadores — todos escritos con el operador
+primero, como llamadas a función, nunca con pipes:
+
+| Operador | Significado | Equivalente en JS |
+|---|---|---|
+| `len` | longitud de un string, array u objeto | `.length` / `Object.keys().length` |
+| `index` | acceso por elemento o clave | `arr[0]` / `obj["k"]` |
+
+```
+{= if gt (len .items) 0 =}has items{= end =}
+{= index .items 0 =}
+```
+
+El **núcleo garantizado** es `eq`, `ne`, `lt`, `gt`, `and`, `or`, `not`, `len`, `index`.
+Construye toda condición a partir de estos y seguirá funcionando entre versiones del engine.
+(`le` y `ge` funcionan hoy pero están fuera del núcleo garantizado — para una garantía estable,
+invierte con `not (gt …)` / `not (lt …)`.)
+
+<Aside type="note">
+Los pipes y los operadores son herramientas distintas: `dasherize` es un **pipe**
+(`.name | dasherize`); `eq` es un **operador** (`eq .kind "primary"`). Los operadores nunca se
+usan con pipe.
+</Aside>
+
+### Truthiness — casi como lo falsy de JS, con una trampa
+
+`{= if .x =}` sin operador comprueba si `.x` está "vacío". `false`, `0`, `""` y `null` son
+falsy, como en JS — pero un **array u objeto vacío también es falsy aquí**, donde JS trata a
+ambos como truthy. Eso en realidad es conveniente — para comprobar "¿esta lista tiene
+elementos?" escribes `{= if .items =}` directamente, sin `.length`.
+
+### La trampa del tipo numérico
+
+<Aside type="caution">
+Los literales numéricos deben coincidir con el tipo numérico de aquello contra lo que comparas,
+o el renderizado **falla con error**:
+
+- **Los valores de opción que son números JSON llegan como decimales.** Compáralos con un
+  **literal decimal**: `eq .count 2.0` funciona; `eq .count 2` **falla**.
+- **`len` retorna un entero.** Compáralo con un **literal de número entero**:
+  `gt (len .items) 0` funciona; `gt (len .items) 0.0` **falla**.
+
+En JavaScript `2 === 2.0` es `true` y nunca piensas en ello. Aquí las dos formas de literal son
+tipos distintos. Regla práctica: **literal decimal para un valor de opción, número entero para
+`len`.**
+</Aside>
+
+## `with` y variables
+
+`with` reasocia el punto `.` a un objeto anidado durante el bloque, así que dentro escribes
+`.name` y `.email` en lugar de `.user.name` / `.user.email`:
+
+```
+{= with .user =}{= .name =} ({= .email =}){= end =}
+```
+
+`$name` declara una variable con `:=` (igual que un índice/valor de `range`). Asigna un valor
+con pipe una sola vez y reutilízalo en lugar de repetir el pipe:
+
+```
+{= $base := .name | dasherize =}
+{= $base =}.component.ts
+{= $base =}.component.spec.ts
+```
+
+<Aside type="note">
+**No disponible: sub-plantillas.** `define`, `template` y `block` están bloqueados en tiempo de
+parseo — una plantilla que los usa falla con un error tipado y no escribe nada. Es un límite de
+seguridad deliberado, no un descuido.
+</Aside>
+
+## Plantillas en la ruta de salida
+
+El argumento `path` usa el **mismo** lenguaje que `template` — los mismos campos, pipes y
+sandbox. Así es como obtienes un directorio y un nombre de archivo con su casing a partir de una
+sola opción:
+
+```ts
+create("src/{= .name | dasherize =}/{= .name | classify =}.ts", { template, options });
+```
+
+con `name: "userProfile"` → `src/user-profile/UserProfile.ts`.
+
+La ruta renderizada se verifica por contención: una ruta que intenta escapar del workspace (por
+ejemplo vía `../`) se rechaza con un error tipado y **no se escribe ningún archivo**.
+
+## Espacios en blanco: limpio por defecto
+
+Una línea que contiene **solo** una directiva de control — `range`, `if`, `else`, `end`, `with`,
+una asignación o un comentario — se elimina entera (su indentación y su salto de línea final)
+antes del renderizado. Así que esta plantilla:
+
+```
+{= range .methods =}
+  {= .name =}
+{= end =}
+```
+
+produce una línea limpia por método, sin líneas en blanco provenientes de las líneas de
+`range`/`end`. Una línea genuinamente vacía — sin directiva alguna — siempre se preserva, y una
+línea que contiene una expresión de campo o pipe (`{= .name =}`) nunca se recorta.
+
+## Cuando algo sale mal
+
+Todo fallo es un error **tipado y posicionado** (nombra un `File:Line:Column`) y, en caso de
+fallo, **no se escribe ningún archivo** — el engine falla el renderizado completo de forma
+cerrada en lugar de producir un archivo parcial. Un nombre de opción mal escrito te da la línea
+y columna exactas de la referencia. Como el SDK nunca renderiza, todos los errores de plantilla
+aparecen en tiempo de ejecución, nunca en el momento en que se llama a `create()`. Consulta
+[manejo de errores](/es/guides/error-handling/) para la taxonomía completa.
+
+## Próximos pasos
+
+Para cualquier cosa más grande que un par de archivos, no escribas un `create()` por archivo —
+mantén una carpeta de archivos de plantilla y replícala con
+[`scaffold()`](/es/guides/scaffolding/). El resto de la superficie de mutación vive en
+[verbos de mutación](/es/guides/mutation-verbs/).
