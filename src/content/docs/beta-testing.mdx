@@ -3,16 +3,80 @@ title: Join the beta
 description: Apply to test Project Builder and send feedback directly from your MCP client.
 ---
 
-Project Builder's beta program is for people who want to test real project-generation workflows and report problems before a public release.
+Project Builder's beta program is for people who want to test real project-generation workflows and report problems before a public release. Access is tied to a verified GitHub identity and is granted manually.
 
 ## Apply
 
-1. Open the beta application page.
-2. Continue with the GitHub account you will use with your MCP client.
-3. Confirm your application. Your verified GitHub identity and email address are added to the private review list.
-4. Wait for approval. Applications are reviewed manually.
-5. When approved, you will receive an email from `beta@pbuilder.dev` with the MCP sign-in instructions.
+1. Open the beta application page below.
+2. Select **Continue with GitHub** and authorize the GitHub account you will use with your MCP client.
+3. After GitHub returns you to Project Builder, select **Join the review list**.
+4. Wait for manual review. Applying does not grant immediate MCP access.
+5. When approved, you will receive an email from `beta@pbuilder.dev` confirming that your GitHub identity can connect.
 
 [Apply to become a beta tester](https://project-builder-schematics.github.io/feedback-dashboard/?mode=apply)
 
-Submitting an application does not grant immediate access. Never share an approval email or authentication link.
+## MCP server URL
+
+Use this Streamable HTTP endpoint with a supported MCP client:
+
+```text
+https://bbivrybsyxpmkstomccd.supabase.co/functions/v1/project-builder-mcp
+```
+
+## Connect from Codex
+
+Add the remote server:
+
+```sh
+codex mcp add project-builder-feedback \
+  --url https://bbivrybsyxpmkstomccd.supabase.co/functions/v1/project-builder-mcp
+```
+
+Start GitHub authentication:
+
+```sh
+codex mcp login project-builder-feedback
+```
+
+Complete the browser flow with the same GitHub account used in your application. Restart Codex if the newly added tools do not appear in an existing session.
+
+## Connect from Claude Code
+
+Add the remote HTTP server:
+
+```sh
+claude mcp add --transport http project-builder-feedback \
+  https://bbivrybsyxpmkstomccd.supabase.co/functions/v1/project-builder-mcp
+```
+
+Open Claude Code, run `/mcp`, select `project-builder-feedback`, and complete authentication in the browser with your approved GitHub account.
+
+## Send feedback
+
+Once connected, ask your MCP client to use the `report_issue` tool. A useful report includes:
+
+- a short, specific title;
+- what happened and what you expected;
+- exact reproduction steps;
+- the Project Builder version and operating system;
+- whether the problem blocks your work or has a workaround.
+
+Example:
+
+```text
+Report this Project Builder issue through the feedback MCP:
+the generator stops after the first prompt on macOS 15 using version 0.14.2-beta.3.
+It should create the project and exit successfully. Reproduce it by running ...
+```
+
+The tool returns a report reference. If evidence would help, ask the client to create an attachment upload link, then open that temporary link to add supported images or videos. Upload links are private capabilities: do not share them.
+
+## Troubleshooting
+
+- **Access denied:** confirm that the application was approved and that the MCP client authenticated with the same GitHub account.
+- **Application still pending:** applications are reviewed manually; wait for the approval email before connecting.
+- **Authentication opens the wrong account:** clear the MCP server's saved authentication and repeat the browser flow with the approved GitHub account.
+- **Tools do not appear:** restart the MCP client after adding and authenticating the server.
+- **An upload link expired:** ask the MCP client to create a new attachment upload link.
+
+Never share approval emails, OAuth links, invitation codes, access tokens, or attachment upload links.
