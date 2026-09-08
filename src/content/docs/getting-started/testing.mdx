@@ -7,45 +7,152 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@pbuilder/sdk/testing` runs a factory in-memory — no CLI, no engine, no disk. Your factory
-is a plain typed function, so it tests like one: run it through `runFactoryForTest`, then
-assert on the resulting tree.
+<Aside type="tip" title="Testing utilities, not a test runner">
+`@pbuilder/sdk/testing` provides utilities for testing schematics with your test runner.
+Bun is not required for the in-memory factory example below: it runs on Node with
+Vitest, Jest, or Rstest.
+</Aside>
+
+Run your factory through `runFactoryForTest`, then assert on the resulting tree — no
+CLI, no engine process, and no generated files on disk.
 
 ## A first test
 
-Create `schematics/hello/factory.test.ts` next to the factory:
+Start in a separate directory so this example does not change your application's test
+configuration. Use Node **26.8.1** and npm **11.19.0**, the versions used to verify it.
+Create this `package.json`, then install the SDK and Vitest:
 
-```ts title="schematics/hello/factory.test.ts"
-import { test, expect } from "bun:test";
-import { runFactoryForTest } from "@pbuilder/sdk/testing";
-import { create } from "@pbuilder/sdk/commons";
+```json title="package.json"
+{
+  "private": true,
+  "type": "module"
+}
+```
 
-// in your schematic this is `import run from "./factory.ts";`
-const run = (input: { name: string }) => {
-  create(`src/services/${input.name}.ts`, {
-    template: `export const serviceName = "${input.name}";`,
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 vitest@5.0.0
+```
+
+Use a JavaScript ESM factory to keep the example independent of TypeScript transforms:
+
+```js title="factory.js"
+import { create } from '@pbuilder/sdk/commons';
+
+export function greetingFactory(input) {
+  create('src/greeting.txt', {
+    template: `Hello, ${input.name}!\n`,
     options: {},
   });
-};
+}
+```
 
-test("factory creates the service file", async () => {
-  const result = await runFactoryForTest(run, { name: "payments" });
+Create a `tests` directory and add:
 
+```js title="tests/vitest.test.js"
+import process from 'node:process';
+import { expect, test } from 'vitest';
+import { runFactoryForTest } from '@pbuilder/sdk/testing';
+import { greetingFactory } from '../factory.js';
+
+test('commits a greeting through the SDK harness on Node without Bun', async () => {
+  expect(process.versions.node).toBeDefined();
+  expect(process.versions.bun).toBeUndefined();
+  const result = await runFactoryForTest(greetingFactory, { name: 'Ada' });
   expect(result.error).toBeUndefined();
-  expect(result.tree.get("src/services/payments.ts"))
-    .toEqual(`export const serviceName = "payments";`);
-  expect(result.tree.has("src/services/payments.ts")).toBe(true);
-  expect([...result.tree.keys()]).toEqual(["src/services/payments.ts"]);
-  expect(result.tree.size).toBe(1);
+  expect(result.tree.get('src/greeting.txt')).toBe('Hello, Ada!\n');
+});
+```
+
+```js title="vitest.config.js"
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: { environment: 'node', include: ['tests/vitest.test.js'] },
 });
 ```
 
 ```sh
-bun test schematics
+node node_modules/vitest/vitest.mjs run
 ```
 
-This runs only your schematic tests under Bun — your app's own test runner (Jest, Vitest,
-whatever you use) stays untouched and the two coexist in one repo.
+Expected result: **one passing test**. The greeting exists in the committed in-memory
+tree, not as `src/greeting.txt` on disk. JavaScript interpolation produces the text;
+this test does not exercise SDK template rendering.
+
+## Use Jest or Rstest instead
+
+Keep the same `package.json` and `factory.js`. Copy the test above to the path for your
+chosen runner and replace **only** its `expect, test` import; keep the other imports and
+assertions unchanged. Install only the runner you choose. Each configuration selects
+its own test file, so the three examples can also coexist.
+
+### Jest
+
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 jest@30.5.1
+```
+
+In `tests/jest.test.js`, replace the Vitest import with:
+
+```js
+import { expect, test } from '@jest/globals';
+```
+
+```js title="jest.config.js"
+export default {
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/tests/jest.test.js'],
+  transform: {},
+};
+```
+
+```sh
+node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand
+```
+
+Expected result: **one passing test**. This uses Jest's native ESM mode with transforms
+disabled; Node emits an experimental VM Modules warning.
+
+### Rstest
+
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 @rstest/core@0.11.12
+```
+
+In `tests/rstest.test.js`, replace the Vitest import with:
+
+```js
+import { expect, test } from '@rstest/core';
+```
+
+```js title="rstest.config.js"
+import { defineConfig } from '@rstest/core';
+
+export default defineConfig({
+  testEnvironment: 'node',
+  include: ['tests/rstest.test.js'],
+});
+```
+
+```sh
+node node_modules/@rstest/core/bin/rstest.js run
+```
+
+Expected result: **one passing test**, using the same factory and assertions.
+
+### Scope of the verified example
+
+These versions passed the inline `create` case on Node 26.8.1 on macOS ARM64. The SDK
+declares Node `>=25.9.0` and Bun `1.3.14` in its engines; this result does not change those
+requirements or establish official Node-only support for every SDK feature. Schema
+validation, filesystem scaffolding, template rendering, and TypeScript type checking
+are not covered by this example.
+
+Runner references: [Vitest configuration](https://vitest.dev/config/),
+[Jest ESM](https://jestjs.io/docs/30.0/ecmascript-modules), and
+[Rstest configuration](https://rstest.rs/guide/basic/configure-rstest).
+
+## Read the result tree
 
 `result.tree` is typed as `ReadonlyMap<string, string>` and is a `Map` at runtime,
 not a plain object. Use `.get(path)` to read content (`undefined` when absent),
@@ -60,7 +167,7 @@ Seed files are readable by the factory, but untouched seed paths are absent from
 returned Map. A write to a seeded path appears when committed:
 
 ```ts
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 import { runFactoryForTest } from "@pbuilder/sdk/testing";
 import { find, replaceContent } from "@pbuilder/sdk/commons";
 
@@ -81,7 +188,7 @@ test("a seeded file is readable; only the write is committed", async () => {
 
 ## `packageDir` — anchoring package-local verbs
 
-The options bag's other field, `packageDir` (pass `import.meta.dir`), anchors the
+The options bag's other field, `packageDir` (the schematic package's absolute directory), anchors the
 package-local verbs (`scaffold`, `copyIn`, `create({ templateFile })`) and opts the run
 into schema-derived input validation against the adjacent `schema.json`. Without it those
 verbs have nothing to resolve against. (When the CLI runs your schematic, it passes the
@@ -99,7 +206,13 @@ Templates are stored **verbatim** in the test tree — rendering happens in the 
 shape.
 </Aside>
 
-## Editor errors on `bun:test`?
+## Bun as an alternative
+
+You can also use Bun's test runner with the harness. Import `test` and `expect` from
+`bun:test` in your Bun tests and run `bun test` with their path. The Node runtime
+assertions above are specific to the Node smoke test; omit them when running on Bun.
+
+### Editor errors on `bun:test`?
 
 `bun test` strips types rather than checking them, so it runs fine either way — but your
 editor needs a few tsconfig settings to resolve the imports. Add `typescript` and
@@ -111,6 +224,5 @@ editor needs a few tsconfig settings to resolve the imports. Add `typescript` an
   `Cannot find module '@pbuilder/sdk/commons'` even though the import is correct.
 - `allowImportingTsExtensions: true` — factories import the generated types with an
   explicit `.ts` extension (`./schema.generated.ts`), which TypeScript rejects by default.
-- `types: ["bun"]` — leaving `types` empty or unset hides the `bun:test` ambient module
-  even with `@types/bun` installed; naming it explicitly is what makes
-  `Cannot find module 'bun:test'` go away.
+- If you restrict ambient types with `types`, include `"bun"` alongside any existing
+  entries so the editor can resolve `bun:test` from `@types/bun`.

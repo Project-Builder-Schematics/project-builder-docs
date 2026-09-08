@@ -7,60 +7,167 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-`@pbuilder/sdk/testing` ejecuta un factory en memoria — sin CLI, sin engine, sin disco. Tu
-factory es una función tipada común y corriente, así que se prueba como tal: ejecútala con
-`runFactoryForTest` y luego haz aserciones sobre el árbol resultante.
+<Aside type="tip" title="Utilidades de testing, no un ejecutor de pruebas">
+`@pbuilder/sdk/testing` ofrece utilidades para probar schematics con tu ejecutor de pruebas.
+Bun no es necesario para el ejemplo de factory en memoria que aparece a continuación:
+se ejecuta en Node con Vitest, Jest o Rstest.
+</Aside>
+
+Ejecuta tu factory con `runFactoryForTest` y comprueba el árbol resultante — sin CLI,
+sin un proceso del engine y sin archivos generados en disco.
 
 ## Un primer test
 
-Crea `schematics/hello/factory.test.ts` junto al factory:
+Comienza en un directorio separado para no cambiar la configuración de pruebas de tu
+aplicación. Utiliza Node **26.8.1** y npm **11.19.0**, las versiones usadas para verificar
+el ejemplo. Crea este `package.json` e instala el SDK y Vitest:
 
-```ts title="schematics/hello/factory.test.ts"
-import { test, expect } from "bun:test";
-import { runFactoryForTest } from "@pbuilder/sdk/testing";
-import { create } from "@pbuilder/sdk/commons";
+```json title="package.json"
+{
+  "private": true,
+  "type": "module"
+}
+```
 
-// en tu schematic esto es `import run from "./factory.ts";`
-const run = (input: { name: string }) => {
-  create(`src/services/${input.name}.ts`, {
-    template: `export const serviceName = "${input.name}";`,
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 vitest@5.0.0
+```
+
+Utiliza un factory JavaScript ESM para que el ejemplo no dependa de transformaciones de TypeScript:
+
+```js title="factory.js"
+import { create } from '@pbuilder/sdk/commons';
+
+export function greetingFactory(input) {
+  create('src/greeting.txt', {
+    template: `Hello, ${input.name}!\n`,
     options: {},
   });
-};
+}
+```
 
-test("factory creates the service file", async () => {
-  const result = await runFactoryForTest(run, { name: "payments" });
+Crea un directorio `tests` y añade:
 
+```js title="tests/vitest.test.js"
+import process from 'node:process';
+import { expect, test } from 'vitest';
+import { runFactoryForTest } from '@pbuilder/sdk/testing';
+import { greetingFactory } from '../factory.js';
+
+test('commits a greeting through the SDK harness on Node without Bun', async () => {
+  expect(process.versions.node).toBeDefined();
+  expect(process.versions.bun).toBeUndefined();
+  const result = await runFactoryForTest(greetingFactory, { name: 'Ada' });
   expect(result.error).toBeUndefined();
-  expect(result.tree.get("src/services/payments.ts"))
-    .toEqual(`export const serviceName = "payments";`);
-  expect(result.tree.has("src/services/payments.ts")).toBe(true);
-  expect([...result.tree.keys()]).toEqual(["src/services/payments.ts"]);
-  expect(result.tree.size).toBe(1);
+  expect(result.tree.get('src/greeting.txt')).toBe('Hello, Ada!\n');
+});
+```
+
+```js title="vitest.config.js"
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: { environment: 'node', include: ['tests/vitest.test.js'] },
 });
 ```
 
 ```sh
-bun test schematics
+node node_modules/vitest/vitest.mjs run
 ```
 
-Esto ejecuta con Bun únicamente los tests de tus schematics — el test runner de tu propia
-aplicación (Jest, Vitest, el que uses) queda intacto y ambos conviven en un mismo repo.
+Resultado esperado: **una prueba aprobada**. El saludo existe en el árbol de escrituras
+confirmadas en memoria, no como `src/greeting.txt` en disco. La interpolación de JavaScript
+produce el texto; esta prueba no comprueba el renderizado de plantillas del SDK.
 
-`result.tree` is typed as `ReadonlyMap<string, string>` and is a `Map` at runtime,
-not a plain object. Use `.get(path)` to read content (`undefined` when absent),
-`.has(path)` to check membership, `[...result.tree.keys()]` to list paths, and
-`.size` to count entries. Do not use `result.tree[path]` to read files.
+## Usar Jest o Rstest en su lugar
+
+Conserva el mismo `package.json` y `factory.js`. Copia la prueba anterior a la ruta del
+ejecutor elegido y sustituye **solo** su importación de `expect, test`; conserva las demás
+importaciones y aserciones. Instala únicamente el ejecutor que elijas. Cada configuración
+selecciona su propio archivo de prueba, por lo que los tres ejemplos también pueden coexistir.
+
+### Jest
+
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 jest@30.5.1
+```
+
+En `tests/jest.test.js`, sustituye la importación de Vitest por:
+
+```js
+import { expect, test } from '@jest/globals';
+```
+
+```js title="jest.config.js"
+export default {
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/tests/jest.test.js'],
+  transform: {},
+};
+```
+
+```sh
+node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand
+```
+
+Resultado esperado: **una prueba aprobada**. Se utiliza el modo ESM nativo de Jest sin
+transformaciones; Node emite una advertencia sobre el carácter experimental de VM Modules.
+
+### Rstest
+
+```sh
+npm install --save-dev --save-exact @pbuilder/sdk@0.2.4 @rstest/core@0.11.12
+```
+
+En `tests/rstest.test.js`, sustituye la importación de Vitest por:
+
+```js
+import { expect, test } from '@rstest/core';
+```
+
+```js title="rstest.config.js"
+import { defineConfig } from '@rstest/core';
+
+export default defineConfig({
+  testEnvironment: 'node',
+  include: ['tests/rstest.test.js'],
+});
+```
+
+```sh
+node node_modules/@rstest/core/bin/rstest.js run
+```
+
+Resultado esperado: **una prueba aprobada**, con el mismo factory y las mismas aserciones.
+
+### Alcance del ejemplo verificado
+
+Estas versiones aprobaron el caso de `create` con contenido inline en Node 26.8.1 sobre
+macOS ARM64. El SDK declara Node `>=25.9.0` y Bun `1.3.14` en sus engines; este resultado
+no modifica esos requisitos ni establece soporte oficial exclusivo de Node para todas
+las funciones del SDK. El ejemplo no cubre la validación de esquemas, el scaffolding
+del sistema de archivos, el renderizado de plantillas ni la comprobación de tipos de TypeScript.
+
+Referencias de los ejecutores: [configuración de Vitest](https://vitest.dev/config/),
+[ESM en Jest](https://jestjs.io/docs/30.0/ecmascript-modules) y
+[configuración de Rstest](https://rstest.rs/guide/basic/configure-rstest).
+
+## Leer el árbol resultante
+
+`result.tree` tiene el tipo `ReadonlyMap<string, string>` y es un `Map` en tiempo de
+ejecución, no un objeto plano. Utiliza `.get(path)` para leer el contenido (`undefined`
+si no existe), `.has(path)` para comprobar su presencia, `[...result.tree.keys()]` para
+listar rutas y `.size` para contar entradas. No utilices `result.tree[path]` para leer archivos.
 
 ## Archivos seed e idempotencia
 
-The `seed` option is a plain object (`Record<string, string>`); the returned
-`result.tree` is a Map containing **committed writes only**, not a full workspace snapshot.
-Seed files are readable by the factory, but untouched seed paths are absent from the
-returned Map. A write to a seeded path appears when committed:
+La opción `seed` es un objeto plano (`Record<string, string>`); el `result.tree` devuelto
+es un Map que contiene **solo las escrituras confirmadas**, no una instantánea completa
+del espacio de trabajo. El factory puede leer los archivos iniciales, pero sus rutas no
+aparecen en el Map si no se modifican. Una escritura en una ruta inicial aparece al confirmarse:
 
 ```ts
-import { test, expect } from "bun:test";
+import { test, expect } from "vitest";
 import { runFactoryForTest } from "@pbuilder/sdk/testing";
 import { find, replaceContent } from "@pbuilder/sdk/commons";
 
@@ -81,7 +188,7 @@ test("a seeded file is readable; only the write is committed", async () => {
 
 ## `packageDir` — anclar los verbos locales al paquete
 
-El otro campo de la bolsa de opciones, `packageDir` (pasa `import.meta.dir`), ancla los
+El otro campo de las opciones, `packageDir` (el directorio absoluto del paquete del schematic), ancla los
 verbos locales al paquete (`scaffold`, `copyIn`, `create({ templateFile })`) y activa en la
 ejecución la validación de entradas derivada del schema contra el `schema.json` adyacente.
 Sin él, esos verbos no tienen contra qué resolverse. (Cuando la CLI ejecuta tu schematic,
@@ -100,7 +207,14 @@ aserciones sobre un `create` con plantilla significa hacerlas sobre el texto cru
 valide la forma del resultado.
 </Aside>
 
-## ¿Errores del editor con `bun:test`?
+## Bun como alternativa
+
+También puedes utilizar el ejecutor de pruebas de Bun con el harness. Importa `test`
+y `expect` desde `bun:test` en tus pruebas de Bun y ejecuta `bun test` con su ruta. Las
+aserciones sobre el entorno Node del ejemplo anterior son específicas de esa prueba;
+omítelas al ejecutar con Bun.
+
+### ¿Errores del editor con `bun:test`?
 
 `bun test` elimina los tipos en lugar de verificarlos, así que corre bien de cualquier
 manera — pero tu editor necesita algunos ajustes de tsconfig para resolver los imports.
@@ -113,6 +227,5 @@ Agrega `typescript` y `@types/bun` como dependencias de desarrollo y asegúrate 
   reporta `Cannot find module '@pbuilder/sdk/commons'` aunque el import sea correcto.
 - `allowImportingTsExtensions: true` — los factories importan los tipos generados con una
   extensión `.ts` explícita (`./schema.generated.ts`), que TypeScript rechaza por defecto.
-- `types: ["bun"]` — dejar `types` vacío o sin definir oculta el módulo ambiente
-  `bun:test` incluso con `@types/bun` instalado; nombrarlo explícitamente es lo que hace
-  desaparecer `Cannot find module 'bun:test'`.
+- Si restringes los tipos ambientales con `types`, incluye `"bun"` junto a las entradas
+  existentes para que el editor pueda resolver `bun:test` desde `@types/bun`.
