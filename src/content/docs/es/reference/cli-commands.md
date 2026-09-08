@@ -147,7 +147,7 @@ Los tokens de flags de schematic siguen estas reglas:
 | `--force` | Reservado — aún no implementado; emite una advertencia si se establece. |
 | `--auto-install` | Reservado — aún no implementado; emite una advertencia si se establece. |
 
-**Native engine limitation (CLI 0.9.1):** `--dry-run` / `--commit=never` is unsupported. The native adapter rejects any commit mode other than `always` before constructing or running the engine; it does not produce a preview. Place CLI flags **before** `<collection>:<schematic>`: after it, `--dry-run` is only a schematic input and does not select the CLI's no-write mode. Do not rely on that placement to prevent writes.
+**Native engine limitation:** `--dry-run` / `--commit=never` is unsupported. The native adapter rejects any commit mode other than `always` before constructing or running the engine; it does not produce a preview. Place CLI flags **before** `<collection>:<schematic>`: after it, `--dry-run` is only a schematic input and does not select the CLI's no-write mode. Do not rely on that placement to prevent writes.
 
 ### Ejemplos
 
