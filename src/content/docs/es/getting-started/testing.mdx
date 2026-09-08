@@ -34,6 +34,9 @@ test("factory creates the service file", async () => {
   expect(result.error).toBeUndefined();
   expect(result.tree.get("src/services/payments.ts"))
     .toEqual(`export const serviceName = "payments";`);
+  expect(result.tree.has("src/services/payments.ts")).toBe(true);
+  expect([...result.tree.keys()]).toEqual(["src/services/payments.ts"]);
+  expect(result.tree.size).toBe(1);
 });
 ```
 
@@ -44,12 +47,17 @@ bun test schematics
 Esto ejecuta con Bun únicamente los tests de tus schematics — el test runner de tu propia
 aplicación (Jest, Vitest, el que uses) queda intacto y ambos conviven en un mismo repo.
 
+`result.tree` is typed as `ReadonlyMap<string, string>` and is a `Map` at runtime,
+not a plain object. Use `.get(path)` to read content (`undefined` when absent),
+`.has(path)` to check membership, `[...result.tree.keys()]` to list paths, and
+`.size` to count entries. Do not use `result.tree[path]` to read files.
+
 ## Archivos seed e idempotencia
 
-`result.tree` contiene **únicamente las escrituras confirmadas**. Los archivos que
-prepueblas mediante la opción `seed` son legibles por el factory pero nunca aparecen en el
-árbol — que es exactamente cómo se verifica la idempotencia (un seed intacto está ausente
-del árbol):
+The `seed` option is a plain object (`Record<string, string>`); the returned
+`result.tree` is a Map containing **committed writes only**, not a full workspace snapshot.
+Seed files are readable by the factory, but untouched seed paths are absent from the
+returned Map. A write to a seeded path appears when committed:
 
 ```ts
 import { test, expect } from "bun:test";
@@ -62,11 +70,12 @@ test("a seeded file is readable; only the write is committed", async () => {
     replaceContent("services.txt", `${existing}\n${input.name}`);
   };
 
-  const seed = { "services.txt": "payments" };
+  const seed = { "services.txt": "payments", "untouched.txt": "keep" };
   const result = await runFactoryForTest(run, { name: "orders" }, { seed });
 
   expect(result.error).toBeUndefined();
   expect(result.tree.get("services.txt")).toEqual("payments\norders");
+  expect(result.tree.has("untouched.txt")).toBe(false);
 });
 ```
 

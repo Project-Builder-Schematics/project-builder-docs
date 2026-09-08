@@ -115,7 +115,7 @@ Ejecuta un schematic con nombre contra un workspace de proyecto. Alias: `e`, `g`
 ### Sinopsis
 
 ```sh
-builder execute <collection>:<schematic> [schematic flags]
+builder execute [CLI flags] <collection>:<schematic> [schematic flags]
 ```
 
 Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/angular:component`). La colección debe estar registrada en `project-builder.json` (creado por `builder init`).
@@ -147,7 +147,7 @@ Los tokens de flags de schematic siguen estas reglas:
 | `--force` | Reservado — aún no implementado; emite una advertencia si se establece. |
 | `--auto-install` | Reservado — aún no implementado; emite una advertencia si se establece. |
 
-**Limitación actual:** ningún motor respeta `--commit=never` todavía. El modo se resuelve y se transmite al motor, que aun así escribe — la CLI emite una advertencia cada vez que el modo resuelto no es `always`, de modo que una invocación con `--dry-run` nunca se confunde silenciosamente con una previsualización segura.
+**Native engine limitation (CLI 0.9.1):** `--dry-run` / `--commit=never` is unsupported. The native adapter rejects any commit mode other than `always` before constructing or running the engine; it does not produce a preview. Place CLI flags **before** `<collection>:<schematic>`: after it, `--dry-run` is only a schematic input and does not select the CLI's no-write mode. Do not rely on that placement to prevent writes.
 
 ### Ejemplos
 
@@ -161,8 +161,8 @@ builder g default:my-component --standalone --no-tests
 # Global flags go BEFORE the positional; schematic flags go after
 builder --output=json execute default:my-component --name=button
 
-# Request a no-write run (currently still writes — a warning is emitted)
-builder execute default:my-component --dry-run
+# Unsupported for native schematics: rejected, not a preview
+builder execute --dry-run default:my-component
 ```
 
 ---
