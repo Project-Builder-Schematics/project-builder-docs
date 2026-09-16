@@ -1,0 +1,188 @@
+---
+title: External collections
+description: Run schematics that live outside the working directory — for example from a git worktree — with --manifest or BUILDER_MANIFEST, while generated files still land where you run the command.
+sidebar:
+  order: 9
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+By default, `builder execute` reads `project-builder.json` — and every collection, factory and
+schema it registers — from the working directory. `--manifest` points those reads somewhere
+else on the same machine, while generated files still land in the working directory.
+
+The motivating case is **git worktrees**: your schematics are not committed to the
+application repository, so a worktree created next to the main checkout does not have them.
+With `--manifest`, every checkout runs the same schematics from one place.
+
+## Two roots
+
+| Root | What it is | What it is used for |
+|---|---|---|
+| **Manifest root** | The directory named by `--manifest` (or the working directory when it is not given) | All reads: `project-builder.json`, `collection.json`, factories, `schema.json`, templates. Paths registered in the manifest resolve against this directory. |
+| **Workspace** | The working directory | All writes: generated files, and the `@pbuilder/sdk` the run uses |
+
+Without `--manifest` both roots are the working directory, which is why you normally never
+notice the difference.
+
+<Aside type="caution" title="Local directories only">
+`--manifest` and `BUILDER_MANIFEST` accept a path on this machine — nothing else. Any value
+that starts with a URL scheme (`https://`, `git://`, `ssh://`, `file://`) or a drive letter
+is rejected. Nothing is fetched, cloned or cached.
+</Aside>
+
+## Set up a shared collections directory
+
+Keep the schematics in a directory of their own, outside the application checkouts, with
+**no `node_modules` in it or above it**:
+
+```text
+~/work/
+├── app-schematics/          ← manifest root
+│   ├── project-builder.json
+│   └── schematics/
+│       └── hello/
+│           ├── factory.ts
+│           ├── schema.json
+│           └── schema.generated.ts
+├── app/                     ← main checkout
+└── app-feature-x/           ← git worktree of app
+```
+
+```json title="app-schematics/project-builder.json"
+{
+  "collections": {
+    "default": { "hello": { "path": "./schematics/hello" } }
+  }
+}
+```
+
+<Aside type="danger" title="The manifest root must not carry its own SDK">
+A factory resolves `@pbuilder/sdk` from its own location first. If the manifest root — or any
+directory above it — has a `node_modules/@pbuilder/sdk`, the factory loads that copy while
+the run uses the workspace's copy. Two copies are never mixed: the run fails with
+`engine_native_developer_fault` and a note about a *split module graph*, even when both
+copies are the same version.
+
+This is why schematics kept inside the main checkout, which has its own `node_modules`,
+cannot be run from a worktree with `--manifest`. Move them to a directory of their own.
+</Aside>
+
+<Steps>
+
+1. **Install the SDK in each checkout that runs schematics.** The run uses the
+   **workspace's** `@pbuilder/sdk`, from a real `node_modules` directory in that checkout —
+   a symlinked `node_modules`, or an SDK linked in from another checkout, is rejected as
+   escaping the workspace. It must be version 0.3.1 or later: older versions cannot be
+   loaded by a factory outside the workspace.
+
+   Declare it as usual, or install it without touching `package.json` as described in
+   [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/):
+
+   ```sh
+   cd ~/work/app-feature-x
+   npm install --no-save @pbuilder/sdk
+   ```
+
+2. **Run the schematic, naming the manifest root.** `--manifest` goes **before**
+   `<collection>:<schematic>`:
+
+   ```sh
+   builder execute --manifest=../app-schematics default:hello --name=payments
+   ```
+
+   The factory and its schema are read from `~/work/app-schematics`; the generated file is
+   written to `~/work/app-feature-x/src/services/payments.ts`.
+
+3. **Inspect the collection the same way:**
+
+   ```sh
+   builder info --manifest=../app-schematics default
+   ```
+
+</Steps>
+
+The same command works from the main checkout — every checkout, worktree or not, uses the
+shared directory.
+
+## How the value is read
+
+- **A directory or the file itself.** `--manifest=../app-schematics` and
+  `--manifest=../app-schematics/project-builder.json` are equivalent.
+- **Relative or absolute.** A relative value resolves against the working directory. The
+  path is canonicalised once, following symbolic links.
+- **Naming the working directory** is the same as not passing the flag.
+- **Placement.** For `execute`, `--manifest` must come before `<collection>:<schematic>` —
+  after it, it is rejected with `invalid_input` instead of being passed to the schematic.
+  `info` accepts it before or after its argument.
+
+## Set it once with `BUILDER_MANIFEST`
+
+Tools that spawn `builder` inside a checkout — scripts, editors, agents — can set the
+environment variable instead of passing the flag:
+
+```sh
+export BUILDER_MANIFEST=~/work/app-schematics
+builder execute default:hello --name=orders
+```
+
+- `--manifest` always wins over `BUILDER_MANIFEST`. A flag that names an unusable directory
+  fails on its own; it never falls back to the variable.
+- When the variable points somewhere other than the working directory, every run prints the
+  `warn_manifest_root_ambient` warning with the resolved path, so an ambient setting never
+  goes unnoticed.
+
+## Trust rules
+
+The manifest root decides which code runs, so the CLI only accepts one that nobody else can
+modify. It refuses:
+
+- a root that is writable by its group or by other users;
+- a root with a directory above it that is **group**-writable, or world-writable without the
+  sticky bit;
+- a root, or a directory above it, owned by a user other than you or root;
+- the filesystem root, and your home directory itself (a directory inside your home is
+  fine).
+
+<Aside type="note">
+On macOS and many Linux systems `/tmp` is writable by its group, so a manifest root under
+`/tmp` is refused. Use a directory inside your home directory.
+</Aside>
+
+## What stays in the workspace
+
+- **`builder new schematic`** always writes to the working directory. If `--manifest` or
+  `BUILDER_MANIFEST` names a different directory, it refuses with
+  `manifest_scoped_authoring_refused` before writing anything. To author in the shared
+  directory, `cd` into it and run `builder new schematic` there. The shared directory has no
+  SDK, so the scaffold skips `schema.generated.ts` with a warning; regenerate types from any
+  checkout that has the SDK — codegen writes inside the project you name:
+
+  ```sh
+  cd ~/work/app
+  bunx pbuilder-codegen --project ../app-schematics
+  ```
+- **SDK settings in the external manifest are ignored.** An `sdk.root` or `sdk.version` in
+  the external `project-builder.json` is not used — the workspace's own installed SDK and its
+  own `package.json` decide. When the external manifest declares an `sdk.root`, the run warns
+  with `warn_manifest_sdk_root_ignored`.
+- **Other commands** do not accept `--manifest`: passing it to `init`, for example, fails
+  with `manifest_root_unsupported_command`.
+
+## Paths inside the manifest
+
+Every path the external manifest registers must be **relative** to the manifest root and stay
+inside it:
+
+- An absolute `path` fails with `collection_absolute_path`.
+- A path that resolves outside the manifest root — for example `../app/schematics/hello` —
+  fails as escaping the named manifest root.
+
+## Related
+
+- [`builder execute`](/reference/cli-commands/#builder-execute) and
+  [`builder info`](/reference/cli-commands/#builder-info) — flag reference.
+- [CLI output and errors](/reference/cli-output-and-errors/#manifest-root) — every
+  `--manifest` error and warning.
+- [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/) — install the SDK in a
+  checkout without editing `package.json`.

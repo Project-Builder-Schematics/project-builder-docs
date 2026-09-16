@@ -52,6 +52,11 @@ está diseñada deliberadamente para que la manejen agentes de IA: la salida reg
 JSON estructurado, así que un agente puede ejecutar un schematic y parsear el resultado
 como cualquier otra API.
 
+La CLI trabaja con dos anclas: la **raíz del manifiesto**, contra la que se resuelve cada
+lectura (`project-builder.json`, colecciones, factories, schemas, plantillas), y el
+**directorio de trabajo**, donde cae cada escritura. Por defecto son el mismo directorio;
+`--manifest` las separa — ver [Colecciones externas](/es/guides/external-collections/).
+
 ## La historia de los AST
 
 He aquí una simplificación extrema — pero útil —: **escribir software, en el día a día, es

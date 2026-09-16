@@ -175,11 +175,11 @@ Runs a named schematic against a project workspace. Aliases: `e`, `g`, `generate
 builder execute [CLI flags] <collection>:<schematic> [schematic flags]
 ```
 
-Provide the schematic as `<collection>:<schematic>` (for example `@schematics/angular:component`). The collection must be registered in `project-builder.json` (created by `builder init`).
+Provide the schematic as `<collection>:<schematic>` (for example `@schematics/angular:component`). The collection must be registered in `project-builder.json` — the one in the working directory (created by `builder init`), or the one named by [`--manifest`](#external-manifest---manifest).
 
 ### What it does
 
-`execute` validates the workspace (`project-builder.json` must exist), resolves the collection and schematic across all registration shapes, validates your inputs against the schematic's `schema.json`, and then runs the schematic through the engine, streaming its events to the terminal.
+`execute` validates the workspace (`project-builder.json` must exist in the working directory, or in the directory named by `--manifest`), resolves the collection and schematic across all registration shapes, validates your inputs against the schematic's `schema.json`, and then runs the schematic through the engine, streaming its events to the terminal.
 
 ### SDK requirement
 
@@ -269,10 +269,22 @@ Schematic flag tokens follow these rules:
 - Tokens that do not start with `--` (bare words, single-dash flags) are skipped with a warning.
 - Duplicate flag names are preserved in order, with a warning.
 
+### External manifest (`--manifest`)
+
+`--manifest=<path>` reads `project-builder.json`, collections, factories, schemas and templates from another directory on this machine, while generated files are still written to the working directory. The `BUILDER_MANIFEST` environment variable does the same; the flag always wins over it. See [External collections](/guides/external-collections/) for the full workflow.
+
+- **Value.** A directory or its `project-builder.json`, absolute or relative to the working directory, canonicalised once. Local paths only: URL schemes and drive letters are rejected. Naming the working directory is the same as omitting the flag.
+- **Placement.** Put it before `<collection>:<schematic>`. After the positional it is rejected (`invalid_input`), never passed to the schematic.
+- **Trust.** The root, and every directory above it, must not be writable by other users or by a group (a world-writable ancestor with the sticky bit is allowed), and must be owned by you or by root. The filesystem root and your home directory itself are refused.
+- **Paths in the manifest** must be relative to the manifest root and stay inside it.
+- **SDK.** The run uses the working directory's own `@pbuilder/sdk` (0.3.1 or later), installed in a real `node_modules`. The manifest root and its ancestors must not contain another `@pbuilder/sdk` copy, or the run fails with a split module graph. `sdk.root` and `sdk.version` in the external manifest are ignored.
+- **Warnings.** A root that came from `BUILDER_MANIFEST` is announced with `warn_manifest_root_ambient`; an ignored external `sdk.root` with `warn_manifest_sdk_root_ignored`.
+
 ### Flags
 
 | Flag | Effect |
 |---|---|
+| `--manifest=<path>` | Read the manifest, collections and schematics from this directory (or its `project-builder.json`) instead of the working directory. Must precede `<collection>:<schematic>`. See [External manifest](#external-manifest---manifest). |
 | `--commit=<never\|always>` | Write mode. Default `always`. `ask` is accepted syntactically but rejected — reserved for a future release. |
 | `--dry-run` | Alias for `--commit=never`. Setting `--dry-run` together with a disagreeing `--commit` value is an error. |
 | `--non-interactive` | Reserved — not yet implemented; emits a warning if set. |
@@ -296,6 +308,9 @@ builder --output=json execute default:my-component --name=button
 
 # Unsupported for native schematics: rejected, not a preview
 builder execute --dry-run default:my-component
+
+# Run a schematic registered in another checkout; files land in the working directory
+builder execute --manifest=../app-schematics default:my-component --name=button
 ```
 
 ---
@@ -337,6 +352,7 @@ Type generation is delegated to `pbuilder-codegen`, a binary shipped inside `@pb
 | `--inline` | Embed the schematic definition in `project-builder.json` instead of creating standalone files. |
 | `--language=<ts\|js>` | Force TypeScript or JavaScript factory. Auto-detect default: TS if `devDependencies.typescript` or `tsconfig.json` exists; falls back to TS with a warning otherwise. |
 | `--extends=<@scope/pkg:base>` | Declare a base schematic this one extends. Grammar enforced (`@scope/pkg:collection`); path traversal rejected. |
+| `--manifest=<path>` | Accepted only when it names the working directory itself. `new schematic` always writes to the working directory: if `--manifest` or `BUILDER_MANIFEST` names another directory, it refuses with `manifest_scoped_authoring_refused` before writing — `cd` into that directory instead. |
 
 ### Examples
 
@@ -415,7 +431,7 @@ Inspects the current project workspace's registered collections and schematics, 
 ### Synopsis
 
 ```sh
-builder info [<collection>[:<schematic>]]
+builder info [<collection>[:<schematic>]] [--manifest=<path>]
 ```
 
 ### What it does
@@ -428,7 +444,13 @@ The single optional argument selects one of three forms:
 | `builder info <collection>` | List a collection's schematics |
 | `builder info <collection>:<schematic>` | Show a schematic's full input detail |
 
-`info` has no local flags. Pass the global `--output=json` for machine-readable output.
+### Flags
+
+| Flag | Effect |
+|---|---|
+| `--manifest=<path>` | Inspect the manifest in this directory (or this `project-builder.json`) instead of the working directory. Also read from `BUILDER_MANIFEST`; the flag wins. Unlike `execute`, it may come before or after the argument. See [External manifest](#external-manifest---manifest). |
+
+Pass the global `--output=json` for machine-readable output.
 
 ### Examples
 
@@ -444,6 +466,9 @@ builder info default:my-component
 
 # Machine-readable variant
 builder info default:my-component --output=json
+
+# Inspect collections registered in another directory
+builder info --manifest=../app-schematics default
 ```
 
 ---

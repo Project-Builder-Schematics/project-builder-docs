@@ -47,6 +47,11 @@ input, resolves the schematic, and starts the engine — which owns the run from
 CLI is deliberately designed for AI agents to drive: output comes back as structured JSON,
 so an agent can run a schematic and parse the result like any other API.
 
+The CLI works with two anchors: the **manifest root**, which every read (`project-builder.json`,
+collections, factories, schemas, templates) resolves against, and the **working directory**,
+which every write lands in. By default they are the same directory; `--manifest` separates
+them — see [External collections](/guides/external-collections/).
+
 ## The AST story
 
 Here's an extreme — but useful — simplification: **writing software, day to day, is

@@ -175,11 +175,11 @@ Ejecuta un schematic con nombre contra un workspace de proyecto. Alias: `e`, `g`
 builder execute [CLI flags] <collection>:<schematic> [schematic flags]
 ```
 
-Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/angular:component`). La colección debe estar registrada en `project-builder.json` (creado por `builder init`).
+Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/angular:component`). La colección debe estar registrada en `project-builder.json` — el del directorio de trabajo (creado por `builder init`), o el indicado por [`--manifest`](#manifiesto-externo---manifest).
 
 ### Qué hace
 
-`execute` valida el workspace (`project-builder.json` debe existir), resuelve la colección y el schematic a través de todas las formas de registro, valida tus entradas contra el `schema.json` del schematic, y luego ejecuta el schematic a través del motor, transmitiendo sus eventos a la terminal.
+`execute` valida el workspace (`project-builder.json` debe existir en el directorio de trabajo, o en el directorio indicado por `--manifest`), resuelve la colección y el schematic a través de todas las formas de registro, valida tus entradas contra el `schema.json` del schematic, y luego ejecuta el schematic a través del motor, transmitiendo sus eventos a la terminal.
 
 ### Requisito del SDK
 
@@ -269,10 +269,22 @@ Los tokens de flags de schematic siguen estas reglas:
 - Los tokens que no comienzan con `--` (palabras sueltas, flags de un solo guion) se omiten con una advertencia.
 - Los nombres de flags duplicados se preservan en orden, con una advertencia.
 
+### Manifiesto externo (`--manifest`)
+
+`--manifest=<path>` lee `project-builder.json`, las colecciones, factories, schemas y plantillas desde otro directorio de esta máquina, mientras que los archivos generados se siguen escribiendo en el directorio de trabajo. La variable de entorno `BUILDER_MANIFEST` hace lo mismo; el flag siempre tiene prioridad sobre ella. Ver [Colecciones externas](/es/guides/external-collections/) para el flujo completo.
+
+- **Valor.** Un directorio o su `project-builder.json`, absoluto o relativo al directorio de trabajo, canonicalizado una sola vez. Solo rutas locales: se rechazan los esquemas de URL y las letras de unidad. Indicar el propio directorio de trabajo equivale a omitir el flag.
+- **Ubicación.** Ponlo antes de `<collection>:<schematic>`. Después del posicional se rechaza (`invalid_input`); nunca se pasa al schematic.
+- **Confianza.** Ni la raíz ni ningún directorio por encima pueden ser escribibles por otros usuarios o por un grupo (se permite un ancestro escribible por todos con sticky bit), y deben pertenecerte a ti o a root. Se rechazan la raíz del sistema de archivos y tu propio directorio home.
+- **Las rutas del manifiesto** deben ser relativas a la raíz del manifiesto y quedar dentro de ella.
+- **SDK.** La ejecución usa el `@pbuilder/sdk` del propio directorio de trabajo (0.3.1 o posterior), instalado en un `node_modules` real. La raíz del manifiesto y sus ancestros no deben contener otra copia de `@pbuilder/sdk`, o la ejecución falla con un split module graph. Se ignoran `sdk.root` y `sdk.version` del manifiesto externo.
+- **Advertencias.** Una raíz que vino de `BUILDER_MANIFEST` se anuncia con `warn_manifest_root_ambient`; un `sdk.root` externo ignorado, con `warn_manifest_sdk_root_ignored`.
+
 ### Flags
 
 | Flag | Efecto |
 |---|---|
+| `--manifest=<path>` | Leer el manifiesto, las colecciones y los schematics desde este directorio (o su `project-builder.json`) en lugar del directorio de trabajo. Debe ir antes de `<collection>:<schematic>`. Ver [Manifiesto externo](#manifiesto-externo---manifest). |
 | `--commit=<never\|always>` | Modo de escritura. Por defecto `always`. `ask` se acepta sintácticamente pero se rechaza — reservado para una versión futura. |
 | `--dry-run` | Alias de `--commit=never`. Establecer `--dry-run` junto con un valor de `--commit` contradictorio es un error. |
 | `--non-interactive` | Reservado — aún no implementado; emite una advertencia si se establece. |
@@ -296,6 +308,9 @@ builder --output=json execute default:my-component --name=button
 
 # Unsupported for native schematics: rejected, not a preview
 builder execute --dry-run default:my-component
+
+# Run a schematic registered in another checkout; files land in the working directory
+builder execute --manifest=../app-schematics default:my-component --name=button
 ```
 
 ---
@@ -337,6 +352,7 @@ La generación de tipos se delega a `pbuilder-codegen`, un binario incluido dent
 | `--inline` | Incrustar la definición del schematic en `project-builder.json` en lugar de crear archivos independientes. |
 | `--language=<ts\|js>` | Forzar una factory en TypeScript o JavaScript. Autodetección por defecto: TS si existe `devDependencies.typescript` o `tsconfig.json`; en caso contrario recurre a TS con una advertencia. |
 | `--extends=<@scope/pkg:base>` | Declarar un schematic base que este extiende. La gramática se aplica estrictamente (`@scope/pkg:collection`); el path traversal se rechaza. |
+| `--manifest=<path>` | Solo se acepta si indica el propio directorio de trabajo. `new schematic` siempre escribe en el directorio de trabajo: si `--manifest` o `BUILDER_MANIFEST` indican otro directorio, se niega con `manifest_scoped_authoring_refused` antes de escribir — haz `cd` a ese directorio. |
 
 ### Ejemplos
 
@@ -415,7 +431,7 @@ Inspecciona las colecciones y schematics registrados en el workspace de proyecto
 ### Sinopsis
 
 ```sh
-builder info [<collection>[:<schematic>]]
+builder info [<collection>[:<schematic>]] [--manifest=<path>]
 ```
 
 ### Qué hace
@@ -428,7 +444,13 @@ El único argumento opcional selecciona una de tres formas:
 | `builder info <collection>` | Lista los schematics de una colección |
 | `builder info <collection>:<schematic>` | Muestra el detalle completo de las entradas de un schematic |
 
-`info` no tiene flags locales. Pasa el flag global `--output=json` para obtener salida legible por máquinas.
+### Flags
+
+| Flag | Efecto |
+|---|---|
+| `--manifest=<path>` | Inspeccionar el manifiesto de este directorio (o este `project-builder.json`) en lugar del directorio de trabajo. También se lee de `BUILDER_MANIFEST`; el flag tiene prioridad. A diferencia de `execute`, puede ir antes o después del argumento. Ver [Manifiesto externo](#manifiesto-externo---manifest). |
+
+Pasa el flag global `--output=json` para obtener salida legible por máquinas.
 
 ### Ejemplos
 
@@ -444,6 +466,9 @@ builder info default:my-component
 
 # Machine-readable variant
 builder info default:my-component --output=json
+
+# Inspect collections registered in another directory
+builder info --manifest=../app-schematics default
 ```
 
 ---

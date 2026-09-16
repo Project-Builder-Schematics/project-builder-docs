@@ -151,9 +151,10 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | `execute_invalid_factory_pointer` | 2 | schematic's factory pointer is empty or missing in collection.json | Note: set `collection.json`'s factory to `<module>#<export>` |
 | `execute_invalid_input_value` | 2 | input value is invalid | Note: check the input's type, enum values, and whether it is scalar-typed |
 | `execute_manifest_path_escape` | 3 | manifest-derived path resolves outside the workspace root | Note: check the manifest for a path that escapes the project workspace. If `sdk.root` was removed, `node_modules/@pbuilder/sdk` may be a leftover link — confirm it is a symlink, never a directory, then delete it |
+| `execute_manifest_path_escape` (`path_escapes_manifest_root`) | 3 | manifest-derived path resolves outside the named manifest root | Note: check the manifest for a path that escapes the named manifest root |
 | `execute_manifest_path_escape` (`sdk_node_modules_escapes_workspace`) | 3 | node_modules is a symlink that resolves outside the workspace root | Note: check whether `node_modules` is a symlink pointing outside the project workspace; the leftover `sdk.root` link note above also applies |
 | `execute_missing_required_inputs` | 2 | missing required input(s) | Fix: `builder execute <collection>:<schematic> --<name>=<value>` |
-| `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json` |
+| `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edit `schema.json` to fix the JSON syntax error |
 | `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
@@ -230,6 +231,30 @@ This is not a `builder` error: it comes from your package runner (`npx`, `bunx`)
 
 With `sdk.root`, run the script directly — see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from the configured root by itself.
 
+### Manifest root
+
+Errors and warnings from [`--manifest` / `BUILDER_MANIFEST`](/guides/external-collections/). Locations in `detail` are relative to the manifest root, such as `2 levels above the manifest root`.
+
+| Code | Reason | Exit | Message | Remedy |
+|---|---|---|---|---|
+| `manifest_root_unsupported_scheme` | `manifest_root_unsupported_scheme` | 2 | manifest root is not a supported location — a URL or drive letter is not accepted | Point `--manifest` (or `BUILDER_MANIFEST`) at a local directory or `project-builder.json` file |
+| `manifest_root_unresolvable` | `manifest_root_unresolvable` | 3 | manifest root does not resolve to a usable directory or project-builder.json file | Point it at an existing, readable directory or `project-builder.json` file |
+| `manifest_root_untrusted` | `manifest_root_untrusted_owner` | 3 | the manifest root is owned by another user | Move the manifest root under a path owned by you or by root |
+| `manifest_root_untrusted` | `manifest_root_writable_by_others` | 3 | the manifest root itself is writable by its group or by any user | `chmod go-w` the manifest root so only its owner can write to it |
+| `manifest_root_untrusted` | `manifest_root_ancestor_world_writable` | 3 | a directory above the manifest root is writable by its group, or by any user without the sticky bit | `chmod o-w` (or `g-w`) that directory, or move the manifest root under a directory only you can write to. A root under `/tmp` hits this |
+| `manifest_root_untrusted` | `manifest_root_is_filesystem_root` | 3 | the filesystem root cannot be named as a manifest root | Point it at the specific directory holding `project-builder.json` |
+| `manifest_root_untrusted` | `manifest_root_is_home_directory` | 3 | your home directory cannot be named as a manifest root | Point it at a directory inside your home directory, not the home directory itself |
+| `manifest_root_unsupported_command` | `manifest_root_command_unsupported` | 2 | this command does not support --manifest | `--manifest` is supported on `execute`, `info` and `new schematic` only |
+| `manifest_scoped_authoring_refused` | `manifest_scoped_authoring_refused` | 2 | new schematic refuses to author under a named external manifest root | `cd` into that directory and run `builder new schematic` there instead |
+| `collection_absolute_path` | `collection_path_absolute` | 3 | a manifest-registered path must be relative to the manifest's own root | Make the registered `path` relative to the manifest root |
+
+| Warning | Meaning |
+|---|---|
+| `warn_manifest_root_ambient` | The manifest root came from `BUILDER_MANIFEST`, not from a flag. The message names the resolved directory. |
+| `warn_manifest_sdk_root_ignored` | The external manifest declares an `sdk.root`; it is ignored and the working directory's installed `@pbuilder/sdk` is used. |
+
+A run that fails with `engine_native_developer_fault` and a note about a *split module graph* while using `--manifest` means the manifest root, or a directory above it, has its own `@pbuilder/sdk`. See [External collections](/guides/external-collections/#set-up-a-shared-collections-directory).
+
 ### `builder info`
 
 | Code | Exit | Message | Remedy |
@@ -237,9 +262,10 @@ With `sdk.root`, run the script directly — see [Type generation with `sdk.root
 | `info_ambiguous_registration` | 2 | registration is ambiguous | Note: resolve the collection to a single registration mode |
 | `info_collection_not_found` | 2 | collection not found in project-builder.json | Note: check `project-builder.json` for the registered collection name |
 | `info_invalid_factory_pointer` | 3 | schematic's factory pointer is empty or missing | Note: edit `collection.json`'s factory to `<module>#<export>` |
+| `info_invalid_factory_pointer` (`path_escapes_manifest_root`) | 3 | schematic's registered path, factory module, or schema.json resolves outside the named manifest root | Note: keep every registered path inside the manifest root |
 | `info_manifest_invalid` | 3 | collection manifest not found | Fix: check that `collection.json` exists at the registered path |
 | `info_manifest_invalid` | 3 | collection manifest could not be parsed | Note: edit `collection.json` to fix the JSON syntax error |
-| `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json` |
+| `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `info_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `info_schema_invalid` | 3 | schema.json is missing or could not be parsed | Note: ensure `schema.json` exists at the schematic root and is valid JSON |
 | `info_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
