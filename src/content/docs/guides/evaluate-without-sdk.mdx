@@ -79,6 +79,22 @@ before the failure stay on disk.
 
    Skip this step if the repository already has an SDK installed.
 
+   **Alternative: use a global SDK.** Instead of installing into `node_modules`, point
+   [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot) in `project-builder.json`
+   at a global install — for example the directory `bun add -g @pbuilder/sdk` creates:
+
+   ```json title="project-builder.json"
+   {
+     "sdk": {
+       "root": "/Users/me/.bun/install/global/node_modules/@pbuilder/sdk"
+     }
+   }
+   ```
+
+   The first committing `builder execute` then creates a single symbolic link,
+   `node_modules/@pbuilder/sdk`, pointing at that root. To regenerate types by hand in this
+   setup, see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot).
+
 4. **Create and run a schematic:**
 
    ```sh
@@ -152,8 +168,10 @@ Work from what the trial actually changed — not from a blanket reset:
    `.claude/skills/pbuilder/` — when they did not exist before.
 3. Undo only trial changes in tracked files, such as the marker block added to `AGENTS.md`
    or `CLAUDE.md`. Keep any edits of your own.
-4. Remove the trial SDK from `node_modules` if you installed one, and the lines you added to
-   the exclude file.
+4. Remove the trial SDK from `node_modules` if you installed one — or, if you used
+   `sdk.root`, remove the key and then the link it left behind
+   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`). Also remove the
+   lines you added to the exclude file.
 
 Do not reach for `git clean` or `git reset --hard`: they also destroy work that has nothing
 to do with the trial.

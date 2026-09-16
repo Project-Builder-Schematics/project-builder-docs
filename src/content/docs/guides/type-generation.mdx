@@ -232,6 +232,27 @@ bunx pbuilder-codegen
 git diff --exit-code -- '*schema.generated.ts'
 ```
 
+## When the SDK comes from `sdk.root`
+
+With [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot), `node_modules/@pbuilder/sdk` is a link the CLI created, not a package your package manager installed — so there is no `node_modules/.bin/pbuilder-codegen` shim. Package runners then misbehave in one of two ways:
+
+- `bunx pbuilder-codegen` and `npx pbuilder-codegen` report the binary as missing, even though the SDK is present and `builder execute` works.
+- If an SDK is also installed globally, `npx` can run **that global copy** without telling you — possibly a different version from the one `sdk.root` names.
+- Recent pnpm versions run an install before `pnpm exec`. That makes the command work, but it writes a `pnpm-lock.yaml` and a shim into your project — the kind of change `sdk.root` exists to avoid.
+
+The `generate:types` script that `builder init` adds calls `pbuilder-codegen` by name, so it is affected too.
+
+Run the script directly with Node instead. It accepts the same forms — no argument, `--project <directory>`, or a schematic directory:
+
+```sh
+node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js
+node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js schematics/hello
+```
+
+The link exists once a committing `builder execute` has run. Before that, use the configured root itself: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
+
+`builder new schematic` needs none of this: it resolves the configured root on its own and regenerates the new schematic's types.
+
 ## Output files and write boundaries
 
 Codegen only writes where the run is allowed to:

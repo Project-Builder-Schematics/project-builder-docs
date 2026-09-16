@@ -240,6 +240,27 @@ bunx pbuilder-codegen
 git diff --exit-code -- '*schema.generated.ts'
 ```
 
+## Cuando el SDK viene de `sdk.root`
+
+Con [`sdk.root`](/es/reference/cli-commands/#sdk-externo-sdkroot), `node_modules/@pbuilder/sdk` es un enlace que creó la CLI, no un paquete que instaló tu gestor de paquetes — así que no hay shim `node_modules/.bin/pbuilder-codegen`. Los ejecutores de paquetes fallan entonces de una de estas formas:
+
+- `bunx pbuilder-codegen` y `npx pbuilder-codegen` reportan que falta el binario, aunque el SDK está presente y `builder execute` funciona.
+- Si además hay un SDK instalado globalmente, `npx` puede ejecutar **esa copia global** sin avisarte — posiblemente una versión distinta de la que indica `sdk.root`.
+- Las versiones recientes de pnpm ejecutan una instalación antes de `pnpm exec`. Eso hace que el comando funcione, pero escribe un `pnpm-lock.yaml` y un shim en tu proyecto — justo el tipo de cambio que `sdk.root` existe para evitar.
+
+El script `generate:types` que agrega `builder init` llama a `pbuilder-codegen` por nombre, así que también se ve afectado.
+
+Ejecuta el script directamente con Node. Acepta las mismas formas — sin argumento, `--project <directory>` o un directorio de schematic:
+
+```sh
+node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js
+node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js schematics/hello
+```
+
+El enlace existe una vez que corrió un `builder execute` con commit. Antes de eso, usa la raíz configurada: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
+
+`builder new schematic` no necesita nada de esto: resuelve la raíz configurada por su cuenta y regenera los tipos del nuevo schematic.
+
 ## Archivos de salida y límites de escritura
 
 El codegen solo escribe donde la ejecución tiene permitido hacerlo:

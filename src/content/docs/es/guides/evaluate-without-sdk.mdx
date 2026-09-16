@@ -81,6 +81,22 @@ las salidas escritas antes del fallo quedan en disco.
 
    Omite este paso si el repositorio ya tiene un SDK instalado.
 
+   **Alternativa: usa un SDK global.** En lugar de instalar en `node_modules`, apunta
+   [`sdk.root`](/es/reference/cli-commands/#sdk-externo-sdkroot) en `project-builder.json` a
+   una instalación global — por ejemplo el directorio que crea `bun add -g @pbuilder/sdk`:
+
+   ```json title="project-builder.json"
+   {
+     "sdk": {
+       "root": "/Users/me/.bun/install/global/node_modules/@pbuilder/sdk"
+     }
+   }
+   ```
+
+   El primer `builder execute` con commit crea entonces un único enlace simbólico,
+   `node_modules/@pbuilder/sdk`, que apunta a esa raíz. Para regenerar tipos a mano con esta
+   configuración, ver [Generación de tipos con `sdk.root`](/es/guides/type-generation/#cuando-el-sdk-viene-de-sdkroot).
+
 4. **Crea y ejecuta un schematic:**
 
    ```sh
@@ -156,8 +172,10 @@ Parte de lo que la prueba realmente cambió — no de un reset general:
    `.claude/skills/pbuilder/` — cuando no existían antes.
 3. Deshaz solo los cambios de la prueba en archivos versionados, como el bloque marcador
    agregado a `AGENTS.md` o `CLAUDE.md`. Conserva tus propias ediciones.
-4. Quita el SDK de prueba de `node_modules` si lo instalaste, y las líneas que agregaste al
-   archivo de exclusión.
+4. Quita el SDK de prueba de `node_modules` si lo instalaste — o, si usaste `sdk.root`,
+   quita la clave y luego el enlace que dejó
+   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`). Quita también las
+   líneas que agregaste al archivo de exclusión.
 
 No recurras a `git clean` ni a `git reset --hard`: también destruyen trabajo que no tiene
 nada que ver con la prueba.

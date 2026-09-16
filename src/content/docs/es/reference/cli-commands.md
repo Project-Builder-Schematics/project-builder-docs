@@ -183,7 +183,7 @@ Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/an
 
 ### Requisito del SDK
 
-`execute` ejecuta el schematic con el `@pbuilder/sdk` instalado en `node_modules/@pbuilder/sdk` del workspace. Una declaración en `package.json` no instala nada: el paquete debe estar presente, completo y legible. Declararlo no es obligatorio — ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/).
+`execute` ejecuta el schematic con el `@pbuilder/sdk` instalado en `node_modules/@pbuilder/sdk` del workspace, o con un SDK fuera del proyecto indicado por [`sdk.root`](#sdk-externo-sdkroot). Una declaración en `package.json` no instala nada: el paquete debe estar presente, completo y legible. Declararlo no es obligatorio — ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/).
 
 Antes de inspeccionar la instalación, `execute` selecciona un requisito de versión de la **primera** de estas fuentes que esté presente:
 
@@ -207,6 +207,55 @@ Para declarar un requisito sin agregar una dependencia, defínelo en `project-bu
 ```
 
 `init` nunca escribe este bloque, y la clave de nivel superior `dependencies` de `project-builder.json` no interviene en la selección del SDK.
+
+### SDK externo (`sdk.root`)
+
+`sdk.root` ejecuta los schematics con un `@pbuilder/sdk` que vive fuera del proyecto — normalmente una instalación global — sin instalarlo en el proyecto ni editar `package.json`:
+
+```json title="project-builder.json"
+{
+  "sdk": {
+    "root": "/Users/me/.bun/install/global/node_modules/@pbuilder/sdk"
+  }
+}
+```
+
+**El valor.** Una ruta absoluta se usa tal cual; una ruta relativa se resuelve contra el directorio que contiene `project-builder.json`. La ruta se canonicaliza — se resuelven los enlaces simbólicos que contenga, así que en macOS `/tmp/sdk` pasa a ser `/private/tmp/sdk`. Funcionan las rutas con espacios y con segmentos `..`. La raíz puede estar fuera del workspace o dentro: su ubicación por sí sola no la hace válida. El valor se valida cuando se ejecuta `execute` o `new schematic`, no al leer la configuración.
+
+**Qué debe ser la raíz.** El directorio del paquete en sí, tal como lo deja una instalación global:
+
+| Instalación | `sdk.root` |
+|---|---|
+| `bun add -g @pbuilder/sdk` | `~/.bun/install/global/node_modules/@pbuilder/sdk` (expande `~` — escribe la ruta completa) |
+| `npm install -g @pbuilder/sdk` | `<npm root -g>/@pbuilder/sdk` — ejecuta `npm root -g` para obtener el prefijo |
+
+Antes de enlazar nada, `execute` valida la raíz:
+
+- **Identidad** — el `name` de su `package.json` es `@pbuilder/sdk`.
+- **Distribución** — existen `dist/bin/pbuilder-runner.js` y `dist/transport`.
+- **Versión** — la versión instalada cumple el [requisito del SDK](#requisito-del-sdk), seleccionado igual que para una instalación local.
+- **Dependencias** — las dependencias de ejecución del propio SDK (hoy `ts-morph`) se resuelven desde un `node_modules` en la raíz o por encima de ella. Un directorio de caché de un gestor de paquetes no sirve.
+- **Permisos** — la raíz no es escribible por su grupo ni por otros usuarios, ningún directorio por encima es escribible por todos sin el sticky bit, y la raíz y sus ancestros te pertenecen a ti o a root. Un directorio por encima de la raíz que solo es escribible por el **grupo** no hace fallar la ejecución: emite la advertencia `warn_sdk_root_group_writable` y la ejecución continúa.
+
+**El enlace.** Cuando la ejecución hace commit, `execute` crea exactamente una entrada: `node_modules/@pbuilder/sdk` en el workspace, un **enlace simbólico** a la raíz canónica. Crea `node_modules/` y `node_modules/@pbuilder/` si faltan, y no escribe nada más. Volver a ejecutar con la misma raíz reutiliza el enlace sin escribir; cambiar `sdk.root` lo redirige. Una escritura fallida no deja un enlace a medias. Las ejecuciones sin commit — `--dry-run` o `--commit=never` — no crean nada; para schematics nativos se rechazan de todos modos (ver la limitación del motor nativo más abajo).
+
+**Una instalación local no gana en silencio.** Si `node_modules/@pbuilder/sdk` ya es un directorio real, `execute` nunca lo sobrescribe ni elige uno de los dos por ti: falla con `execute_sdk_link_path_conflict`. La única excepción es una entrada local que resuelve canónicamente al mismo directorio que `sdk.root` — en ese caso la ejecución continúa sin error y sin escribir. Ninguna de las dos instalaciones se modifica nunca.
+
+**`builder new schematic`** resuelve el SDK directamente desde `sdk.root`, sin un `execute` previo y sin enlace. Valida la raíz de la misma forma — salvo el requisito de versión, que solo aplica `execute`. Una raíz que falla cualquier comprobación cuenta como "sin SDK utilizable": el comando igualmente termina con `0` y escribe el andamiaje, advierte y omite `schema.generated.ts`. Nunca ejecuta nada desde una raíz que no pasó la validación.
+
+**`builder info`** ignora `sdk.root`, sea válido o no.
+
+**Los mensajes nunca contienen la ruta.** Ningún error, advertencia, sugerencia ni campo JSON incluye la ruta de la raíz configurada. Las ubicaciones se describen respecto de la raíz — "the configured root itself", "1 level above sdk.root", "N levels above sdk.root".
+
+**Quitar `sdk.root`.** Borrar la clave no elimina el enlace. El siguiente `execute` falla con `execute_manifest_path_escape`, porque el enlace sobrante ahora apunta fuera del workspace. Confirma que es un symlink — nunca un directorio — y bórralo:
+
+```sh
+test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk
+```
+
+**Regenerar tipos a mano.** Ningún gestor de paquetes instaló nada, así que no hay un shim `node_modules/.bin/pbuilder-codegen`. Ver [Generación de tipos con `sdk.root`](/es/guides/type-generation/#cuando-el-sdk-viene-de-sdkroot).
+
+Cada código de error y reason está en [Errores del SDK](/es/reference/cli-output-and-errors/#errores-del-sdk).
 
 ### Pasar entradas al schematic
 
@@ -277,7 +326,7 @@ Dos modos, controlados por `--inline`.
 
 **Modo inline (`--inline`)** — incrusta el schematic directamente dentro de `project-builder.json` bajo `collections.default.schematics.<name>`; no se crean archivos en `schematics/<name>/`. Se disparan advertencias suaves cuando una colección acumula 10 o más schematics inline, o cuando `project-builder.json` supera los 20KB después de la escritura.
 
-La generación de tipos se delega a `pbuilder-codegen`, un binario incluido dentro de `@pbuilder/sdk`. Cuando el SDK no está instalado, el paso automático de codegen se omite con una advertencia en lugar de hacer fallar el andamiaje (`schema.generated.ts` queda desactualizado o ausente). Para regenerar los tipos más tarde — para un schematic o para todas las colecciones registradas — ver [Generación de tipos](/es/guides/type-generation/).
+La generación de tipos se delega a `pbuilder-codegen`, un binario incluido dentro de `@pbuilder/sdk`. Cuando el SDK no está instalado, el paso automático de codegen se omite con una advertencia en lugar de hacer fallar el andamiaje (`schema.generated.ts` queda desactualizado o ausente). Con [`sdk.root`](#sdk-externo-sdkroot) configurado, el codegen se ejecuta desde esa raíz; una raíz que no pasa la validación se trata como si no hubiera un SDK utilizable. Para regenerar los tipos más tarde — para un schematic o para todas las colecciones registradas — ver [Generación de tipos](/es/guides/type-generation/).
 
 ### Flags
 
