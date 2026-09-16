@@ -94,3 +94,31 @@ Two properties fall out of this design:
 - **The SDK is self-contained.** Everything a factory produces is IR, so the testing
   harness can stand in for the entire engine side and run factories completely in memory —
   no CLI, no engine, no disk. That's why schematics are testable like any other code.
+
+### For integrators: how the runner receives input
+
+This matters only if you build an engine or adapter that spawns the SDK runner yourself —
+`builder execute` handles it for you, and there is no `--input-file` flag on `builder`.
+
+The runner takes the schematic's input from **exactly one** of `--input <json>` or
+`--input-file <path>`. An input file must be a **readable regular file** containing valid JSON,
+no larger than 10 MiB (10485760 bytes). Absolute and relative paths both work, and a symbolic
+link is followed when its target is a regular file — even one outside the working directory.
+
+The runner checks the input **before** it expects the host's greeting and before it imports the
+factory. When the input is rejected, the runner exits with code `1` and one line on stderr:
+
+| Input | Diagnostic |
+|---|---|
+| A directory, named pipe or other non-regular file; a missing file; a broken link | `pbuilder-runner: --input-file could not be read — <relative-path> is not a readable file` |
+| A file over the cap | `pbuilder-runner: --input-file exceeds the 10485760-byte cap` |
+| Invalid JSON | `pbuilder-runner: --input-file is not valid JSON (line L, column C)` |
+| Both `--input` and `--input-file` | `pbuilder-runner: --input and --input-file are mutually exclusive — pass exactly one` |
+| Neither | `pbuilder-runner: exactly one of --input or --input-file is required` |
+
+None of these is a factory or handshake problem: materialize the JSON into a regular file —
+not a pipe or a directory — and, for a link, check its target. The runner's input handling is
+defined in the SDK source,
+[`src/transport/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/transport/runner.ts).
+The runner is not a standalone generator: without a host speaking the protocol on stdin/stdout,
+it stops at the greeting.

@@ -104,3 +104,32 @@ De este diseño se desprenden dos propiedades:
   testing puede sustituir por completo al lado del engine y ejecutar factories enteramente
   en memoria — sin CLI, sin engine, sin disco. Por eso los schematics son testeables como
   cualquier otro código.
+
+### Para integradores: cómo recibe la entrada el runner
+
+Esto solo importa si construyes un engine o un adaptador que lanza el runner del SDK por tu
+cuenta — `builder execute` se encarga de ello, y `builder` no tiene un flag `--input-file`.
+
+El runner toma la entrada del schematic de **exactamente uno** de `--input <json>` o
+`--input-file <path>`. Un archivo de entrada debe ser un **archivo regular legible** con JSON
+válido, de no más de 10 MiB (10485760 bytes). Funcionan tanto rutas absolutas como relativas, y
+un enlace simbólico se sigue cuando su destino es un archivo regular — incluso si está fuera del
+directorio de trabajo.
+
+El runner valida la entrada **antes** de esperar el saludo del host y antes de importar la
+factory. Cuando la entrada se rechaza, el runner termina con código `1` y una línea en stderr:
+
+| Entrada | Diagnóstico |
+|---|---|
+| Un directorio, un named pipe u otro archivo no regular; un archivo inexistente; un enlace roto | `pbuilder-runner: --input-file could not be read — <relative-path> is not a readable file` |
+| Un archivo que supera el límite | `pbuilder-runner: --input-file exceeds the 10485760-byte cap` |
+| JSON inválido | `pbuilder-runner: --input-file is not valid JSON (line L, column C)` |
+| `--input` y `--input-file` a la vez | `pbuilder-runner: --input and --input-file are mutually exclusive — pass exactly one` |
+| Ninguno de los dos | `pbuilder-runner: exactly one of --input or --input-file is required` |
+
+Ninguno de estos es un problema de la factory ni del handshake: materializa el JSON en un archivo
+regular — no un pipe ni un directorio — y, si es un enlace, revisa su destino. El manejo de la
+entrada del runner está definido en el código del SDK,
+[`src/transport/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/transport/runner.ts).
+El runner no es un generador independiente: sin un host que hable el protocolo por stdin/stdout,
+se detiene en el saludo.
