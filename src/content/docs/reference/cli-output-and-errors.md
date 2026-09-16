@@ -68,6 +68,8 @@ Every error the CLI emits includes:
 - a human-readable **message**, and
 - a non-empty **suggestions** list — `Fix:` entries are direct remedies, `Note:` entries are context.
 
+Some codes also carry a **`reason`** that distinguishes variants of the same code, and a short, path-free **`detail`** (for example which field failed). Both appear in JSON output; the tables below list the reason where it changes the remedy.
+
 In text mode, errors render as a fixed block on **stderr**, independent of where stdout is redirected. In JSON mode, `builder execute` writes a structured JSON error envelope to stdout instead (and the text block is suppressed), so machine consumers always find the error in the stream they are parsing.
 
 Interactive prompts for **sensitive** schematic inputs are refused outside a TTY (`engine_non_tty_ask_unavailable`) — in scripts and CI, pass the value explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
@@ -116,12 +118,17 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `init_not_implemented` | 1 | init mode not yet implemented | Note: this init mode is not implemented yet |
 | `init_package_manager_not_found` | 3 | package manager not found | Fix: run with `--package-manager` to select one explicitly |
 | `init_skill_exists` | 2 | skill artefact set already exists (`.claude/skills/pbuilder/`) | Fix: run with `--force` to overwrite the full skill artefact set |
+| `invalid_input` | 2 | package.json is not valid JSON | Fix: fix the syntax errors in `package.json` and re-run |
+| `invalid_input` | 2 | package.json `<field>` field is not a valid string map | Note: fix the `devDependencies` or `scripts` field (for example a `null` value) and re-run. See [`package.json` edits](/reference/cli-commands/#packagejson-edits) |
+
+A failed `init` leaves the outputs written before the failure on disk. Once fixed, re-run with `--force`.
 
 ### `builder new`
 
 | Code | Exit | Message | Remedy |
 |---|---|---|---|
-| `new_codegen_failed` | 4 | code generation could not complete | Fix: reinstall the SDK: `bun add -d @pbuilder/sdk`; or re-run with `--verbose` to see the full subprocess output |
+| `new_codegen_failed` | 4 | @pbuilder/sdk installation could not be resolved for code generation | Fix: reinstall the SDK: `bun add -d @pbuilder/sdk`; or re-run with `--verbose` to see the full subprocess output |
+| `new_codegen_failed` | 4 | pbuilder-codegen failed | Fix: re-run with `--verbose` to see the codegen output. If it reports `refusing symbolic-link output`, reinstalling does not help — see [Symbolic-link outputs](/guides/type-generation/#symbolic-link-outputs) |
 | `new_collection_exists` | 2 | collection already exists | Fix: run with `--force` to overwrite |
 | `new_invalid_extends` | 2 | `--extends` value does not match the required grammar | Note: `--extends` must be in the form `@scope/pkg:collection` |
 | `new_invalid_language` | 2 | `--language` value is not supported | Note: `--language` accepts `ts` or `js` |
@@ -143,17 +150,110 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `execute_invalid_factory_pointer` | 2 | schematic is missing a factory.ts or factory.js file | Note: create `factory.ts` or `factory.js` in the schematic root |
 | `execute_invalid_factory_pointer` | 2 | schematic's factory pointer is empty or missing in collection.json | Note: set `collection.json`'s factory to `<module>#<export>` |
 | `execute_invalid_input_value` | 2 | input value is invalid | Note: check the input's type, enum values, and whether it is scalar-typed |
-| `execute_manifest_path_escape` | 3 | manifest-derived path resolves outside the workspace root | Note: check the manifest for a path that escapes the project workspace |
+| `execute_manifest_path_escape` | 3 | manifest-derived path resolves outside the workspace root | Note: check the manifest for a path that escapes the project workspace. If `sdk.root` was removed, `node_modules/@pbuilder/sdk` may be a leftover link — confirm it is a symlink, never a directory, then delete it |
+| `execute_manifest_path_escape` (`path_escapes_manifest_root`) | 3 | manifest-derived path resolves outside the named manifest root | Note: check the manifest for a path that escapes the named manifest root |
+| `execute_manifest_path_escape` (`sdk_node_modules_escapes_workspace`) | 3 | node_modules is a symlink that resolves outside the workspace root | Note: check whether `node_modules` is a symlink pointing outside the project workspace; the leftover `sdk.root` link note above also applies |
 | `execute_missing_required_inputs` | 2 | missing required input(s) | Fix: `builder execute <collection>:<schematic> --<name>=<value>` |
-| `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json` |
+| `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edit `schema.json` to fix the JSON syntax error |
 | `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
-| `execute_sdk_not_installed` | 4 | @pbuilder/sdk is not installed in this workspace | Fix: `bun add -d @pbuilder/sdk` |
-| `execute_sdk_version_mismatch` | 4 | @pbuilder/sdk installation could not be verified against the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
-| `execute_sdk_version_mismatch` | 4 | installed @pbuilder/sdk version is below the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
+| `execute_sdk_link_failed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
+| `execute_sdk_link_path_conflict` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
+| `execute_sdk_not_installed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
+| `execute_sdk_root_invalid` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
+| `execute_sdk_version_mismatch` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
 | `execute_unsupported_registration` | 2 | schematic is registered in a mode execute does not support | Note: register the schematic as path-mode or collection-mode |
 | `execution_failed` | 5 | schematic execution failed | Note: check the schematic's own output above for the underlying cause |
+
+### SDK diagnostics
+
+`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement) and [External SDK root](/reference/cli-commands/#external-sdk-root-sdkroot)). Each reason calls for a different repair — only `sdk_absent` means the SDK is actually missing.
+
+#### Local installation
+
+| Code | Reason | Exit | Message | Repair |
+|---|---|---|---|---|
+| `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provide a compatible SDK at `node_modules/@pbuilder/sdk` (see below) |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but required distribution files are missing — reinstall it |
+| `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Check permissions and dangling symlinks on `node_modules/@pbuilder/sdk` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Fix the value named in `detail`, for example `project-builder.json.sdk.version: expected a numeric version floor` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Check that the workspace `package.json` is readable and not oversized |
+| `execute_sdk_version_mismatch` | `sdk_version_unparseable` | 4 | installed @pbuilder/sdk version is invalid; check the local package.json | Inspect the `version` in `node_modules/@pbuilder/sdk/package.json` |
+| `execute_sdk_version_mismatch` | `sdk_version_below_floor` | 4 | installed @pbuilder/sdk version is below the selected requirement; choose a compatible version | Install a version that meets the selected requirement, or correct the requirement |
+
+The CLI does not detect your package manager for these errors: its suggestions list one local installation command per manager, and you choose one. They change `package.json` and may change the lockfile:
+
+| Package manager | Command |
+|---|---|
+| npm | `npm install --save-dev @pbuilder/sdk` |
+| pnpm | `pnpm add -D @pbuilder/sdk` |
+| Yarn | `yarn add --dev @pbuilder/sdk` |
+| Bun | `bun add -D @pbuilder/sdk` |
+
+Pin a version when you need reproducible installs. The suggestions also offer the alternative of pointing [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot) at an existing `@pbuilder/sdk` directory. To provide an SDK without declaring it, see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
+
+#### External root (`sdk.root`)
+
+These codes appear only when `project-builder.json` sets `sdk.root`. `execute_sdk_version_mismatch` applies to an external root exactly as to a local install. No message, detail or JSON field ever contains the configured path: locations are reported relative to the root, such as `the configured root itself` or `2 levels above sdk.root`.
+
+| Code | Reason | Exit | Message | Repair |
+|---|---|---|---|---|
+| `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Set `"sdk": {"root": "<directory>"}` — absolute, or relative to `project-builder.json` |
+| `execute_sdk_root_invalid` | `sdk_root_unresolvable` | 4 | sdk.root does not resolve to a readable directory | Point `sdk.root` at an existing, readable `@pbuilder/sdk` package directory |
+| `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Point it at the package directory whose `package.json` name is `@pbuilder/sdk` — not its parent |
+| `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstall or rebuild the SDK so `dist/bin/pbuilder-runner.js` and `dist/transport` are present |
+| `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` names the dependency (for example `ts-morph`). Point `sdk.root` at a complete installation, such as the one `bun add -g @pbuilder/sdk` creates — not a package-manager cache |
+| `execute_sdk_root_invalid` | `sdk_root_writable_by_others` | 4 | sdk.root itself is writable by its group or by any user | `chmod go-w` the root so only its owner can write to it |
+| `execute_sdk_root_invalid` | `sdk_ancestor_world_writable` | 4 | a directory above sdk.root is writable by any user and is not sticky | `detail` gives the depth. `chmod o-w` that directory, or move the SDK under a directory only you can write to |
+| `execute_sdk_root_invalid` | `sdk_root_untrusted_owner` | 4 | sdk.root, or a directory above it, is owned by another user | Move the SDK under a path owned by you or by root |
+| `execute_sdk_link_path_conflict` | `sdk_root_local_install_present` | 4 | a real @pbuilder/sdk is already installed at node_modules/@pbuilder/sdk and differs from sdk.root | Remove `sdk.root` to use the installed SDK, or delete `node_modules/@pbuilder/sdk` to use the configured one |
+| `execute_sdk_link_path_conflict` | `sdk_link_path_occupied` | 4 | node_modules/@pbuilder/sdk is a regular file, so the SDK link cannot be created | Delete that file, then re-run |
+| `execute_sdk_link_path_conflict` | `sdk_link_path_dangling` | 4 | node_modules/@pbuilder/sdk is a link to a target that no longer exists | Delete the broken link (confirm it is a symlink, never a directory), then re-run |
+| `execute_sdk_link_path_conflict` | `sdk_link_path_invalid_package` | 4 | node_modules/@pbuilder/sdk is a directory that is not a usable @pbuilder/sdk package | Remove or reinstall `node_modules/@pbuilder/sdk`, then re-run |
+| `execute_sdk_link_path_conflict` | `sdk_scope_dir_occupied` | 4 | node_modules/@pbuilder is a file or a link, so the SDK link cannot be placed inside it | Replace `node_modules/@pbuilder` with a real directory, then re-run |
+| `execute_sdk_link_path_conflict` | `sdk_node_modules_not_a_directory` | 4 | node_modules is a regular file, so the SDK link cannot be created | Delete or rename that file so `node_modules` can be a directory |
+| `execute_sdk_link_path_conflict` | `sdk_node_modules_unresolvable` | 4 | node_modules is a symlink that does not resolve to a directory | Delete or repair the `node_modules` symlink, then re-run |
+| `execute_sdk_link_failed` | `sdk_link_write_failed` | 4 | the SDK link node_modules/@pbuilder/sdk could not be written | Check write permission on `node_modules` and `node_modules/@pbuilder`, then re-run |
+
+| Warning | Meaning |
+|---|---|
+| `warn_sdk_root_group_writable` | A directory above the root is group-writable, so anyone in that group could replace the SDK. The run continues; the message names the depth and the remedy — `chmod g-w` that directory, or move the SDK under a directory only you can write to. Global installs under a shared prefix, such as Homebrew's, commonly trigger it. |
+
+### `pbuilder-codegen` is not found, or a different version runs
+
+This is not a `builder` error: it comes from your package runner (`npx`, `bunx`) when you regenerate types by hand. Two situations look alike:
+
+| Situation | What happens |
+|---|---|
+| `@pbuilder/sdk` is not installed at all | The runner cannot find the binary — install the SDK |
+| The SDK comes from `sdk.root` | `node_modules/@pbuilder/sdk` is a link that no package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. The runner reports the binary as missing even though the SDK works — or, if an SDK is installed globally, `npx` can silently run **that global copy** instead, possibly a different version. Recent pnpm versions install before `pnpm exec`, which writes a lockfile into the project |
+
+With `sdk.root`, run the script directly — see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from the configured root by itself.
+
+### Manifest root
+
+Errors and warnings from [`--manifest` / `BUILDER_MANIFEST`](/guides/external-collections/). Locations in `detail` are relative to the manifest root, such as `2 levels above the manifest root`.
+
+| Code | Reason | Exit | Message | Remedy |
+|---|---|---|---|---|
+| `manifest_root_unsupported_scheme` | `manifest_root_unsupported_scheme` | 2 | manifest root is not a supported location — a URL or drive letter is not accepted | Point `--manifest` (or `BUILDER_MANIFEST`) at a local directory or `project-builder.json` file |
+| `manifest_root_unresolvable` | `manifest_root_unresolvable` | 3 | manifest root does not resolve to a usable directory or project-builder.json file | Point it at an existing, readable directory or `project-builder.json` file |
+| `manifest_root_untrusted` | `manifest_root_untrusted_owner` | 3 | the manifest root is owned by another user | Move the manifest root under a path owned by you or by root |
+| `manifest_root_untrusted` | `manifest_root_writable_by_others` | 3 | the manifest root itself is writable by its group or by any user | `chmod go-w` the manifest root so only its owner can write to it |
+| `manifest_root_untrusted` | `manifest_root_ancestor_world_writable` | 3 | a directory above the manifest root is writable by its group, or by any user without the sticky bit | `chmod o-w` (or `g-w`) that directory, or move the manifest root under a directory only you can write to. A root under `/tmp` hits this |
+| `manifest_root_untrusted` | `manifest_root_is_filesystem_root` | 3 | the filesystem root cannot be named as a manifest root | Point it at the specific directory holding `project-builder.json` |
+| `manifest_root_untrusted` | `manifest_root_is_home_directory` | 3 | your home directory cannot be named as a manifest root | Point it at a directory inside your home directory, not the home directory itself |
+| `manifest_root_unsupported_command` | `manifest_root_command_unsupported` | 2 | this command does not support --manifest | `--manifest` is supported on `execute`, `info` and `new schematic` only |
+| `manifest_scoped_authoring_refused` | `manifest_scoped_authoring_refused` | 2 | new schematic refuses to author under a named external manifest root | `cd` into that directory and run `builder new schematic` there instead |
+| `collection_absolute_path` | `collection_path_absolute` | 3 | a manifest-registered path must be relative to the manifest's own root | Make the registered `path` relative to the manifest root |
+
+| Warning | Meaning |
+|---|---|
+| `warn_manifest_root_ambient` | The manifest root came from `BUILDER_MANIFEST`, not from a flag. The message names the resolved directory. |
+| `warn_manifest_sdk_root_ignored` | The external manifest declares an `sdk.root`; it is ignored and the working directory's installed `@pbuilder/sdk` is used. |
+
+A run that fails with `engine_native_developer_fault` and a note about a *split module graph* while using `--manifest` means the manifest root, or a directory above it, has its own `@pbuilder/sdk`. See [External collections](/guides/external-collections/#set-up-a-shared-collections-directory).
 
 ### `builder info`
 
@@ -162,9 +262,10 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `info_ambiguous_registration` | 2 | registration is ambiguous | Note: resolve the collection to a single registration mode |
 | `info_collection_not_found` | 2 | collection not found in project-builder.json | Note: check `project-builder.json` for the registered collection name |
 | `info_invalid_factory_pointer` | 3 | schematic's factory pointer is empty or missing | Note: edit `collection.json`'s factory to `<module>#<export>` |
+| `info_invalid_factory_pointer` (`path_escapes_manifest_root`) | 3 | schematic's registered path, factory module, or schema.json resolves outside the named manifest root | Note: keep every registered path inside the manifest root |
 | `info_manifest_invalid` | 3 | collection manifest not found | Fix: check that `collection.json` exists at the registered path |
 | `info_manifest_invalid` | 3 | collection manifest could not be parsed | Note: edit `collection.json` to fix the JSON syntax error |
-| `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json` |
+| `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `info_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `info_schema_invalid` | 3 | schema.json is missing or could not be parsed | Note: ensure `schema.json` exists at the schematic root and is valid JSON |
 | `info_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |

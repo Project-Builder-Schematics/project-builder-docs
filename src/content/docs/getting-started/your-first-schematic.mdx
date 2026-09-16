@@ -53,8 +53,14 @@ you haven't.
    }
    ```
 
-   Property types are `string`, `number`, `boolean`, and `enum` (which requires a
-   non-empty `choices` array); `default` and `description` are optional.
+   Property types are `string`, `number`, `boolean`, and `enum`; `default` and
+   `description` are optional. An `enum` currently needs its values under **both**
+   `choices` (read by codegen and the SDK) and `enum` (read by `builder execute`), with the
+   same values:
+
+   ```json
+   { "type": "enum", "label": "Size", "choices": ["sm", "md"], "enum": ["sm", "md"] }
+   ```
 
 4. **Regenerate the input types:**
 
@@ -63,7 +69,9 @@ you haven't.
    ```
 
    This rewrites `schema.generated.ts` with an `Input` type derived from your schema —
-   your factory is typed against the schema, never against a hand-written shape.
+   your factory is typed against the schema, never against a hand-written shape. To
+   regenerate every registered schematic at once, run `bunx pbuilder-codegen` with no
+   arguments — see [Type generation](/guides/type-generation/).
 
 5. **Write the factory:**
 

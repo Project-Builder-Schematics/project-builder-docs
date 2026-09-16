@@ -1,0 +1,218 @@
+---
+title: Evaluate without adopting the SDK
+description: Try Project Builder in an existing repository without declaring @pbuilder/sdk in package.json — what init still changes, how to keep the trial local, and how to clean up or adopt.
+sidebar:
+  order: 8
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+You want to try Project Builder in a repository you already have — without adding
+`@pbuilder/sdk` to its `package.json` and without restoring that file after every run.
+`builder init --no-sdk-dependency` gives you that: the CLI skips the SDK declaration and its
+install, and `builder execute` runs against an SDK that is simply present in
+`node_modules`.
+
+<Aside type="caution" title="This is not an “untouched repository” mode">
+`--no-sdk-dependency` only keeps `package.json` out of it. `init` still:
+
+- creates or merges `project-builder.json`,
+- creates `schematics/.gitkeep`,
+- writes `.claude/skills/pbuilder/` (`SKILL.md`, `use.md`, `choose.md`, `create.md`),
+- adds or updates a marker block in `AGENTS.md` or `CLAUDE.md` — **a tracked agent file can
+  change** while `package.json` stays untouched.
+
+Schematics you run write their own files. If `init` fails part-way, the outputs written
+before the failure stay on disk.
+</Aside>
+
+## Before you start
+
+- The `builder` CLI and Bun are installed — see [Installation](/getting-started/installation/).
+- You know what is already modified, so you can tell trial changes apart later:
+
+  ```sh
+  git status --short
+  ```
+
+## Run the trial
+
+<Steps>
+
+1. **Preview what `init` will do.** Nothing is written or installed:
+
+   ```sh
+   builder init . --no-sdk-dependency --dry-run --non-interactive
+   ```
+
+   With `--no-sdk-dependency` alone, the plan contains no `package.json` step at all. The
+   skill and marker lines are a plan, not an exact prediction of what happens to files that
+   already exist.
+
+2. **Initialise the workspace:**
+
+   ```sh
+   builder init . --no-sdk-dependency --non-interactive
+   ```
+
+   `init` adds no SDK entry, no `generate:types` script and runs no install. It also
+   **removes nothing**: an SDK version or script already in `package.json` stays, and an SDK
+   already installed stays usable. The warning it prints lists the ways to provide an SDK;
+   the next step is one of them.
+
+   Want the `generate:types` script anyway? Add `--skip-types-script=false`. The full flag
+   matrix is in the [`builder init` reference](/reference/cli-commands/#package-setup-flags).
+
+3. **Put an SDK in `node_modules` without declaring it.** `execute` needs a complete SDK at
+   `node_modules/@pbuilder/sdk`. With npm or Bun you can install one without touching
+   `package.json` or the lockfile:
+
+   ```sh
+   npm install --no-save @pbuilder/sdk
+   # or
+   bun add --no-save @pbuilder/sdk
+   ```
+
+   pnpm and Yarn have no equivalent option — their add commands always record the
+   dependency. A later install or prune by your package manager can remove an unsaved
+   package; if that happens, run the command again.
+
+   Skip this step if the repository already has an SDK installed.
+
+   **Alternative: use a global SDK.** Instead of installing into `node_modules`, point
+   [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot) in `project-builder.json`
+   at a global install — for example the directory `bun add -g @pbuilder/sdk` creates:
+
+   ```json title="project-builder.json"
+   {
+     "sdk": {
+       "root": "/Users/me/.bun/install/global/node_modules/@pbuilder/sdk"
+     }
+   }
+   ```
+
+   The first committing `builder execute` then creates a single symbolic link,
+   `node_modules/@pbuilder/sdk`, pointing at that root. To regenerate types by hand in this
+   setup, see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot).
+
+4. **Create and run a schematic:**
+
+   ```sh
+   builder new schematic hello
+   builder execute default:hello
+   ```
+
+   `new schematic` writes `schematics/hello/` and registers it in `project-builder.json`.
+   The generated factory is an empty stub, so this first run reports no changes. From here
+   on, follow [Your first schematic](/getting-started/your-first-schematic/) to give it real
+   logic.
+
+</Steps>
+
+<Aside type="danger" title="Schematic runs write to your working tree">
+`builder execute` has no preview for native schematics: `--dry-run` is rejected, not
+simulated. Put CLI flags **before** `<collection>:<schematic>` — after it, `--dry-run` is
+just a schematic input and does not stop any write. Review `git diff` after every run.
+</Aside>
+
+## Choose the SDK version
+
+With no declaration anywhere, `execute` requires SDK **0.2.4** or newer — the oldest version
+the CLI is tested against. To require a specific floor without adding a dependency, set it
+in `project-builder.json`:
+
+```json
+{
+  "sdk": {
+    "version": "0.2.4"
+  }
+}
+```
+
+A declaration in `package.json` still takes priority over `sdk.version`, and an invalid
+value fails instead of falling back. The full selection order is in the
+[SDK requirement](/reference/cli-commands/#sdk-requirement) reference; each failure reason
+and its repair is in [SDK diagnostics](/reference/cli-output-and-errors/#sdk-diagnostics).
+
+## Keep trial files out of Git
+
+The CLI never edits Git's exclude files — do it yourself if you want `git status` to stay
+quiet during the trial. Resolve the right file first; in a worktree, `.git` is not a
+directory:
+
+```sh
+git rev-parse --git-path info/exclude
+```
+
+Then add the entries that apply, and **only** for paths that are currently untracked:
+
+```text
+/project-builder.json
+/.claude/skills/pbuilder/
+/schematics/
+```
+
+Local excludes affect untracked files only. They do not hide changes to tracked files — an
+agent-file marker, a manifest, a lockfile or generated code still show up in `git diff`, and
+you still need to review them. Do not use `git update-index --skip-worktree` or
+`--assume-unchanged` to hide those instead. Never exclude a `schematics/` directory that
+already existed in the repository.
+
+## Clean up
+
+Work from what the trial actually changed — not from a blanket reset:
+
+1. Run `git status --short` and `git diff`, and compare with the status you noted before the
+   trial.
+2. Remove only files the trial created: `project-builder.json`, `schematics/` and
+   `.claude/skills/pbuilder/` — when they did not exist before.
+3. Undo only trial changes in tracked files, such as the marker block added to `AGENTS.md`
+   or `CLAUDE.md`. Keep any edits of your own.
+4. Remove the trial SDK from `node_modules` if you installed one — or, if you used
+   `sdk.root`, remove the key and then the link it left behind
+   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`). Also remove the
+   lines you added to the exclude file.
+
+Do not reach for `git clean` or `git reset --hard`: they also destroy work that has nothing
+to do with the trial.
+
+## Adopt Project Builder
+
+When the trial convinces you:
+
+<Steps>
+
+1. Remove the exclude lines you added, and decide which of `project-builder.json`,
+   `schematics/` and `.claude/skills/pbuilder/` to commit.
+
+2. Declare the SDK with **one** package-manager command, pinning a version if you need
+   reproducible installs:
+
+   | Package manager | Command |
+   |---|---|
+   | npm | `npm install --save-dev @pbuilder/sdk` |
+   | pnpm | `pnpm add -D @pbuilder/sdk` |
+   | Yarn | `yarn add --dev @pbuilder/sdk` |
+   | Bun | `bun add -D @pbuilder/sdk` |
+
+   This changes `package.json` and may change the lockfile.
+
+3. Optionally let `init` add the missing `generate:types` script. `--force` also merges
+   `project-builder.json` and regenerates the skill files and marker, so preview first and
+   review the full diff afterwards:
+
+   ```sh
+   builder init . --force --dry-run --non-interactive
+   builder init . --force --non-interactive
+   ```
+
+</Steps>
+
+## Related
+
+- [`builder init`](/reference/cli-commands/#builder-init) — outputs, flags and the
+  `package.json` edit contract.
+- [`builder execute`](/reference/cli-commands/#builder-execute) — running schematics and the
+  SDK requirement.
+- [CLI output and errors](/reference/cli-output-and-errors/) — every error code and its
+  remedy.

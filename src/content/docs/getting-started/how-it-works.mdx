@@ -47,6 +47,11 @@ input, resolves the schematic, and starts the engine — which owns the run from
 CLI is deliberately designed for AI agents to drive: output comes back as structured JSON,
 so an agent can run a schematic and parse the result like any other API.
 
+The CLI works with two anchors: the **manifest root**, which every read (`project-builder.json`,
+collections, factories, schemas, templates) resolves against, and the **working directory**,
+which every write lands in. By default they are the same directory; `--manifest` separates
+them — see [External collections](/guides/external-collections/).
+
 ## The AST story
 
 Here's an extreme — but useful — simplification: **writing software, day to day, is
@@ -64,7 +69,8 @@ author would have to pick libraries, install them, and learn each one's tree sha
 The SDK solves this by **centralizing the ASTs**: it builds on those libraries and exposes
 them as ready-to-use dialects — TypeScript and React today, with more file types (HTML,
 CSS) and framework dialects (Angular, Vue, Svelte) planned. You install nothing extra;
-they're already part of the SDK.
+they're already part of the SDK. When a custom edit needs the library itself, each dialect
+exports it as `astLibrary` — see [AST libraries](/reference/ast-libraries/).
 
 The boundary stays clean: **ASTs belong to the SDK.** By the time an AST edit reaches the
 engine, it has already been lowered to a plain, ready-to-apply record — the engine never
@@ -88,3 +94,31 @@ Two properties fall out of this design:
 - **The SDK is self-contained.** Everything a factory produces is IR, so the testing
   harness can stand in for the entire engine side and run factories completely in memory —
   no CLI, no engine, no disk. That's why schematics are testable like any other code.
+
+### For integrators: how the runner receives input
+
+This matters only if you build an engine or adapter that spawns the SDK runner yourself —
+`builder execute` handles it for you, and there is no `--input-file` flag on `builder`.
+
+The runner takes the schematic's input from **exactly one** of `--input <json>` or
+`--input-file <path>`. An input file must be a **readable regular file** containing valid JSON,
+no larger than 10 MiB (10485760 bytes). Absolute and relative paths both work, and a symbolic
+link is followed when its target is a regular file — even one outside the working directory.
+
+The runner checks the input **before** it expects the host's greeting and before it imports the
+factory. When the input is rejected, the runner exits with code `1` and one line on stderr:
+
+| Input | Diagnostic |
+|---|---|
+| A directory, named pipe or other non-regular file; a missing file; a broken link | `pbuilder-runner: --input-file could not be read — <relative-path> is not a readable file` |
+| A file over the cap | `pbuilder-runner: --input-file exceeds the 10485760-byte cap` |
+| Invalid JSON | `pbuilder-runner: --input-file is not valid JSON (line L, column C)` |
+| Both `--input` and `--input-file` | `pbuilder-runner: --input and --input-file are mutually exclusive — pass exactly one` |
+| Neither | `pbuilder-runner: exactly one of --input or --input-file is required` |
+
+None of these is a factory or handshake problem: materialize the JSON into a regular file —
+not a pipe or a directory — and, for a link, check its target. The runner's input handling is
+defined in the SDK source,
+[`src/transport/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/transport/runner.ts).
+The runner is not a standalone generator: without a host speaking the protocol on stdin/stdout,
+it stops at the greeting.
