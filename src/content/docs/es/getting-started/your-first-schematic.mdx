@@ -54,8 +54,14 @@ escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia 
    }
    ```
 
-   Los tipos de propiedad son `string`, `number`, `boolean` y `enum` (que requiere un
-   array `choices` no vacío); `default` y `description` son opcionales.
+   Los tipos de propiedad son `string`, `number`, `boolean` y `enum`; `default` y
+   `description` son opcionales. Por ahora, un `enum` necesita sus valores en **ambas**
+   claves, `choices` (la leen el codegen y el SDK) y `enum` (la lee `builder execute`), con
+   los mismos valores:
+
+   ```json
+   { "type": "enum", "label": "Size", "choices": ["sm", "md"], "enum": ["sm", "md"] }
+   ```
 
 4. **Regenera los tipos de entrada:**
 
@@ -64,7 +70,9 @@ escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia 
    ```
 
    Esto reescribe `schema.generated.ts` con un tipo `Input` derivado de tu schema — tu
-   factory queda tipado contra el schema, nunca contra una forma escrita a mano.
+   factory queda tipado contra el schema, nunca contra una forma escrita a mano. Para
+   regenerar todos los schematics registrados de una vez, ejecuta `bunx pbuilder-codegen`
+   sin argumentos — ver [Generación de tipos](/es/guides/type-generation/).
 
 5. **Escribe el factory:**
 

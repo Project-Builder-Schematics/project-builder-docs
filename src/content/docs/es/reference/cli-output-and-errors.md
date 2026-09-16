@@ -127,7 +127,8 @@ Un `init` fallido deja en disco las salidas escritas antes del fallo. Una vez co
 
 | Código | Salida | Mensaje | Remedio |
 |---|---|---|---|
-| `new_codegen_failed` | 4 | code generation could not complete | Fix: reinstala el SDK: `bun add -d @pbuilder/sdk`; o re-ejecuta con `--verbose` para ver la salida completa del subproceso |
+| `new_codegen_failed` | 4 | @pbuilder/sdk installation could not be resolved for code generation | Fix: reinstala el SDK: `bun add -d @pbuilder/sdk`; o re-ejecuta con `--verbose` para ver la salida completa del subproceso |
+| `new_codegen_failed` | 4 | pbuilder-codegen failed | Fix: re-ejecuta con `--verbose` para ver la salida del codegen. Si indica `refusing symbolic-link output`, reinstalar no ayuda — ver [Salidas que son enlaces simbólicos](/es/guides/type-generation/#salidas-que-son-enlaces-simbólicos) |
 | `new_collection_exists` | 2 | collection already exists | Fix: ejecuta con `--force` para sobrescribir |
 | `new_invalid_extends` | 2 | `--extends` value does not match the required grammar | Note: `--extends` debe tener la forma `@scope/pkg:collection` |
 | `new_invalid_language` | 2 | `--language` value is not supported | Note: `--language` acepta `ts` o `js` |

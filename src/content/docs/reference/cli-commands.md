@@ -277,7 +277,7 @@ Two modes, controlled by `--inline`.
 
 **Inline mode (`--inline`)** — embeds the schematic directly inside `project-builder.json` under `collections.default.schematics.<name>`; no `schematics/<name>/` files are created. Soft warnings fire when a collection accumulates 10 or more inline schematics, or when `project-builder.json` exceeds 20KB after the write.
 
-Type generation is delegated to `pbuilder-codegen`, a binary shipped inside `@pbuilder/sdk`. When the SDK is not installed, the automatic codegen step skips with a warning rather than failing the scaffold (`schema.generated.ts` is left stale or absent).
+Type generation is delegated to `pbuilder-codegen`, a binary shipped inside `@pbuilder/sdk`. When the SDK is not installed, the automatic codegen step skips with a warning rather than failing the scaffold (`schema.generated.ts` is left stale or absent). To regenerate types later — for one schematic or every registered collection — see [Type generation](/guides/type-generation/).
 
 ### Flags
 
