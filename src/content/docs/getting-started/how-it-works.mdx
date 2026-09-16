@@ -69,7 +69,8 @@ author would have to pick libraries, install them, and learn each one's tree sha
 The SDK solves this by **centralizing the ASTs**: it builds on those libraries and exposes
 them as ready-to-use dialects — TypeScript and React today, with more file types (HTML,
 CSS) and framework dialects (Angular, Vue, Svelte) planned. You install nothing extra;
-they're already part of the SDK.
+they're already part of the SDK. When a custom edit needs the library itself, each dialect
+exports it as `astLibrary` — see [AST libraries](/reference/ast-libraries/).
 
 The boundary stays clean: **ASTs belong to the SDK.** By the time an AST edit reaches the
 engine, it has already been lowered to a plain, ready-to-apply record — the engine never

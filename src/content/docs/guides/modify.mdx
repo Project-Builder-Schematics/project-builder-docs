@@ -142,37 +142,163 @@ Factories re-run against already-generated projects, and the import ops are buil
 `removeImport` on an absent binding is a no-op (zero directives emitted). You get re-runnable
 import management without writing your own "is it already there?" check.
 
-## `.modify()` — the universal escape hatch
+## Custom edits with `.modify()`
 
-Every dialect handle carries one universal op alongside its named ops: `.modify(ast => …)`.
-Your callback receives the **same live AST instance the named ops mutate** — a ts-morph
-`SourceFile` — so anything a named op could do, `.modify()` can do too, without waiting for a
-structured op to exist:
+Named ops cover the common edits. When the change you need is not in that vocabulary, use
+`.modify(fn)` — every dialect handle has it. Pick the tool by the edit, not by habit:
+
+| You need to… | Use |
+|---|---|
+| Add or remove an import, add a top-level declaration, set one JSX prop | The dialect's [named ops](#the-typescript-dialect) |
+| Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
+| Edit a file type no dialect covers — JSON, YAML, Markdown, CSS… | [`find` from `@pbuilder/sdk/commons`](#files-without-a-dialect) |
+
+The callback receives **only the AST** — a ts-morph `SourceFile` for both current dialects,
+the same live instance the named ops mutate. There is no second argument. Named ops and
+`.modify()` calls chained on one handle still flush as a **single** write, in chain order.
+
+### The dialect's AST library: `astLibrary`
+
+Custom edits usually need more than the methods on the AST: enum constants such as
+`SyntaxKind`, type guards such as `Node.isStringLiteral`, and type names for your own
+annotations. Each dialect exports its complete AST library as `astLibrary`, from the same
+entry point as `find`:
 
 ```ts
-import * as ts from "@pbuilder/sdk/typescript";
+import { find, astLibrary } from "@pbuilder/sdk/typescript";
 
-await ts.find("src/app.module.ts")
-  .addImport("BooksModule", "./books/books.module")
-  .modify((ast) => {
-    // full ts-morph surface available here — decorators, call args, anything
-    const imports = ast
-      .getClassOrThrow("AppModule")
-      .getDecoratorOrThrow("Module")
-      .getArguments()[0];
-    // …structured edits the named ops don't cover yet
-  });
+astLibrary.SyntaxKind.ArrayLiteralExpression;   // runtime constant
+astLibrary.Node.isStringLiteral(node);           // runtime helper
+type Routes = astLibrary.ArrayLiteralExpression; // type-only access
 ```
 
-Because it joins the same coalescing chain, mixing named ops and `.modify()` on one handle still
-flushes as a **single** write. Two things to respect:
+Use the `astLibrary` of the dialect whose handle you are editing — `@pbuilder/sdk/typescript`
+for `.ts`, `@pbuilder/sdk/react` for `.tsx`. You do not need to add ts-morph to your own
+dependencies to work with the AST. Each dialect owns its library and version; which library
+backs each dialect is listed in [AST libraries](/reference/ast-libraries/).
 
-- **Operate only on the `ast` the callback hands you.** If your schematic depends on ts-morph
-  directly, that is a *separate realm* from the SDK's internal ts-morph — a `Node` or
-  `SourceFile` from your own import is not interchangeable with the callback's AST, even at the
-  identical ts-morph version. Never pass ts-morph objects across that boundary.
-- **`.modify()` runs with full process privilege — it is not a sandbox.** Your own callbacks are
-  your own trust; treat third-party dialects or op-packs built on it accordingly.
+### Example: register a route (TypeScript)
+
+The TypeScript dialect has no op to append to an array literal. This factory adds a path to
+an exported `routes` array, and does nothing when it is already there:
+
+```ts title="src/routes.ts (before)"
+export const routes = [
+  "/",
+  "/about",
+];
+```
+
+```ts title="factory.ts"
+import { find, astLibrary } from "@pbuilder/sdk/typescript";
+
+type ArrayLiteral = astLibrary.ArrayLiteralExpression;
+
+export default async (input: { path: string }) => {
+  await find("src/routes.ts").modify((ast) => {
+    const routes: ArrayLiteral = ast
+      .getVariableDeclarationOrThrow("routes")
+      .getInitializerIfKindOrThrow(astLibrary.SyntaxKind.ArrayLiteralExpression);
+
+    const alreadyRegistered = routes
+      .getElements()
+      .some((el) => astLibrary.Node.isStringLiteral(el) && el.getLiteralValue() === input.path);
+
+    if (!alreadyRegistered) {
+      routes.addElement(JSON.stringify(input.path));
+    }
+  });
+};
+```
+
+```ts title="src/routes.ts (after, with --path=/pricing)"
+export const routes = [
+  "/",
+  "/about",
+  "/pricing"
+];
+```
+
+Running it again with the same input leaves the file unchanged.
+
+### Example: add a `<Route>` (React)
+
+`setJsxProp` edits props, not children. This factory combines a named op with `.modify()` to
+import a page and add a `<Route>` inside `<Routes>` — one write for both:
+
+```tsx title="src/App.tsx (before)"
+import { Routes, Route } from "react-router-dom";
+import { Home } from "./pages/Home";
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+    </Routes>
+  );
+}
+```
+
+```ts title="factory.ts"
+import { find, astLibrary } from "@pbuilder/sdk/react";
+
+export default async (input: { path: string; component: string }) => {
+  await find("src/App.tsx")
+    .addImport(input.component, `./pages/${input.component}`)
+    .modify((ast) => {
+      const routes = ast
+        .getDescendantsOfKind(astLibrary.SyntaxKind.JsxElement)
+        .find((el) => el.getOpeningElement().getTagNameNode().getText() === "Routes");
+      if (routes === undefined) {
+        throw new Error("src/App.tsx has no <Routes> element");
+      }
+
+      const exists = routes
+        .getDescendantsOfKind(astLibrary.SyntaxKind.JsxSelfClosingElement)
+        .some((el) => {
+          const attr = el.getAttribute("path");
+          return (
+            astLibrary.Node.isJsxAttribute(attr) &&
+            attr.getInitializer()?.getText() === JSON.stringify(input.path)
+          );
+        });
+      if (exists) return;
+
+      const children = routes.getJsxChildren().map((child) => child.getText()).join("").trim();
+      routes.setBodyText(`${children}\n<Route path="${input.path}" element={<${input.component} />} />`);
+    });
+};
+```
+
+```tsx title="src/App.tsx (after, with --path=/pricing --component=Pricing)"
+import { Routes, Route } from "react-router-dom";
+import { Home } from "./pages/Home";
+import { Pricing } from "./pages/Pricing";
+
+export function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/pricing" element={<Pricing />} />
+    </Routes>
+  );
+}
+```
+
+Both examples check before they edit, so a re-run writes nothing — the same
+[idempotency](#idempotency-safe-to-re-run) the named ops give you.
+
+### Rules for custom edits
+
+- **Operate only on the `ast` the callback hands you**, with the `astLibrary` of the same
+  dialect. If your project also installs ts-morph directly, that copy is a separate realm: a
+  `Node` or `SourceFile` created from it is not interchangeable with the callback's AST, even
+  at the same version. Do not pass objects across that boundary, and do not assume AST objects
+  from different dialects are interchangeable.
+- **`.modify()` runs with full process privilege — it is not a sandbox.** Your own callbacks
+  are your own trust; treat third-party dialects or op-packs built on it accordingly.
+- **Strings you insert are code.** Text passed to `addElement`, `setBodyText` and similar
+  methods is inserted verbatim — sanitize anything derived from user input.
 
 <Aside type="note" title="Mixing AST ops with replaceContent">
 A dialect handle's `.replaceContent(content)` rejects while an AST op (named or `.modify()`) is
@@ -186,11 +312,64 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 ```
 </Aside>
 
+## Files without a dialect
+
+Dialects exist for `.ts` and `.tsx` today. Any other file — `package.json`, a YAML config, a
+Markdown index, a stylesheet — is still editable with `find` from `@pbuilder/sdk/commons`: it
+returns a handle for **any** path, with `read()` plus the text-level verbs
+(`replaceContent`, `rename`, `move`, `copy`, `remove`). There is no AST: read the content,
+transform it with whatever parser fits the format, and write the result back.
+
+```json title="config/features.json (before)"
+{
+  "enabled": ["search"]
+}
+```
+
+```ts title="factory.ts"
+import { find, replaceContent } from "@pbuilder/sdk/commons";
+
+export default async (input: { flag: string }) => {
+  const content = await find("config/features.json").read();
+  if (content === undefined) {
+    throw new Error("config/features.json not found");
+  }
+
+  const config = JSON.parse(content) as { enabled: string[] };
+  if (config.enabled.includes(input.flag)) return;
+
+  config.enabled.push(input.flag);
+  replaceContent("config/features.json", `${JSON.stringify(config, null, 2)}\n`);
+};
+```
+
+```json title="config/features.json (after, with --flag=billing)"
+{
+  "enabled": [
+    "search",
+    "billing"
+  ]
+}
+```
+
+Two differences from a dialect edit:
+
+- **You own the formatting.** Re-serializing rewrites the whole file — here, `JSON.stringify`
+  reflows the array. Use a format-preserving parser when layout matters.
+- **Handle the three read states.** `read()` resolves `undefined` for a missing file and `""`
+  for an empty one; branch with strict comparisons, as described in
+  [Reading files](/guides/mutation-verbs/#reading-files-findpathread).
+
 ## Going further
 
-If a named op doesn't exist for what you need, reach for `.modify()` — that's what it's for.
+- [AST libraries](/reference/ast-libraries/) — which library and version back each dialect,
+  and how `astLibrary` exposes them.
+- **Building a dialect of your own** is a contributor-level surface. Every dialect must export
+  its complete library as `astLibrary`, and its conformance fixture must pass the actual module
+  and a library exercise — see the SDK's
+  [dialect authoring guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration).
 
 The dialect family is designed to grow: support for more file types such as **HTML and CSS**
 (each backed by its own parser/AST library), and framework-aware dialects for **Angular, Vue,
-and Svelte**, are planned. Building a dialect of your own (new file types, custom op-packs) is a
-contributor-level surface and will be covered in a future advanced section of these docs.
+and Svelte**, are planned. Until then, edit those files with `find` from
+`@pbuilder/sdk/commons`.

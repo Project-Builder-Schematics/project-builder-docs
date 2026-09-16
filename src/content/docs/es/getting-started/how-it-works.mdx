@@ -77,7 +77,8 @@ forma del árbol de cada una.
 El SDK lo resuelve **centralizando los AST**: se apoya en esas librerías y las expone como
 dialectos listos para usar — TypeScript y React hoy, con más tipos de archivo (HTML, CSS)
 y dialectos de frameworks (Angular, Vue, Svelte) en el plan. No instalas nada extra; ya
-forman parte del SDK.
+forman parte del SDK. Cuando una edición personalizada necesita la librería en sí, cada
+dialecto la exporta como `astLibrary` — ver [Librerías AST](/es/reference/ast-libraries/).
 
 La frontera se mantiene limpia: **los AST pertenecen al SDK.** Para cuando una edición de
 AST llega al engine, ya fue reducida a un registro plano y listo para aplicar — el engine
