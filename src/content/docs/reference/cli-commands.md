@@ -62,9 +62,35 @@ A successful `init` produces:
 2. **`schematics/.gitkeep`** — skeleton folder for local schematic authoring (later filled in by `builder new schematic`).
 3. **`.claude/skills/pbuilder/`** — bundled AI skill artefact set: `SKILL.md` (router) plus `use.md`, `choose.md`, `create.md`.
 4. **A fenced reference block in `AGENTS.md`** (preferred) or `CLAUDE.md` — idempotent and line-exact.
-5. **`@pbuilder/sdk` added to `devDependencies`** in `package.json` — additive merge; existing dependencies are preserved.
+5. **`package.json` setup** — `devDependencies["@pbuilder/sdk"]` and a `scripts["generate:types"]` entry, each added only when its key is missing. See [`package.json` edits](#packagejson-edits).
 
-After the writes, `init` optionally invokes your detected package manager to install the SDK (with a 120-second timeout). Then, in an interactive terminal, it prompts for MCP server setup; an affirmative reply prints setup instructions.
+After the writes, `init` invokes your detected package manager to install the SDK (with a 120-second timeout), unless `--no-install`, `--no-sdk-dependency` or `--no-skill` is set. Then, in an interactive terminal, it prompts for MCP server setup; an affirmative reply prints setup instructions.
+
+The outputs are written in the order above. If a later step fails, earlier outputs stay on disk — there is no whole-init rollback. Fix the cause and re-run with `--force`.
+
+### `package.json` edits
+
+`init` adds two entries to `package.json`:
+
+| Entry | Value |
+|---|---|
+| `devDependencies["@pbuilder/sdk"]` | `>=0.1.0` |
+| `scripts["generate:types"]` | A shell loop that runs `pbuilder-codegen` once for every `schema.json` under `schematics/`, skipping `files/` template trees |
+
+The edit is additive and lossless:
+
+- **Only missing keys are added.** An SDK version you already pinned, or your own `generate:types` script, is never overwritten.
+- **Existing bytes are kept.** New entries are inserted into the file as it is — indentation, tabs, CRLF line endings and key order elsewhere stay untouched, and the inserted lines follow the surrounding style. When `package.json` does not exist, `init` creates a minimal one.
+- **Nothing to add means identical content.** When both entries already exist, the file content stays byte-identical. `init` still writes the file, so do not rely on it being untouched on disk (for example, its modification time).
+- **With no entry requested, `package.json` is not touched at all.** Under `--no-sdk-dependency` (with its inherited `--skip-types-script`) or `--no-skill`, `init` does not read, create or write it.
+
+`init` validates the fields it is about to edit:
+
+- A `devDependencies` or `scripts` field that is present but is not an object of strings — including `"scripts": null` — is invalid, not an empty map. `init` stops with [`invalid_input`](/reference/cli-output-and-errors/#builder-init) (`package.json scripts field is not a valid string map`) and leaves `package.json` unchanged. Repair the field and re-run. Each field is checked only when its entry is requested.
+- A `package.json` that is not valid JSON fails the same way.
+- A document whose root is `null` is treated as an empty object.
+
+These guarantees cover the CLI's own edit. The install step that follows — and any install you run later — is your package manager's, and it can rewrite `package.json` and the lockfile itself. Use `--no-install` to separate the two.
 
 ### Flags
 
@@ -75,10 +101,32 @@ After the writes, `init` optionally invokes your detected package manager to ins
 | `--json` | Emit machine-readable JSON output (NDJSON). Combines with `--dry-run` for a full structured plan. |
 | `--non-interactive` | Disable all prompts (suitable for CI and AI agents). With `--mcp` unset, defaults to `--mcp=no`. |
 | `--package-manager=<npm\|pnpm\|yarn\|bun>` | Override package-manager detection. Default: lockfile sniff (pnpm > yarn > bun > npm) with `npm` as fallback. |
-| `--no-install` | Skip the package-manager install step. The SDK is still declared in `package.json` — run the install manually later. |
-| `--no-skill` | Atomically skip the skill artefact set, the AGENTS/CLAUDE reference block, and the SDK dev-dependency. Use when you want only `project-builder.json` + `schematics/`. |
+| `--no-install` | Skip the package-manager install step only. The requested `package.json` entries are still added — run the install manually later. |
+| `--no-sdk-dependency` | Do not add `@pbuilder/sdk` to `devDependencies` and do not run the install step. Existing entries are preserved, never removed. Its value is also the default for `--skip-types-script`. See [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/). |
+| `--skip-types-script` | Do not add the `generate:types` script. When omitted, it takes the value of `--no-sdk-dependency`; an explicit value, such as `--skip-types-script=false`, always wins. |
+| `--no-skill` | Skip the skill artefact set, the AGENTS/CLAUDE reference block, all `package.json` setup, the install step and MCP setup. Use when you want only `project-builder.json` + `schematics/`. |
 | `--mcp=<yes\|no\|prompt>` | Control the MCP setup prompt. Default: `prompt` in a TTY, `no` under `--non-interactive`. `--mcp=prompt` is incompatible with `--non-interactive`. |
 | `--publishable` | Reserved — currently returns the `init_not_implemented` error. |
+
+### Package setup flags
+
+`--no-sdk-dependency` and `--skip-types-script` decide what `init` asks of `package.json`. The table assumes a real run without `--no-install` or `--no-skill`; "add" means add when the key is missing.
+
+| `--no-sdk-dependency` | `--skip-types-script` | Add `@pbuilder/sdk` | Add `generate:types` | Run install |
+|---|---|---|---|---|
+| omitted / `false` | omitted / `false` | Yes | Yes | Yes |
+| omitted / `false` | `true` | Yes | No | Yes |
+| `true` | omitted / `true` | No | No | No |
+| `true` | `false` | No | Yes | No |
+
+`--no-sdk-dependency=false` keeps the normal SDK setup, and `--skip-types-script=false` overrides the inherited default. These are two specific `init` flags — not a general rule that one `--no-` flag negates another. `--no-install` removes only the install step from any row, and `--no-skill` skips every column.
+
+When `--no-sdk-dependency` is set, `init` prints a warning with the ways to provide an SDK: use one already at `node_modules/@pbuilder/sdk`, or install it locally with your package manager.
+
+With `--dry-run`, `init` writes nothing and installs nothing:
+
+- It reads the real `package.json` only when an entry is requested, and lists only the entries that are actually missing — for example `Would modify: package.json (generate:types)` — plus the install step when it would run. Invalid fields fail the preview the same way they fail a real run.
+- The skill artefact set and the agent marker always appear as planned creates/appends, whatever already exists on disk. Treat them as a plan, not an exact prediction.
 
 ### Examples
 
@@ -102,6 +150,15 @@ builder init --no-install
 # Minimal init — only project-builder.json + schematics/ (no SKILL, no SDK)
 builder init --no-skill
 
+# Evaluate without declaring the SDK — no SDK entry, no generate:types, no install
+builder init --no-sdk-dependency --non-interactive
+
+# Same, but keep a generate:types entry
+builder init --no-sdk-dependency --skip-types-script=false --non-interactive
+
+# Adopt the SDK without adding generate:types
+builder init --skip-types-script --non-interactive
+
 # Force re-init over an existing workspace
 builder init --force
 ```
@@ -123,6 +180,33 @@ Provide the schematic as `<collection>:<schematic>` (for example `@schematics/an
 ### What it does
 
 `execute` validates the workspace (`project-builder.json` must exist), resolves the collection and schematic across all registration shapes, validates your inputs against the schematic's `schema.json`, and then runs the schematic through the engine, streaming its events to the terminal.
+
+### SDK requirement
+
+`execute` runs the schematic against the `@pbuilder/sdk` installed at `node_modules/@pbuilder/sdk` in the workspace. A declaration in `package.json` does not install anything: the package must be present, complete and readable. Declaring it is not required — see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
+
+Before it inspects the installation, `execute` selects a version requirement from the **first** of these sources that is present:
+
+1. `package.json` → `devDependencies["@pbuilder/sdk"]`
+2. `package.json` → `dependencies["@pbuilder/sdk"]`
+3. `project-builder.json` → `sdk.version`
+4. None present: `0.2.4`, the oldest SDK the CLI is tested against. It is not a guarantee that every newer SDK works.
+
+The requirement is a **numeric floor**, not a semver range: leading operators such as `^`, `~` or `>=` are dropped, and the installed version must be greater than or equal to the number that remains. The `>=0.1.0` entry that `builder init` adds therefore selects a `0.1.0` floor.
+
+The selected value must be valid. An invalid value fails with `sdk_requirement_invalid`, and the CLI does not fall back to a lower-priority source — once a source is selected, the sources below it are not read. See [SDK diagnostics](/reference/cli-output-and-errors/#sdk-diagnostics).
+
+To declare a requirement without adding a dependency, set it in `project-builder.json`:
+
+```json
+{
+  "sdk": {
+    "version": "0.2.4"
+  }
+}
+```
+
+`init` never writes this block, and the top-level `dependencies` key in `project-builder.json` plays no part in SDK selection.
 
 ### Passing inputs to the schematic
 

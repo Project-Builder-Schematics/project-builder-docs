@@ -1,0 +1,204 @@
+---
+title: Evaluar sin adoptar el SDK
+description: Prueba Project Builder en un repositorio existente sin declarar @pbuilder/sdk en package.json — qué sigue cambiando init, cómo mantener la prueba en local y cómo limpiar o adoptar.
+sidebar:
+  order: 7
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Quieres probar Project Builder en un repositorio que ya tienes — sin agregar `@pbuilder/sdk`
+a su `package.json` y sin restaurar ese archivo después de cada ejecución.
+`builder init --no-sdk-dependency` te da exactamente eso: la CLI omite la declaración del
+SDK y su instalación, y `builder execute` se ejecuta con un SDK que simplemente está
+presente en `node_modules`.
+
+<Aside type="caution" title="No es un modo de “repositorio intacto”">
+`--no-sdk-dependency` solo deja fuera a `package.json`. `init` igualmente:
+
+- crea o fusiona `project-builder.json`,
+- crea `schematics/.gitkeep`,
+- escribe `.claude/skills/pbuilder/` (`SKILL.md`, `use.md`, `choose.md`, `create.md`),
+- agrega o actualiza un bloque marcador en `AGENTS.md` o `CLAUDE.md` — **un archivo de
+  agente versionado puede cambiar** aunque `package.json` quede intacto.
+
+Los schematics que ejecutes escriben sus propios archivos. Si `init` falla a mitad de camino,
+las salidas escritas antes del fallo quedan en disco.
+</Aside>
+
+## Antes de empezar
+
+- La CLI `builder` y Bun están instalados — ver [Instalación](/es/getting-started/installation/).
+- Sabes qué está modificado de antemano, para poder distinguir después los cambios de la
+  prueba:
+
+  ```sh
+  git status --short
+  ```
+
+## Ejecuta la prueba
+
+<Steps>
+
+1. **Previsualiza lo que hará `init`.** No se escribe ni se instala nada:
+
+   ```sh
+   builder init . --no-sdk-dependency --dry-run --non-interactive
+   ```
+
+   Con `--no-sdk-dependency` solo, el plan no contiene ningún paso sobre `package.json`. Las
+   líneas de skill y del marcador son un plan, no una predicción exacta de lo que ocurre con
+   archivos que ya existen.
+
+2. **Inicializa el workspace:**
+
+   ```sh
+   builder init . --no-sdk-dependency --non-interactive
+   ```
+
+   `init` no agrega la entrada del SDK ni el script `generate:types`, y no ejecuta ninguna
+   instalación. Tampoco **elimina nada**: una versión del SDK o un script que ya esté en
+   `package.json` se queda, y un SDK ya instalado sigue siendo utilizable. La advertencia que
+   imprime lista las formas de proveer un SDK; el siguiente paso es una de ellas.
+
+   ¿Quieres el script `generate:types` de todos modos? Agrega `--skip-types-script=false`. La
+   matriz completa de flags está en la
+   [referencia de `builder init`](/es/reference/cli-commands/#flags-de-packagejson).
+
+3. **Coloca un SDK en `node_modules` sin declararlo.** `execute` necesita un SDK completo en
+   `node_modules/@pbuilder/sdk`. Con npm o Bun puedes instalarlo sin tocar `package.json` ni
+   el lockfile:
+
+   ```sh
+   npm install --no-save @pbuilder/sdk
+   # or
+   bun add --no-save @pbuilder/sdk
+   ```
+
+   pnpm y Yarn no tienen una opción equivalente — sus comandos `add` siempre registran la
+   dependencia. Una instalación o limpieza posterior de tu gestor de paquetes puede eliminar
+   un paquete no guardado; si ocurre, vuelve a ejecutar el comando.
+
+   Omite este paso si el repositorio ya tiene un SDK instalado.
+
+4. **Crea y ejecuta un schematic:**
+
+   ```sh
+   builder new schematic hello
+   builder execute default:hello
+   ```
+
+   `new schematic` escribe `schematics/hello/` y lo registra en `project-builder.json`. La
+   factory generada es un stub vacío, así que esta primera ejecución no reporta cambios. A
+   partir de aquí, sigue [Tu primer schematic](/es/getting-started/your-first-schematic/) para
+   darle lógica real.
+
+</Steps>
+
+<Aside type="danger" title="Ejecutar un schematic escribe en tu árbol de trabajo">
+`builder execute` no tiene previsualización para schematics nativos: `--dry-run` se rechaza,
+no se simula. Ubica los flags de la CLI **antes** de `<collection>:<schematic>` — después de
+él, `--dry-run` es solo una entrada del schematic y no evita ninguna escritura. Revisa
+`git diff` después de cada ejecución.
+</Aside>
+
+## Elige la versión del SDK
+
+Sin ninguna declaración, `execute` exige el SDK **0.2.4** o posterior — la versión más antigua
+con la que se prueba la CLI. Para exigir un piso específico sin agregar una dependencia,
+defínelo en `project-builder.json`:
+
+```json
+{
+  "sdk": {
+    "version": "0.2.4"
+  }
+}
+```
+
+Una declaración en `package.json` sigue teniendo prioridad sobre `sdk.version`, y un valor
+inválido falla en lugar de recurrir a otra fuente. El orden completo de selección está en la
+referencia del [Requisito del SDK](/es/reference/cli-commands/#requisito-del-sdk); cada motivo de
+fallo y su reparación están en [Errores del SDK](/es/reference/cli-output-and-errors/#errores-del-sdk).
+
+## Mantén los archivos de la prueba fuera de Git
+
+La CLI nunca edita los archivos de exclusión de Git — hazlo tú si quieres que `git status`
+quede limpio durante la prueba. Primero resuelve el archivo correcto; en un worktree, `.git`
+no es un directorio:
+
+```sh
+git rev-parse --git-path info/exclude
+```
+
+Luego agrega las entradas que correspondan, y **solo** para rutas que hoy no están
+versionadas:
+
+```text
+/project-builder.json
+/.claude/skills/pbuilder/
+/schematics/
+```
+
+Las exclusiones locales solo afectan a archivos no versionados. No ocultan cambios en
+archivos versionados — un marcador en el archivo de agente, un manifiesto, un lockfile o código
+generado siguen apareciendo en `git diff`, y debes revisarlos. No uses
+`git update-index --skip-worktree` ni `--assume-unchanged` para ocultarlos. Nunca excluyas un
+directorio `schematics/` que ya existía en el repositorio.
+
+## Limpieza
+
+Parte de lo que la prueba realmente cambió — no de un reset general:
+
+1. Ejecuta `git status --short` y `git diff`, y compáralo con el estado que anotaste antes de
+   la prueba.
+2. Elimina solo los archivos que creó la prueba: `project-builder.json`, `schematics/` y
+   `.claude/skills/pbuilder/` — cuando no existían antes.
+3. Deshaz solo los cambios de la prueba en archivos versionados, como el bloque marcador
+   agregado a `AGENTS.md` o `CLAUDE.md`. Conserva tus propias ediciones.
+4. Quita el SDK de prueba de `node_modules` si lo instalaste, y las líneas que agregaste al
+   archivo de exclusión.
+
+No recurras a `git clean` ni a `git reset --hard`: también destruyen trabajo que no tiene
+nada que ver con la prueba.
+
+## Adopta Project Builder
+
+Cuando la prueba te convenza:
+
+<Steps>
+
+1. Quita las líneas de exclusión que agregaste, y decide cuáles de `project-builder.json`,
+   `schematics/` y `.claude/skills/pbuilder/` vas a commitear.
+
+2. Declara el SDK con **un** comando de tu gestor de paquetes, fijando una versión si
+   necesitas instalaciones reproducibles:
+
+   | Gestor de paquetes | Comando |
+   |---|---|
+   | npm | `npm install --save-dev @pbuilder/sdk` |
+   | pnpm | `pnpm add -D @pbuilder/sdk` |
+   | Yarn | `yarn add --dev @pbuilder/sdk` |
+   | Bun | `bun add -D @pbuilder/sdk` |
+
+   Esto modifica `package.json` y puede modificar el lockfile.
+
+3. Opcionalmente, deja que `init` agregue el script `generate:types` que falta. `--force`
+   también fusiona `project-builder.json` y regenera los archivos de skill y el marcador, así
+   que previsualiza primero y revisa el diff completo después:
+
+   ```sh
+   builder init . --force --dry-run --non-interactive
+   builder init . --force --non-interactive
+   ```
+
+</Steps>
+
+## Relacionado
+
+- [`builder init`](/es/reference/cli-commands/#builder-init) — salidas, flags y el contrato de
+  edición de `package.json`.
+- [`builder execute`](/es/reference/cli-commands/#builder-execute) — ejecución de schematics y
+  el requisito del SDK.
+- [Salida y errores de la CLI](/es/reference/cli-output-and-errors/) — cada código de error y
+  su remedio.

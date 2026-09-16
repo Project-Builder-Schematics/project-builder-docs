@@ -68,6 +68,8 @@ Cada error que emite la CLI incluye:
 - un **mensaje** legible para humanos, y
 - una lista de **suggestions** no vacía — las entradas `Fix:` son remedios directos, las entradas `Note:` son contexto.
 
+Algunos códigos también incluyen un **`reason`** que distingue variantes del mismo código, y un **`detail`** breve y sin rutas (por ejemplo, qué campo falló). Ambos aparecen en la salida JSON; las tablas siguientes indican el reason cuando cambia el remedio.
+
 En modo texto, los errores se renderizan como un bloque fijo en **stderr**, independientemente de a dónde se redirija stdout. En modo JSON, `builder execute` escribe en su lugar un envelope de error JSON estructurado en stdout (y el bloque de texto se suprime), de modo que los consumidores automatizados siempre encuentran el error en el stream que están parseando.
 
 Los prompts interactivos para entradas **sensibles** de un schematic se rechazan fuera de una TTY (`engine_non_tty_ask_unavailable`) — en scripts y CI, pasa el valor explícitamente con `builder execute <collection>:<schematic> --<name>=<value>`.
@@ -116,6 +118,10 @@ Registro completo de códigos de error, agrupados por área. Cuando un código c
 | `init_not_implemented` | 1 | init mode not yet implemented | Note: este modo de init aún no está implementado |
 | `init_package_manager_not_found` | 3 | package manager not found | Fix: ejecuta con `--package-manager` para seleccionar uno explícitamente |
 | `init_skill_exists` | 2 | skill artefact set already exists (`.claude/skills/pbuilder/`) | Fix: ejecuta con `--force` para sobrescribir el conjunto completo de artefactos de skill |
+| `invalid_input` | 2 | package.json is not valid JSON | Fix: corrige los errores de sintaxis de `package.json` y re-ejecuta |
+| `invalid_input` | 2 | package.json `<field>` field is not a valid string map | Note: corrige el campo `devDependencies` o `scripts` (por ejemplo, un valor `null`) y re-ejecuta. Ver [Ediciones de `package.json`](/es/reference/cli-commands/#ediciones-de-packagejson) |
+
+Un `init` fallido deja en disco las salidas escritas antes del fallo. Una vez corregida la causa, re-ejecuta con `--force`.
 
 ### `builder new`
 
@@ -149,11 +155,35 @@ Registro completo de códigos de error, agrupados por área. Cuando un código c
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edita `project-builder.json` para corregir el error de sintaxis JSON |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edita `schema.json` para corregir el error de sintaxis JSON |
 | `execute_schematic_not_found` | 2 | schematic not found in collection | Note: verifica en el manifiesto de la colección el nombre del schematic registrado |
-| `execute_sdk_not_installed` | 4 | @pbuilder/sdk is not installed in this workspace | Fix: `bun add -d @pbuilder/sdk` |
-| `execute_sdk_version_mismatch` | 4 | @pbuilder/sdk installation could not be verified against the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
-| `execute_sdk_version_mismatch` | 4 | installed @pbuilder/sdk version is below the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
+| `execute_sdk_not_installed` | 4 | varía según el reason | Ver [Errores del SDK](#errores-del-sdk) |
+| `execute_sdk_version_mismatch` | 4 | varía según el reason | Ver [Errores del SDK](#errores-del-sdk) |
 | `execute_unsupported_registration` | 2 | schematic is registered in a mode execute does not support | Note: registra el schematic en modo path o modo colección |
 | `execution_failed` | 5 | schematic execution failed | Note: revisa la salida propia del schematic más arriba para encontrar la causa subyacente |
+
+### Errores del SDK
+
+`builder execute` verifica el SDK del workspace antes de ejecutar nada (ver [Requisito del SDK](/es/reference/cli-commands/#requisito-del-sdk)). Cada reason requiere una reparación distinta — solo `sdk_absent` significa que el SDK realmente falta.
+
+| Código | Reason | Salida | Mensaje | Reparación |
+|---|---|---|---|---|
+| `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provee un SDK compatible en `node_modules/@pbuilder/sdk` (ver más abajo) |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | El paquete está, pero faltan archivos de distribución requeridos — reinstálalo |
+| `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Revisa los permisos y los symlinks rotos en `node_modules/@pbuilder/sdk` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Corrige el valor indicado en `detail`, por ejemplo `project-builder.json.sdk.version: expected a numeric version floor` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Verifica que el `package.json` del workspace sea legible y no exceda el tamaño permitido |
+| `execute_sdk_version_mismatch` | `sdk_version_unparseable` | 4 | installed @pbuilder/sdk version is invalid; check the local package.json | Inspecciona el `version` de `node_modules/@pbuilder/sdk/package.json` |
+| `execute_sdk_version_mismatch` | `sdk_version_below_floor` | 4 | installed @pbuilder/sdk version is below the selected requirement; choose a compatible version | Instala una versión que cumpla el requisito seleccionado, o corrige el requisito |
+
+La CLI no detecta tu gestor de paquetes para estos errores: sus sugerencias listan un comando de instalación local por gestor, y tú eliges uno. Estos comandos modifican `package.json` y pueden modificar el lockfile:
+
+| Gestor de paquetes | Comando |
+|---|---|
+| npm | `npm install --save-dev @pbuilder/sdk` |
+| pnpm | `pnpm add -D @pbuilder/sdk` |
+| Yarn | `yarn add --dev @pbuilder/sdk` |
+| Bun | `bun add -D @pbuilder/sdk` |
+
+Fija una versión cuando necesites instalaciones reproducibles. Para proveer un SDK sin declararlo, ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/).
 
 ### `builder info`
 

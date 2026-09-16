@@ -62,9 +62,35 @@ Un `init` exitoso produce:
 2. **`schematics/.gitkeep`** — carpeta esqueleto para la autoría de schematics locales (que luego completa `builder new schematic`).
 3. **`.claude/skills/pbuilder/`** — el conjunto de artefactos de skill de IA incluido: `SKILL.md` (router) más `use.md`, `choose.md`, `create.md`.
 4. **Un bloque de referencia delimitado en `AGENTS.md`** (preferido) o `CLAUDE.md` — idempotente y exacto línea a línea.
-5. **`@pbuilder/sdk` agregado a `devDependencies`** en `package.json` — merge aditivo; las dependencias existentes se preservan.
+5. **Configuración de `package.json`** — `devDependencies["@pbuilder/sdk"]` y una entrada `scripts["generate:types"]`, cada una agregada solo cuando falta su clave. Ver [Ediciones de `package.json`](#ediciones-de-packagejson).
 
-Después de las escrituras, `init` opcionalmente invoca el gestor de paquetes detectado para instalar el SDK (con un timeout de 120 segundos). Luego, en una terminal interactiva, pregunta por la configuración del servidor MCP; una respuesta afirmativa imprime las instrucciones de configuración.
+Después de las escrituras, `init` invoca el gestor de paquetes detectado para instalar el SDK (con un timeout de 120 segundos), salvo que se indique `--no-install`, `--no-sdk-dependency` o `--no-skill`. Luego, en una terminal interactiva, pregunta por la configuración del servidor MCP; una respuesta afirmativa imprime las instrucciones de configuración.
+
+Las salidas se escriben en el orden anterior. Si un paso posterior falla, las salidas anteriores quedan en disco — no hay rollback de todo el `init`. Corrige la causa y vuelve a ejecutar con `--force`.
+
+### Ediciones de `package.json`
+
+`init` agrega dos entradas a `package.json`:
+
+| Entrada | Valor |
+|---|---|
+| `devDependencies["@pbuilder/sdk"]` | `>=0.1.0` |
+| `scripts["generate:types"]` | Un bucle de shell que ejecuta `pbuilder-codegen` una vez por cada `schema.json` bajo `schematics/`, omitiendo los árboles de plantillas `files/` |
+
+La edición es aditiva y sin pérdidas:
+
+- **Solo se agregan las claves que faltan.** Una versión del SDK que ya fijaste, o tu propio script `generate:types`, nunca se sobrescribe.
+- **Los bytes existentes se conservan.** Las entradas nuevas se insertan en el archivo tal como está — la indentación, los tabs, los finales de línea CRLF y el orden de claves en el resto del archivo no cambian, y las líneas insertadas siguen el estilo circundante. Si `package.json` no existe, `init` crea uno mínimo.
+- **Si no hay nada que agregar, el contenido queda idéntico.** Cuando ambas entradas ya existen, el contenido del archivo queda idéntico byte a byte. `init` igualmente escribe el archivo, así que no asumas que queda intacto en disco (por ejemplo, su fecha de modificación).
+- **Si no se solicita ninguna entrada, `package.json` no se toca.** Con `--no-sdk-dependency` (y su `--skip-types-script` heredado) o con `--no-skill`, `init` no lo lee, no lo crea y no lo escribe.
+
+`init` valida los campos que va a editar:
+
+- Un campo `devDependencies` o `scripts` presente que no sea un objeto de strings — incluido `"scripts": null` — es inválido, no un mapa vacío. `init` se detiene con [`invalid_input`](/es/reference/cli-output-and-errors/#builder-init) (`package.json scripts field is not a valid string map`) y no modifica `package.json`. Corrige el campo y vuelve a ejecutar. Cada campo se valida solo cuando se solicita su entrada.
+- Un `package.json` que no es JSON válido falla de la misma forma.
+- Un documento cuya raíz es `null` se trata como un objeto vacío.
+
+Estas garantías cubren la edición de la propia CLI. El paso de instalación posterior — y cualquier instalación que ejecutes después — pertenece a tu gestor de paquetes, que puede reescribir `package.json` y el lockfile por su cuenta. Usa `--no-install` para separar ambas cosas.
 
 ### Flags
 
@@ -75,10 +101,32 @@ Después de las escrituras, `init` opcionalmente invoca el gestor de paquetes de
 | `--json` | Emitir salida JSON legible por máquinas (NDJSON). Se combina con `--dry-run` para obtener un plan estructurado completo. |
 | `--non-interactive` | Deshabilitar todos los prompts (apto para CI y agentes de IA). Con `--mcp` sin establecer, el valor por defecto es `--mcp=no`. |
 | `--package-manager=<npm\|pnpm\|yarn\|bun>` | Sobrescribir la detección del gestor de paquetes. Por defecto: detección por lockfile (pnpm > yarn > bun > npm) con `npm` como fallback. |
-| `--no-install` | Omitir el paso de instalación del gestor de paquetes. El SDK igual queda declarado en `package.json` — ejecuta la instalación manualmente más tarde. |
-| `--no-skill` | Omitir atómicamente el conjunto de artefactos de skill, el bloque de referencia en AGENTS/CLAUDE y la dev-dependency del SDK. Úsalo cuando solo quieres `project-builder.json` + `schematics/`. |
+| `--no-install` | Omitir únicamente el paso de instalación del gestor de paquetes. Las entradas solicitadas de `package.json` igual se agregan — ejecuta la instalación manualmente más tarde. |
+| `--no-sdk-dependency` | No agregar `@pbuilder/sdk` a `devDependencies` y no ejecutar la instalación. Las entradas existentes se preservan, nunca se eliminan. Su valor también es el valor por defecto de `--skip-types-script`. Ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/). |
+| `--skip-types-script` | No agregar el script `generate:types`. Si se omite, toma el valor de `--no-sdk-dependency`; un valor explícito, como `--skip-types-script=false`, siempre prevalece. |
+| `--no-skill` | Omitir el conjunto de artefactos de skill, el bloque de referencia en AGENTS/CLAUDE, toda la configuración de `package.json`, la instalación y la configuración de MCP. Úsalo cuando solo quieres `project-builder.json` + `schematics/`. |
 | `--mcp=<yes\|no\|prompt>` | Controlar el prompt de configuración de MCP. Por defecto: `prompt` en una TTY, `no` bajo `--non-interactive`. `--mcp=prompt` es incompatible con `--non-interactive`. |
 | `--publishable` | Reservado — actualmente devuelve el error `init_not_implemented`. |
+
+### Flags de `package.json`
+
+`--no-sdk-dependency` y `--skip-types-script` deciden qué le pide `init` a `package.json`. La tabla asume una ejecución real sin `--no-install` ni `--no-skill`; "agregar" significa agregar cuando la clave falta.
+
+| `--no-sdk-dependency` | `--skip-types-script` | Agregar `@pbuilder/sdk` | Agregar `generate:types` | Ejecutar instalación |
+|---|---|---|---|---|
+| omitido / `false` | omitido / `false` | Sí | Sí | Sí |
+| omitido / `false` | `true` | Sí | No | Sí |
+| `true` | omitido / `true` | No | No | No |
+| `true` | `false` | No | Sí | No |
+
+`--no-sdk-dependency=false` mantiene la configuración normal del SDK, y `--skip-types-script=false` anula el valor heredado. Son dos flags específicos de `init` — no una regla general por la que un flag `--no-` niega a otro. `--no-install` quita solo la instalación de cualquier fila, y `--no-skill` omite todas las columnas.
+
+Con `--no-sdk-dependency`, `init` imprime una advertencia con las formas de proveer un SDK: usar uno que ya esté en `node_modules/@pbuilder/sdk`, o instalarlo localmente con tu gestor de paquetes.
+
+Con `--dry-run`, `init` no escribe ni instala nada:
+
+- Lee el `package.json` real solo cuando se solicita alguna entrada, y lista únicamente las entradas que realmente faltan — por ejemplo `Would modify: package.json (generate:types)` — más la instalación cuando se ejecutaría. Los campos inválidos hacen fallar la previsualización igual que una ejecución real.
+- El conjunto de artefactos de skill y el marcador del archivo de agente siempre aparecen como creaciones/anexos planificados, sin importar lo que ya exista en disco. Tómalos como un plan, no como una predicción exacta.
 
 ### Ejemplos
 
@@ -102,6 +150,15 @@ builder init --no-install
 # Minimal init — only project-builder.json + schematics/ (no SKILL, no SDK)
 builder init --no-skill
 
+# Evaluate without declaring the SDK — no SDK entry, no generate:types, no install
+builder init --no-sdk-dependency --non-interactive
+
+# Same, but keep a generate:types entry
+builder init --no-sdk-dependency --skip-types-script=false --non-interactive
+
+# Adopt the SDK without adding generate:types
+builder init --skip-types-script --non-interactive
+
 # Force re-init over an existing workspace
 builder init --force
 ```
@@ -123,6 +180,33 @@ Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/an
 ### Qué hace
 
 `execute` valida el workspace (`project-builder.json` debe existir), resuelve la colección y el schematic a través de todas las formas de registro, valida tus entradas contra el `schema.json` del schematic, y luego ejecuta el schematic a través del motor, transmitiendo sus eventos a la terminal.
+
+### Requisito del SDK
+
+`execute` ejecuta el schematic con el `@pbuilder/sdk` instalado en `node_modules/@pbuilder/sdk` del workspace. Una declaración en `package.json` no instala nada: el paquete debe estar presente, completo y legible. Declararlo no es obligatorio — ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/).
+
+Antes de inspeccionar la instalación, `execute` selecciona un requisito de versión de la **primera** de estas fuentes que esté presente:
+
+1. `package.json` → `devDependencies["@pbuilder/sdk"]`
+2. `package.json` → `dependencies["@pbuilder/sdk"]`
+3. `project-builder.json` → `sdk.version`
+4. Ninguna presente: `0.2.4`, el SDK más antiguo con el que se prueba la CLI. No garantiza que cualquier SDK más nuevo funcione.
+
+El requisito es un **piso numérico**, no un rango semver: se descartan los operadores iniciales como `^`, `~` o `>=`, y la versión instalada debe ser mayor o igual al número restante. Por eso la entrada `>=0.1.0` que agrega `builder init` selecciona un piso `0.1.0`.
+
+El valor seleccionado debe ser válido. Un valor inválido falla con `sdk_requirement_invalid`, y la CLI no recurre a una fuente de menor prioridad — una vez seleccionada una fuente, las siguientes no se leen. Ver [Errores del SDK](/es/reference/cli-output-and-errors/#errores-del-sdk).
+
+Para declarar un requisito sin agregar una dependencia, defínelo en `project-builder.json`:
+
+```json
+{
+  "sdk": {
+    "version": "0.2.4"
+  }
+}
+```
+
+`init` nunca escribe este bloque, y la clave de nivel superior `dependencies` de `project-builder.json` no interviene en la selección del SDK.
 
 ### Pasar entradas al schematic
 
@@ -147,7 +231,7 @@ Los tokens de flags de schematic siguen estas reglas:
 | `--force` | Reservado — aún no implementado; emite una advertencia si se establece. |
 | `--auto-install` | Reservado — aún no implementado; emite una advertencia si se establece. |
 
-**Native engine limitation:** `--dry-run` / `--commit=never` is unsupported. The native adapter rejects any commit mode other than `always` before constructing or running the engine; it does not produce a preview. Place CLI flags **before** `<collection>:<schematic>`: after it, `--dry-run` is only a schematic input and does not select the CLI's no-write mode. Do not rely on that placement to prevent writes.
+**Limitación del motor nativo:** `--dry-run` / `--commit=never` no está soportado. El adaptador nativo rechaza cualquier modo de commit distinto de `always` antes de construir o ejecutar el motor; no produce una previsualización. Ubica los flags de la CLI **antes** de `<collection>:<schematic>`: después de él, `--dry-run` es solo una entrada del schematic y no selecciona el modo sin escritura de la CLI. No confíes en esa ubicación para evitar escrituras.
 
 ### Ejemplos
 

@@ -68,6 +68,8 @@ Every error the CLI emits includes:
 - a human-readable **message**, and
 - a non-empty **suggestions** list — `Fix:` entries are direct remedies, `Note:` entries are context.
 
+Some codes also carry a **`reason`** that distinguishes variants of the same code, and a short, path-free **`detail`** (for example which field failed). Both appear in JSON output; the tables below list the reason where it changes the remedy.
+
 In text mode, errors render as a fixed block on **stderr**, independent of where stdout is redirected. In JSON mode, `builder execute` writes a structured JSON error envelope to stdout instead (and the text block is suppressed), so machine consumers always find the error in the stream they are parsing.
 
 Interactive prompts for **sensitive** schematic inputs are refused outside a TTY (`engine_non_tty_ask_unavailable`) — in scripts and CI, pass the value explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
@@ -116,6 +118,10 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `init_not_implemented` | 1 | init mode not yet implemented | Note: this init mode is not implemented yet |
 | `init_package_manager_not_found` | 3 | package manager not found | Fix: run with `--package-manager` to select one explicitly |
 | `init_skill_exists` | 2 | skill artefact set already exists (`.claude/skills/pbuilder/`) | Fix: run with `--force` to overwrite the full skill artefact set |
+| `invalid_input` | 2 | package.json is not valid JSON | Fix: fix the syntax errors in `package.json` and re-run |
+| `invalid_input` | 2 | package.json `<field>` field is not a valid string map | Note: fix the `devDependencies` or `scripts` field (for example a `null` value) and re-run. See [`package.json` edits](/reference/cli-commands/#packagejson-edits) |
+
+A failed `init` leaves the outputs written before the failure on disk. Once fixed, re-run with `--force`.
 
 ### `builder new`
 
@@ -149,11 +155,35 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edit `schema.json` to fix the JSON syntax error |
 | `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
-| `execute_sdk_not_installed` | 4 | @pbuilder/sdk is not installed in this workspace | Fix: `bun add -d @pbuilder/sdk` |
-| `execute_sdk_version_mismatch` | 4 | @pbuilder/sdk installation could not be verified against the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
-| `execute_sdk_version_mismatch` | 4 | installed @pbuilder/sdk version is below the workspace's declared floor | Fix: `bun add -d @pbuilder/sdk@latest` |
+| `execute_sdk_not_installed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
+| `execute_sdk_version_mismatch` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
 | `execute_unsupported_registration` | 2 | schematic is registered in a mode execute does not support | Note: register the schematic as path-mode or collection-mode |
 | `execution_failed` | 5 | schematic execution failed | Note: check the schematic's own output above for the underlying cause |
+
+### SDK diagnostics
+
+`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement)). Each reason calls for a different repair — only `sdk_absent` means the SDK is actually missing.
+
+| Code | Reason | Exit | Message | Repair |
+|---|---|---|---|---|
+| `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provide a compatible SDK at `node_modules/@pbuilder/sdk` (see below) |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but required distribution files are missing — reinstall it |
+| `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Check permissions and dangling symlinks on `node_modules/@pbuilder/sdk` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Fix the value named in `detail`, for example `project-builder.json.sdk.version: expected a numeric version floor` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Check that the workspace `package.json` is readable and not oversized |
+| `execute_sdk_version_mismatch` | `sdk_version_unparseable` | 4 | installed @pbuilder/sdk version is invalid; check the local package.json | Inspect the `version` in `node_modules/@pbuilder/sdk/package.json` |
+| `execute_sdk_version_mismatch` | `sdk_version_below_floor` | 4 | installed @pbuilder/sdk version is below the selected requirement; choose a compatible version | Install a version that meets the selected requirement, or correct the requirement |
+
+The CLI does not detect your package manager for these errors: its suggestions list one local installation command per manager, and you choose one. They change `package.json` and may change the lockfile:
+
+| Package manager | Command |
+|---|---|
+| npm | `npm install --save-dev @pbuilder/sdk` |
+| pnpm | `pnpm add -D @pbuilder/sdk` |
+| Yarn | `yarn add --dev @pbuilder/sdk` |
+| Bun | `bun add -D @pbuilder/sdk` |
+
+Pin a version when you need reproducible installs. To provide an SDK without declaring it, see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
 
 ### `builder info`
 
