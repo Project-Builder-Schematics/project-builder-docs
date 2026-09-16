@@ -63,7 +63,9 @@
 :root {
 	--sl-font: 'Inter Variable', 'SF Pro Display', -apple-system, system-ui, 'Segoe UI', sans-serif;
 	--sl-font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
-	--sl-content-width: 50rem;
+	--pb-prose-width: 50rem;
+	--pb-wide-width: 72rem;
+	--sl-content-width: var(--pb-prose-width);
 	--sl-line-height: 1.65;
 	--sl-text-code: 0.875rem;
 	--sl-text-code-sm: 0.8125rem;
@@ -244,6 +246,32 @@ html[data-pb-hide-sidebar] .main-frame {
 
 html[data-pb-hide-toc] .right-sidebar-container {
 	display: none;
+}
+
+/* A hidden panel returns its space to a centred content column capped at
+   --pb-wide-width. Starlight derives the content cap and both column widths from
+   --sl-content-width, so widening it on .main-frame is enough — scoping it there
+   keeps the header's search layout, which reads the same variable, untouched.
+   Prose stays at --pb-prose-width; tables, code and figures use the full column. */
+.sl-markdown-content :is(p, ul, ol:not(.sl-steps), dl, blockquote, aside, h1, h2, h3, h4, h5, h6) {
+	max-width: var(--pb-prose-width);
+}
+
+@media (min-width: 50rem) {
+	html[data-pb-hide-sidebar] .main-frame {
+		--sl-content-width: min(100%, var(--pb-wide-width));
+	}
+}
+
+@media (min-width: 72rem) {
+	html[data-pb-hide-toc] .main-frame {
+		--sl-content-width: min(100%, var(--pb-wide-width));
+	}
+
+	html[data-pb-hide-toc] .main-pane {
+		--sl-content-margin-inline: auto;
+		width: 100%;
+	}
 }
 
 /* Collapsible "On this page" panel (open by default) */
