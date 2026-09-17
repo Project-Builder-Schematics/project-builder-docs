@@ -251,7 +251,9 @@ node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js schematics/hello
 
 The link exists once a committing `builder execute` has run. Before that, use the configured root itself: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
 
-`builder new schematic` needs none of this: it resolves the configured root on its own and regenerates the new schematic's types.
+The same applies when the link was created from [`--sdk-root` or `BUILDER_SDK_ROOT`](/reference/cli-commands/#--sdk-root-and-builder_sdk_root) instead of `sdk.root`. Before the link exists, run the script from that value: `node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js`.
+
+`builder new schematic` needs none of this with `sdk.root`: it resolves the configured root on its own and regenerates the new schematic's types. It does not read `BUILDER_SDK_ROOT`: when the variable is your only SDK source, it warns that `@pbuilder/sdk` was not found and skips `schema.generated.ts` — run the script as above.
 
 ## Output files and write boundaries
 

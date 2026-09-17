@@ -183,7 +183,7 @@ Provide the schematic as `<collection>:<schematic>` (for example `@schematics/an
 
 ### SDK requirement
 
-`execute` runs the schematic against the `@pbuilder/sdk` installed at `node_modules/@pbuilder/sdk` in the workspace, or against an SDK outside the project named by [`sdk.root`](#external-sdk-root-sdkroot). A declaration in `package.json` does not install anything: the package must be present, complete and readable. Declaring it is not required — see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
+`execute` runs the schematic against the `@pbuilder/sdk` installed at `node_modules/@pbuilder/sdk` in the workspace, or against an SDK outside the project — see [SDK source](#sdk-source). A declaration in `package.json` does not install anything: the package must be present, complete and readable. Declaring it is not required — see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
 
 Before it inspects the installation, `execute` selects a version requirement from the **first** of these sources that is present:
 
@@ -207,6 +207,17 @@ To declare a requirement without adding a dependency, set it in `project-builder
 ```
 
 `init` never writes this block, and the top-level `dependencies` key in `project-builder.json` plays no part in SDK selection.
+
+### SDK source
+
+`execute` takes the SDK from the **first** of these sources that is set:
+
+1. [`--sdk-root=<dir>`](#--sdk-root-and-builder_sdk_root)
+2. The [`BUILDER_SDK_ROOT`](#--sdk-root-and-builder_sdk_root) environment variable
+3. [`sdk.root`](#external-sdk-root-sdkroot) in the working directory's `project-builder.json`
+4. The workspace's installed `node_modules/@pbuilder/sdk`
+
+A source that is set but names an unusable directory fails the run: `execute` never falls back to a lower source. The first three name an SDK outside the project and share the same validation, the same link and the same diagnostics, described under `sdk.root` below. The version requirement applies to all four.
 
 ### External SDK root (`sdk.root`)
 
@@ -237,9 +248,9 @@ Before linking anything, `execute` validates the root:
 - **Dependencies** — the SDK's own runtime dependencies (today `ts-morph`) resolve from a `node_modules` at or above the root. A package-manager cache directory does not qualify.
 - **Permissions** — the root is not writable by its group or by other users, no directory above it is world-writable without the sticky bit, and the root and its ancestors are owned by you or by root. A directory above the root that is only **group**-writable does not fail the run: it emits the `warn_sdk_root_group_writable` warning and execution continues.
 
-**The link.** When the run commits, `execute` creates exactly one entry: `node_modules/@pbuilder/sdk` in the workspace, a **symbolic link** to the canonical root. It creates `node_modules/` and `node_modules/@pbuilder/` when they are missing, and writes nothing else. Re-running with the same root reuses the link without writing; changing `sdk.root` repoints it. A failed write leaves no partial link. Runs that do not commit — `--dry-run` or `--commit=never` — create nothing; for native schematics they are rejected anyway (see the native engine limitation below).
+**The link.** When the run commits, `execute` creates exactly one entry: `node_modules/@pbuilder/sdk` in the workspace, a **symbolic link** to the canonical root. It creates `node_modules/` and `node_modules/@pbuilder/` when they are missing, and writes nothing else. Re-running with the same root reuses the link without writing; naming a different root repoints it. A failed write leaves no partial link. Runs that do not commit — `--dry-run` or `--commit=never` — create nothing; for native schematics they are rejected anyway (see the native engine limitation below).
 
-**A local install wins nothing silently.** If `node_modules/@pbuilder/sdk` is already a real directory, `execute` never overwrites it and never picks one of the two for you: it fails with `execute_sdk_link_path_conflict`. The only exception is a local entry that canonically resolves to the same directory as `sdk.root` — then the run proceeds with no error and no write. Neither installation is ever modified.
+**A local install wins nothing silently.** If `node_modules/@pbuilder/sdk` is already a real directory, `execute` never overwrites it and never picks one of the two for you: it fails with `execute_sdk_link_path_conflict`. The only exception is a local entry that canonically resolves to the same directory as the configured root — then the run proceeds with no error and no write. Neither installation is ever modified.
 
 **`builder new schematic`** resolves the SDK from `sdk.root` directly, with no prior `execute` and no link. It validates the root the same way — except for the version requirement, which only `execute` enforces. A root that fails any check counts as "no usable SDK": the command still exits `0` and writes the scaffold, warns, and skips `schema.generated.ts`. It never runs anything from a root that failed validation.
 
@@ -256,6 +267,20 @@ test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk
 **Regenerating types by hand.** No package manager installed anything, so there is no `node_modules/.bin/pbuilder-codegen` shim. See [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot).
 
 Every error code and reason is listed in [SDK diagnostics](/reference/cli-output-and-errors/#sdk-diagnostics).
+
+### `--sdk-root` and `BUILDER_SDK_ROOT`
+
+`--sdk-root=<dir>` names an external SDK root for one run without touching `project-builder.json`. The `BUILDER_SDK_ROOT` environment variable does the same for every run; the flag always wins over it. They name the same directory `sdk.root` does — the `@pbuilder/sdk` package directory — and go through the same validation, the same link and the same diagnostics. See [External collections](/guides/external-collections/#set-up-a-shared-collections-directory) for the setup that uses them.
+
+- **Value.** Absolute, or relative to the **working directory** — not to `project-builder.json`. `~` is not expanded: a shell expands it when you assign the variable (`export` in bash or zsh, `set -x` in fish), but a value quoted in the shell or written into an editor or agent settings file stays literal and fails with `sdk_root_unresolvable`. Write the full path there.
+- **Local paths only.** A value that starts with a URL scheme or a drive letter fails with `sdk_root_unsupported_scheme` before the filesystem is touched.
+- **Empty values.** An empty `BUILDER_SDK_ROOT` counts as unset. An empty `--sdk-root=` fails with `sdk_root_value_invalid`.
+- **Placement.** `execute` only. Put it before `<collection>:<schematic>`; after the positional it is rejected (`invalid_input`), never passed to the schematic. `new schematic` and `info` read neither the flag nor the variable.
+- **With `--manifest`.** Both work together. An external manifest's own `sdk` block stays ignored — with `warn_manifest_sdk_root_ignored` when it declares `sdk.root` — whichever source supplies the SDK.
+- **Announcement.** A root that came from `BUILDER_SDK_ROOT` prints `warn_sdk_root_ambient`, which names the variable but never the path; a root from `--sdk-root` is not announced. To see which SDK ran, check the variable or run `readlink node_modules/@pbuilder/sdk`.
+- **Messages.** The `sdk_root_*` reasons of `sdk.root` apply unchanged, and their messages still say `sdk.root` when the value came from the flag or the variable.
+- **Existing local installs.** A real `node_modules/@pbuilder/sdk` that differs from the named root fails with `execute_sdk_link_path_conflict`. Before setting `BUILDER_SDK_ROOT` for every checkout, remove the SDK installed in each of them.
+- **Stopping.** Unsetting the variable, or dropping the flag, does not remove the link. The next run without an external root fails with `execute_manifest_path_escape`; delete the link as described in [Removing `sdk.root`](#external-sdk-root-sdkroot).
 
 ### Passing inputs to the schematic
 
@@ -277,7 +302,7 @@ Schematic flag tokens follow these rules:
 - **Placement.** Put it before `<collection>:<schematic>`. After the positional it is rejected (`invalid_input`), never passed to the schematic.
 - **Trust.** The root, and every directory above it, must not be writable by other users or by a group (a world-writable ancestor with the sticky bit is allowed), and must be owned by you or by root. The filesystem root and your home directory itself are refused.
 - **Paths in the manifest** must be relative to the manifest root and stay inside it.
-- **SDK.** The run uses the working directory's own `@pbuilder/sdk` (0.3.1 or later), installed in a real `node_modules`. The manifest root and its ancestors must not contain another `@pbuilder/sdk` copy, or the run fails with a split module graph. `sdk.root` and `sdk.version` in the external manifest are ignored.
+- **SDK.** The run uses the working directory's own `@pbuilder/sdk` (0.3.1 or later) — installed in a real `node_modules`, or named with [`--sdk-root` or `BUILDER_SDK_ROOT`](#--sdk-root-and-builder_sdk_root). The manifest root and its ancestors must not contain another `@pbuilder/sdk` copy, or the run fails with a split module graph. `sdk.root` and `sdk.version` in the external manifest are ignored.
 - **Warnings.** A root that came from `BUILDER_MANIFEST` is announced with `warn_manifest_root_ambient`; an ignored external `sdk.root` with `warn_manifest_sdk_root_ignored`.
 
 ### Flags
@@ -285,6 +310,7 @@ Schematic flag tokens follow these rules:
 | Flag | Effect |
 |---|---|
 | `--manifest=<path>` | Read the manifest, collections and schematics from this directory (or its `project-builder.json`) instead of the working directory. Must precede `<collection>:<schematic>`. See [External manifest](#external-manifest---manifest). |
+| `--sdk-root=<dir>` | Run against the `@pbuilder/sdk` in this directory instead of the workspace's installed SDK or `sdk.root`. Also read from `BUILDER_SDK_ROOT`; the flag wins. Must precede `<collection>:<schematic>`. See [`--sdk-root` and `BUILDER_SDK_ROOT`](#--sdk-root-and-builder_sdk_root). |
 | `--commit=<never\|always>` | Write mode. Default `always`. `ask` is accepted syntactically but rejected — reserved for a future release. |
 | `--dry-run` | Alias for `--commit=never`. Setting `--dry-run` together with a disagreeing `--commit` value is an error. |
 | `--non-interactive` | Reserved — not yet implemented; emits a warning if set. |
@@ -311,6 +337,9 @@ builder execute --dry-run default:my-component
 
 # Run a schematic registered in another checkout; files land in the working directory
 builder execute --manifest=../app-schematics default:my-component --name=button
+
+# Same, against a globally installed SDK instead of one in node_modules
+builder execute --manifest=../app-schematics --sdk-root=/Users/me/.bun/install/global/node_modules/@pbuilder/sdk default:my-component --name=button
 ```
 
 ---

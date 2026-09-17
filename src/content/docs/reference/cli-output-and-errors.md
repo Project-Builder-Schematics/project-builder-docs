@@ -150,7 +150,7 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | `execute_invalid_factory_pointer` | 2 | schematic is missing a factory.ts or factory.js file | Note: create `factory.ts` or `factory.js` in the schematic root |
 | `execute_invalid_factory_pointer` | 2 | schematic's factory pointer is empty or missing in collection.json | Note: set `collection.json`'s factory to `<module>#<export>` |
 | `execute_invalid_input_value` | 2 | input value is invalid | Note: check the input's type, enum values, and whether it is scalar-typed |
-| `execute_manifest_path_escape` | 3 | manifest-derived path resolves outside the workspace root | Note: check the manifest for a path that escapes the project workspace. If `sdk.root` was removed, `node_modules/@pbuilder/sdk` may be a leftover link — confirm it is a symlink, never a directory, then delete it |
+| `execute_manifest_path_escape` | 3 | manifest-derived path resolves outside the workspace root | Note: check the manifest for a path that escapes the project workspace. If `sdk.root` was removed — or `--sdk-root` / `BUILDER_SDK_ROOT` is no longer set — `node_modules/@pbuilder/sdk` may be a leftover link — confirm it is a symlink, never a directory, then delete it |
 | `execute_manifest_path_escape` (`path_escapes_manifest_root`) | 3 | manifest-derived path resolves outside the named manifest root | Note: check the manifest for a path that escapes the named manifest root |
 | `execute_manifest_path_escape` (`sdk_node_modules_escapes_workspace`) | 3 | node_modules is a symlink that resolves outside the workspace root | Note: check whether `node_modules` is a symlink pointing outside the project workspace; the leftover `sdk.root` link note above also applies |
 | `execute_missing_required_inputs` | 2 | missing required input(s) | Fix: `builder execute <collection>:<schematic> --<name>=<value>` |
@@ -168,7 +168,7 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 
 ### SDK diagnostics
 
-`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement) and [External SDK root](/reference/cli-commands/#external-sdk-root-sdkroot)). Each reason calls for a different repair — only `sdk_absent` means the SDK is actually missing.
+`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement) and [SDK source](/reference/cli-commands/#sdk-source)). Each reason calls for a different repair — only `sdk_absent` means the SDK is actually missing.
 
 #### Local installation
 
@@ -193,13 +193,14 @@ The CLI does not detect your package manager for these errors: its suggestions l
 
 Pin a version when you need reproducible installs. The suggestions also offer the alternative of pointing [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot) at an existing `@pbuilder/sdk` directory. To provide an SDK without declaring it, see [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
 
-#### External root (`sdk.root`)
+#### External root
 
-These codes appear only when `project-builder.json` sets `sdk.root`. `execute_sdk_version_mismatch` applies to an external root exactly as to a local install. No message, detail or JSON field ever contains the configured path: locations are reported relative to the root, such as `the configured root itself` or `2 levels above sdk.root`.
+These codes appear only when an external root is named — by `--sdk-root`, `BUILDER_SDK_ROOT` or `sdk.root` in `project-builder.json`. Their messages say `sdk.root` whichever of the three named the root. `execute_sdk_version_mismatch` applies to an external root exactly as to a local install. No message, detail or JSON field ever contains the configured path: locations are reported relative to the root, such as `the configured root itself` or `2 levels above sdk.root`.
 
 | Code | Reason | Exit | Message | Repair |
 |---|---|---|---|---|
 | `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Set `"sdk": {"root": "<directory>"}` — absolute, or relative to `project-builder.json` |
+| `execute_sdk_root_invalid` | `sdk_root_unsupported_scheme` | 4 | sdk root is not a supported location — a URL or drive letter is not accepted | Point `--sdk-root` (or `BUILDER_SDK_ROOT`) at a local directory. Only these two can hit it |
 | `execute_sdk_root_invalid` | `sdk_root_unresolvable` | 4 | sdk.root does not resolve to a readable directory | Point `sdk.root` at an existing, readable `@pbuilder/sdk` package directory |
 | `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Point it at the package directory whose `package.json` name is `@pbuilder/sdk` — not its parent |
 | `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstall or rebuild the SDK so `dist/bin/pbuilder-runner.js` and `dist/transport` are present |
@@ -207,7 +208,7 @@ These codes appear only when `project-builder.json` sets `sdk.root`. `execute_sd
 | `execute_sdk_root_invalid` | `sdk_root_writable_by_others` | 4 | sdk.root itself is writable by its group or by any user | `chmod go-w` the root so only its owner can write to it |
 | `execute_sdk_root_invalid` | `sdk_ancestor_world_writable` | 4 | a directory above sdk.root is writable by any user and is not sticky | `detail` gives the depth. `chmod o-w` that directory, or move the SDK under a directory only you can write to |
 | `execute_sdk_root_invalid` | `sdk_root_untrusted_owner` | 4 | sdk.root, or a directory above it, is owned by another user | Move the SDK under a path owned by you or by root |
-| `execute_sdk_link_path_conflict` | `sdk_root_local_install_present` | 4 | a real @pbuilder/sdk is already installed at node_modules/@pbuilder/sdk and differs from sdk.root | Remove `sdk.root` to use the installed SDK, or delete `node_modules/@pbuilder/sdk` to use the configured one |
+| `execute_sdk_link_path_conflict` | `sdk_root_local_install_present` | 4 | a real @pbuilder/sdk is already installed at node_modules/@pbuilder/sdk and differs from the configured SDK root | Delete `node_modules/@pbuilder/sdk` to use the configured root, or stop configuring one (`--sdk-root`, `BUILDER_SDK_ROOT` or `sdk.root`) to use the installed SDK |
 | `execute_sdk_link_path_conflict` | `sdk_link_path_occupied` | 4 | node_modules/@pbuilder/sdk is a regular file, so the SDK link cannot be created | Delete that file, then re-run |
 | `execute_sdk_link_path_conflict` | `sdk_link_path_dangling` | 4 | node_modules/@pbuilder/sdk is a link to a target that no longer exists | Delete the broken link (confirm it is a symlink, never a directory), then re-run |
 | `execute_sdk_link_path_conflict` | `sdk_link_path_invalid_package` | 4 | node_modules/@pbuilder/sdk is a directory that is not a usable @pbuilder/sdk package | Remove or reinstall `node_modules/@pbuilder/sdk`, then re-run |
@@ -219,6 +220,7 @@ These codes appear only when `project-builder.json` sets `sdk.root`. `execute_sd
 | Warning | Meaning |
 |---|---|
 | `warn_sdk_root_group_writable` | A directory above the root is group-writable, so anyone in that group could replace the SDK. The run continues; the message names the depth and the remedy — `chmod g-w` that directory, or move the SDK under a directory only you can write to. Global installs under a shared prefix, such as Homebrew's, commonly trigger it. |
+| `warn_sdk_root_ambient` | The root came from `BUILDER_SDK_ROOT`, not from `--sdk-root`. The message names the variable, never the path — check the variable itself to see which SDK ran. |
 
 ### `pbuilder-codegen` is not found, or a different version runs
 
@@ -227,9 +229,9 @@ This is not a `builder` error: it comes from your package runner (`npx`, `bunx`)
 | Situation | What happens |
 |---|---|
 | `@pbuilder/sdk` is not installed at all | The runner cannot find the binary — install the SDK |
-| The SDK comes from `sdk.root` | `node_modules/@pbuilder/sdk` is a link that no package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. The runner reports the binary as missing even though the SDK works — or, if an SDK is installed globally, `npx` can silently run **that global copy** instead, possibly a different version. Recent pnpm versions install before `pnpm exec`, which writes a lockfile into the project |
+| The SDK comes from an external root (`sdk.root`, `--sdk-root` or `BUILDER_SDK_ROOT`) | `node_modules/@pbuilder/sdk` is a link that no package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. The runner reports the binary as missing even though the SDK works — or, if an SDK is installed globally, `npx` can silently run **that global copy** instead, possibly a different version. Recent pnpm versions install before `pnpm exec`, which writes a lockfile into the project |
 
-With `sdk.root`, run the script directly — see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from the configured root by itself.
+With an external root, run the script directly — see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from `sdk.root` by itself.
 
 ### Manifest root
 
@@ -251,7 +253,7 @@ Errors and warnings from [`--manifest` / `BUILDER_MANIFEST`](/guides/external-co
 | Warning | Meaning |
 |---|---|
 | `warn_manifest_root_ambient` | The manifest root came from `BUILDER_MANIFEST`, not from a flag. The message names the resolved directory. |
-| `warn_manifest_sdk_root_ignored` | The external manifest declares an `sdk.root`; it is ignored and the working directory's installed `@pbuilder/sdk` is used. |
+| `warn_manifest_sdk_root_ignored` | The external manifest declares an `sdk.root`; it is ignored. The message says the working directory's installed `@pbuilder/sdk` was used, but `--sdk-root` or `BUILDER_SDK_ROOT` still supply the SDK when set. |
 
 A run that fails with `engine_native_developer_fault` and a note about a *split module graph* while using `--manifest` means the manifest root, or a directory above it, has its own `@pbuilder/sdk`. See [External collections](/guides/external-collections/#set-up-a-shared-collections-directory).
 

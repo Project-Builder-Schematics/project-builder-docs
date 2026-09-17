@@ -97,6 +97,11 @@ las salidas escritas antes del fallo quedan en disco.
    `node_modules/@pbuilder/sdk`, que apunta a esa raíz. Para regenerar tipos a mano con esta
    configuración, ver [Generación de tipos con `sdk.root`](/es/guides/type-generation/#cuando-el-sdk-viene-de-sdkroot).
 
+   Para no tocar tampoco `project-builder.json`, indica el mismo directorio en cada ejecución
+   con `--sdk-root` (antes de `<collection>:<schematic>`) o una sola vez con la variable de
+   entorno `BUILDER_SDK_ROOT`. Ambos tienen prioridad sobre `sdk.root` — ver
+   [Origen del SDK](/es/reference/cli-commands/#origen-del-sdk).
+
 4. **Crea y ejecuta un schematic:**
 
    ```sh
@@ -172,10 +177,11 @@ Parte de lo que la prueba realmente cambió — no de un reset general:
    `.claude/skills/pbuilder/` — cuando no existían antes.
 3. Deshaz solo los cambios de la prueba en archivos versionados, como el bloque marcador
    agregado a `AGENTS.md` o `CLAUDE.md`. Conserva tus propias ediciones.
-4. Quita el SDK de prueba de `node_modules` si lo instalaste — o, si usaste `sdk.root`,
-   quita la clave y luego el enlace que dejó
-   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`). Quita también las
-   líneas que agregaste al archivo de exclusión.
+4. Quita el SDK de prueba de `node_modules` si lo instalaste. Si usaste una raíz externa,
+   quita el enlace que dejó
+   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`) — después de quitar
+   la clave `sdk.root`, o de dejar sin definir `BUILDER_SDK_ROOT`; `--sdk-root` no deja nada
+   más que deshacer. Quita también las líneas que agregaste al archivo de exclusión.
 
 No recurras a `git clean` ni a `git reset --hard`: también destruyen trabajo que no tiene
 nada que ver con la prueba.
