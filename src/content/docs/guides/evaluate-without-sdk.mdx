@@ -95,6 +95,11 @@ before the failure stay on disk.
    `node_modules/@pbuilder/sdk`, pointing at that root. To regenerate types by hand in this
    setup, see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot).
 
+   To leave `project-builder.json` untouched as well, name the same directory per run with
+   `--sdk-root` (before `<collection>:<schematic>`) or once with the `BUILDER_SDK_ROOT`
+   environment variable instead. Both override `sdk.root` — see
+   [SDK source](/reference/cli-commands/#sdk-source).
+
 4. **Create and run a schematic:**
 
    ```sh
@@ -168,10 +173,11 @@ Work from what the trial actually changed — not from a blanket reset:
    `.claude/skills/pbuilder/` — when they did not exist before.
 3. Undo only trial changes in tracked files, such as the marker block added to `AGENTS.md`
    or `CLAUDE.md`. Keep any edits of your own.
-4. Remove the trial SDK from `node_modules` if you installed one — or, if you used
-   `sdk.root`, remove the key and then the link it left behind
-   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`). Also remove the
-   lines you added to the exclude file.
+4. Remove the trial SDK from `node_modules` if you installed one. If you used an external
+   root, remove the link it left behind
+   (`test -L node_modules/@pbuilder/sdk && rm node_modules/@pbuilder/sdk`) — after removing
+   the `sdk.root` key, or unsetting `BUILDER_SDK_ROOT`; `--sdk-root` leaves nothing else to
+   undo. Also remove the lines you added to the exclude file.
 
 Do not reach for `git clean` or `git reset --hard`: they also destroy work that has nothing
 to do with the trial.

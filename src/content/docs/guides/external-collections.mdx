@@ -70,29 +70,31 @@ cannot be run from a worktree with `--manifest`. Move them to a directory of the
 
 <Steps>
 
-1. **Install the SDK in each checkout that runs schematics.** The run uses the
-   **workspace's** `@pbuilder/sdk`, from a real `node_modules` directory in that checkout —
-   a symlinked `node_modules`, or an SDK linked in from another checkout, is rejected as
-   escaping the workspace. It must be version 0.3.1 or later: older versions cannot be
-   loaded by a factory outside the workspace.
-
-   Declare it as usual, or install it without touching `package.json` as described in
-   [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/):
+1. **Install the SDK once, outside the checkouts.** It must be version 0.3.1 or later: older
+   versions cannot be loaded by a factory outside the workspace.
 
    ```sh
-   cd ~/work/app-feature-x
-   npm install --no-save @pbuilder/sdk
+   bun add -g @pbuilder/sdk
    ```
 
-2. **Run the schematic, naming the manifest root.** `--manifest` goes **before**
+   The package directory this creates, `~/.bun/install/global/node_modules/@pbuilder/sdk`,
+   is the **SDK root**. For other global installs, see
+   [what the root must be](/reference/cli-commands/#external-sdk-root-sdkroot).
+
+2. **Run the schematic, naming both roots.** `--manifest` and `--sdk-root` go **before**
    `<collection>:<schematic>`:
 
    ```sh
-   builder execute --manifest=../app-schematics default:hello --name=payments
+   cd ~/work/app-feature-x
+   builder execute --manifest=../app-schematics \
+     --sdk-root=$HOME/.bun/install/global/node_modules/@pbuilder/sdk \
+     default:hello --name=payments
    ```
 
    The factory and its schema are read from `~/work/app-schematics`; the generated file is
-   written to `~/work/app-feature-x/src/services/payments.ts`.
+   written to `~/work/app-feature-x/src/services/payments.ts`. The checkout needs no
+   `node_modules` of its own: the only other entry the run writes is
+   `node_modules/@pbuilder/sdk`, a link to the SDK root.
 
 3. **Inspect the collection the same way:**
 
@@ -103,7 +105,19 @@ cannot be run from a worktree with `--manifest`. Move them to a directory of the
 </Steps>
 
 The same command works from the main checkout — every checkout, worktree or not, uses the
-shared directory.
+shared directory and the shared SDK.
+
+<Aside type="caution" title="A checkout with its own SDK">
+The order in which `execute` picks an SDK is in
+[SDK source](/reference/cli-commands/#sdk-source). Two cases to watch:
+
+- A checkout that already has a real `node_modules/@pbuilder/sdk` fails with
+  `execute_sdk_link_path_conflict` when you name a different root. Either remove that install,
+  or run that checkout without `--sdk-root` and with `BUILDER_SDK_ROOT` unset, so the run
+  uses it.
+- A `node_modules` that is a symlink to another checkout is rejected as escaping the
+  workspace, with or without `--sdk-root`.
+</Aside>
 
 ## How the value is read
 
@@ -116,21 +130,29 @@ shared directory.
   after it, it is rejected with `invalid_input` instead of being passed to the schematic.
   `info` accepts it before or after its argument.
 
-## Set it once with `BUILDER_MANIFEST`
+## Set it once with environment variables
 
-Tools that spawn `builder` inside a checkout — scripts, editors, agents — can set the
-environment variable instead of passing the flag:
+Tools that spawn `builder` inside a checkout — scripts, editors, agents — can set
+`BUILDER_MANIFEST` and `BUILDER_SDK_ROOT` instead of passing the flags. Set once, they let
+every checkout run the shared schematics with plain commands:
 
 ```sh
 export BUILDER_MANIFEST=~/work/app-schematics
+export BUILDER_SDK_ROOT=~/.bun/install/global/node_modules/@pbuilder/sdk
 builder execute default:hello --name=orders
 ```
 
-- `--manifest` always wins over `BUILDER_MANIFEST`. A flag that names an unusable directory
-  fails on its own; it never falls back to the variable.
-- When the variable points somewhere other than the working directory, every run prints the
-  `warn_manifest_root_ambient` warning with the resolved path, so an ambient setting never
-  goes unnoticed.
+- Each flag always wins over its variable. A flag that names an unusable directory fails on
+  its own; it never falls back to the variable.
+- When `BUILDER_MANIFEST` points somewhere other than the working directory, every run prints
+  the `warn_manifest_root_ambient` warning with the resolved path, so an ambient setting never
+  goes unnoticed. A root from `BUILDER_SDK_ROOT` prints `warn_sdk_root_ambient`, which names
+  the variable but **not** the path — check the variable itself to see which SDK ran.
+- The shell expands `~` in the `export` lines above. A settings file for an editor or agent
+  does not, so write full paths there.
+- Stopped using `BUILDER_SDK_ROOT`? The link it left in each checkout makes the next run fail
+  with `execute_manifest_path_escape`. See
+  [`--sdk-root` and `BUILDER_SDK_ROOT`](/reference/cli-commands/#--sdk-root-and-builder_sdk_root).
 
 ## Trust rules
 
@@ -155,16 +177,17 @@ On macOS and many Linux systems `/tmp` is writable by its group, so a manifest r
   `BUILDER_MANIFEST` names a different directory, it refuses with
   `manifest_scoped_authoring_refused` before writing anything. To author in the shared
   directory, `cd` into it and run `builder new schematic` there. The shared directory has no
-  SDK, so the scaffold skips `schema.generated.ts` with a warning; regenerate types from any
-  checkout that has the SDK — codegen writes inside the project you name:
+  SDK, and `new schematic` does not read `BUILDER_SDK_ROOT`, so the scaffold skips
+  `schema.generated.ts` with a warning. Regenerate types with the SDK root's own script —
+  codegen writes inside the project you name:
 
   ```sh
-  cd ~/work/app
-  bunx pbuilder-codegen --project ../app-schematics
+  node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js --project ~/work/app-schematics
   ```
 - **SDK settings in the external manifest are ignored.** An `sdk.root` or `sdk.version` in
-  the external `project-builder.json` is not used — the workspace's own installed SDK and its
-  own `package.json` decide. When the external manifest declares an `sdk.root`, the run warns
+  the external `project-builder.json` is not used — `--sdk-root`, `BUILDER_SDK_ROOT` or the
+  workspace's own installed SDK supply the SDK, and the workspace's own `package.json` sets
+  the version requirement. When the external manifest declares an `sdk.root`, the run warns
   with `warn_manifest_sdk_root_ignored`.
 - **Other commands** do not accept `--manifest`: passing it to `init`, for example, fails
   with `manifest_root_unsupported_command`.
@@ -184,5 +207,5 @@ inside it:
   [`builder info`](/reference/cli-commands/#builder-info) — flag reference.
 - [CLI output and errors](/reference/cli-output-and-errors/#manifest-root) — every
   `--manifest` error and warning.
-- [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/) — install the SDK in a
+- [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/) — use an SDK in a
   checkout without editing `package.json`.
