@@ -159,7 +159,7 @@ Dos formas de registro tienen archivos que generar:
 | Registro | Ejemplo | Reglas |
 |---|---|---|
 | Directorio del schematic | `"hello": { "path": "./schematics/hello" }` | El directorio debe contener exactamente un `factory.ts` o `factory.js` regular; no tener ninguno o tener ambos es un error. El schema es el `schema.json` de ese directorio. |
-| Manifiesto de colección | `"shared": { "path": "./schematics/collection.json" }` | Cada puntero de factory necesita un export explícito: `module#export`, dividido en el **último** `#`, con un módulo no vacío y un export con forma de identificador (`default` es válido). La ruta del módulo es relativa al manifiesto y debe ser un archivo real. El schema es el `schema.json` junto a ese módulo. |
+| Definición de colección | `"shared": { "path": "./schematics/collection.json" }` | Cada puntero de factory necesita un export explícito: `module#export`, dividido en el **último** `#`, con un módulo no vacío y un export con forma de identificador (`default` es válido). La ruta del módulo es relativa a la definición de colección y debe ser un archivo real. El schema es el `schema.json` junto a ese módulo. |
 
 Ambos valores de `path` se resuelven contra el directorio del proyecto seleccionado; se
 aceptan rutas absolutas siempre que el resultado quede dentro del proyecto. Las factories

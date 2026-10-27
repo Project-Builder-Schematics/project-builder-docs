@@ -157,7 +157,7 @@ Two registration forms have files to generate:
 | Registration | Example | Rules |
 |---|---|---|
 | Schematic directory | `"hello": { "path": "./schematics/hello" }` | The directory must contain exactly one regular `factory.ts` or `factory.js`; having neither or both is an error. The schema is `schema.json` in that directory. |
-| Collection manifest | `"shared": { "path": "./schematics/collection.json" }` | Each factory pointer needs an explicit export: `module#export`, split at the **last** `#`, with a non-empty module and an identifier-shaped export (`default` is valid). The module path is relative to the manifest and must be a real file. The schema is the `schema.json` beside that module. |
+| Collection definition | `"shared": { "path": "./schematics/collection.json" }` | Each factory pointer needs an explicit export: `module#export`, split at the **last** `#`, with a non-empty module and an identifier-shaped export (`default` is valid). The module path is relative to the collection definition and must be a real file. The schema is the `schema.json` beside that module. |
 
 Both `path` values resolve against the selected project's directory; absolute paths are
 accepted as long as the result stays inside the project. Factories are never imported or

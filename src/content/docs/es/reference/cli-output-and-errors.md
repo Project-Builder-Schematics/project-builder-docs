@@ -103,8 +103,8 @@ Registro completo de códigos de error, agrupados por área. Cuando un código c
 | `cli_unknown_flag` | 2 | unrecognised command-line flag | Fix: ejecuta `--help` para ver los flags aceptados |
 | `invalid_input` | 2 | input value invalid | Note: verifica el valor de la entrada contra su formato esperado |
 | `not_implemented` | 1 | command not yet implemented | Note: este comando aún no está implementado |
-| `collection_manifest_invalid` | 3 | collection manifest not found | Fix: verifica que `collection.json` exista en la ruta registrada |
-| `collection_manifest_invalid` | 3 | collection manifest unparseable | Note: edita `collection.json` para corregir el error de sintaxis JSON |
+| `collection_definition_invalid` | 3 | collection definition not found | Fix: verifica que `collection.json` exista en la ruta registrada |
+| `collection_definition_invalid` | 3 | collection definition unparseable | Note: edita `collection.json` para corregir el error de sintaxis JSON |
 
 ### `builder init`
 
@@ -157,7 +157,7 @@ Un `init` fallido deja en disco las salidas escritas antes del fallo. Una vez co
 | `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: ejecuta `builder init` para crear `project-builder.json`; o re-ejecuta con `--manifest` (o `BUILDER_MANIFEST`) indicando un directorio que ya tenga uno |
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edita `project-builder.json` para corregir el error de sintaxis JSON |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edita `schema.json` para corregir el error de sintaxis JSON |
-| `execute_schematic_not_found` | 2 | schematic not found in collection | Note: verifica en el manifiesto de la colección el nombre del schematic registrado |
+| `execute_schematic_not_found` | 2 | schematic not found in collection | Note: verifica en la definición de la colección el nombre del schematic registrado |
 | `execute_sdk_link_failed` | 4 | varía según el reason | Ver [Errores del SDK](#errores-del-sdk) |
 | `execute_sdk_link_path_conflict` | 4 | varía según el reason | Ver [Errores del SDK](#errores-del-sdk) |
 | `execute_sdk_not_installed` | 4 | varía según el reason | Ver [Errores del SDK](#errores-del-sdk) |
@@ -265,12 +265,12 @@ Una ejecución que falla con `engine_native_developer_fault` y una nota sobre un
 | `info_collection_not_found` | 2 | collection not found in project-builder.json | Note: verifica en `project-builder.json` el nombre de la colección registrada |
 | `info_invalid_factory_pointer` | 3 | schematic's factory pointer is empty or missing | Note: edita el factory de `collection.json` a `<module>#<export>` |
 | `info_invalid_factory_pointer` (`path_escapes_manifest_root`) | 3 | schematic's registered path, factory module, or schema.json resolves outside the named manifest root | Note: mantén cada ruta registrada dentro de la raíz del manifiesto |
-| `info_manifest_invalid` | 3 | collection manifest not found | Fix: verifica que `collection.json` exista en la ruta registrada |
-| `info_manifest_invalid` | 3 | collection manifest could not be parsed | Note: edita `collection.json` para corregir el error de sintaxis JSON |
+| `info_collection_definition_invalid` | 3 | collection definition not found | Fix: verifica que `collection.json` exista en la ruta registrada |
+| `info_collection_definition_invalid` | 3 | collection definition could not be parsed | Note: edita `collection.json` para corregir el error de sintaxis JSON |
 | `info_project_not_initialized` | 3 | project-builder.json not found | Fix: ejecuta `builder init` para crear `project-builder.json`; o re-ejecuta con `--manifest` (o `BUILDER_MANIFEST`) indicando un directorio que ya tenga uno |
 | `info_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edita `project-builder.json` para corregir el error de sintaxis JSON |
 | `info_schema_invalid` | 3 | schema.json is missing or could not be parsed | Note: asegúrate de que `schema.json` exista en la raíz del schematic y sea JSON válido |
-| `info_schematic_not_found` | 2 | schematic not found in collection | Note: verifica en el manifiesto de la colección el nombre del schematic registrado |
+| `info_schematic_not_found` | 2 | schematic not found in collection | Note: verifica en la definición de la colección el nombre del schematic registrado |
 
 ### Motor
 
