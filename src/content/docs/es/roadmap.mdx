@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-description: De schematics locales a un orquestador completo — los cuatro niveles de Project Builder, dónde estamos hoy y cómo los workbenches prueban cada paso.
+description: Los cuatro niveles de Project Builder, de schematics locales a un orquestador completo, dónde estamos hoy y cómo los workbenches prueban cada paso.
 sidebar:
   order: 1
 ---
@@ -14,31 +14,31 @@ distribución y la orquestación solo tienen sentido cuando la base está probad
 ## Nivel 1 — Schematics locales *(estamos aquí)*
 
 Todo lo que esta documentación cubre hoy: crear schematics tipados, testeables y
-deterministas, y ejecutarlos dentro de tu propio repositorio — los siete verbos de
+deterministas, y ejecutarlos dentro de tu propio repositorio. Eso incluye los siete verbos de
 mutación, las plantillas, los dialectos basados en AST y el harness de testing en
 memoria.
 
-Y aquí está la parte que importa: el nivel 1 no solo está **construido** — se está
-**probando**. Los [workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/)
-son proyectos reales ejecutando schematics reales, midiendo su efectividad en el campo
-antes de que arranque el siguiente nivel. La vara no es "terminado"; es *demostrablemente
-efectivo*.
+El nivel 1 está construido y ahora se está probando en el campo.
+Los [workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/)
+son proyectos reales que ejecutan schematics reales y miden su efectividad
+antes de que arranque el siguiente nivel. Terminar el nivel 1 no basta para avanzar;
+tiene que ser *demostrablemente efectivo*.
 
 ## Nivel 2 — Schematics interconectados
 
 Schematics que componen: un schematic invocando a otros, encadenando la generación en
-flujos más grandes. La garantía de determinismo se extiende a toda la cadena — una
-ejecución compuesta sigue siendo todo-o-nada, sigue siendo reproducible.
+flujos más grandes. La garantía de determinismo se extiende a toda la cadena: una
+ejecución compuesta sigue siendo todo-o-nada y sigue siendo reproducible.
 
 ## Nivel 3 — Schematics externos
 
-Consumir schematics más allá de tu propio repositorio — registros privados para tu
-organización, paquetes públicos para el ecosistema. Los patrones probados de tu equipo se
+Consumir schematics de fuera de tu propio repositorio: registros privados para tu
+organización y paquetes públicos para el ecosistema. Los patrones probados de tu equipo se
 vuelven bloques instalables.
 
 ## Nivel 4 — Project Builder
 
-La visión completa, y el nombre del proyecto por una razón: un **orquestador de
-schematics que es, a su vez, fácil de orquestar**. Pipelines de generación que atraviesan
-proyectos y equipos — con la misma garantía que se sostiene desde el nivel 1: mismo input,
-mismos bytes.
+La visión completa, y la razón del nombre del proyecto: un **orquestador de
+schematics que es, a su vez, fácil de orquestar**. Los pipelines de generación atraviesan
+proyectos y equipos, con la misma garantía que se sostiene desde el nivel 1: el mismo input
+produce los mismos bytes.

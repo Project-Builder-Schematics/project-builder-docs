@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-The `builder` CLI is AI-first by design: every command has a machine-readable JSON mode, and every error carries a structured code with actionable suggestions. This page documents the user-facing output contract — formats, theming, verbosity — and the full error and exit-code reference.
+The `builder` CLI is AI-first by design: every command has a machine-readable JSON mode, and every error carries a structured code with actionable suggestions. This page documents the user-facing output contract (formats, theming, verbosity) and the full error and exit-code reference.
 
 ## Output formats
 
@@ -34,7 +34,7 @@ builder execute default:my-component --output=./dist
 
 ## Verbosity
 
-`--verbose` (global, text mode only) prints full diagnostic output — sanitised — for subprocess and engine failures, and enables debug-level log lines. Several error remedies suggest re-running with `--verbose` to see the full subprocess output (for example after a package-manager install failure or a codegen failure). JSON output is unaffected by `--verbose`.
+`--verbose` (global, text mode only) prints full, sanitised diagnostic output for subprocess and engine failures, and enables debug-level log lines. Several error remedies suggest re-running with `--verbose` to see the full subprocess output (for example after a package-manager install failure or a codegen failure). JSON output is unaffected by `--verbose`.
 
 ## Theming
 
@@ -58,7 +58,7 @@ BUILDER_THEME=light builder info
 BUILDER_THEME=dark builder --theme=light info
 ```
 
-Auto-detection is lazy: an explicit `--theme` or `BUILDER_THEME` skips it entirely. In unusual PTY automation setups the background-color query can stall startup for up to 5 seconds before falling back — set `BUILDER_THEME` to bypass detection. When stdout is piped or the terminal reports no color support, output degrades gracefully to plain text.
+Auto-detection is lazy: an explicit `--theme` or `BUILDER_THEME` skips it entirely. In unusual PTY automation setups the background-color query can stall startup for up to 5 seconds before falling back; set `BUILDER_THEME` to bypass detection. When stdout is piped or the terminal reports no color support, output degrades gracefully to plain text.
 
 ## Error contract
 
@@ -66,13 +66,13 @@ Every error the CLI emits includes:
 
 - a stable, machine-readable **`code`** (e.g. `init_config_exists`),
 - a human-readable **message**, and
-- a non-empty **suggestions** list — `Fix:` entries are direct remedies, `Note:` entries are context.
+- a non-empty **suggestions** list, where `Fix:` entries are direct remedies and `Note:` entries are context.
 
 Some codes also carry a **`reason`** that distinguishes variants of the same code, and a short, path-free **`detail`** (for example which field failed). Both appear in JSON output; the tables below list the reason where it changes the remedy.
 
 In text mode, errors render as a fixed block on **stderr**, independent of where stdout is redirected. In JSON mode, `builder execute` writes a structured JSON error envelope to stdout instead (and the text block is suppressed), so machine consumers always find the error in the stream they are parsing.
 
-Interactive prompts for **sensitive** schematic inputs are refused outside a TTY (`engine_non_tty_ask_unavailable`) — in scripts and CI, pass the value explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
+Interactive prompts for **sensitive** schematic inputs are refused outside a TTY (`engine_non_tty_ask_unavailable`). In scripts and CI, pass the value explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
 
 ## Exit codes
 
@@ -81,14 +81,14 @@ Every terminating error resolves to exactly one exit family:
 | Code | Family | Meaning |
 |---|---|---|
 | 0 | success | No error. |
-| 1 | internal | Fail-closed — unclassifiable cause, `*_not_implemented` codes, and every code not otherwise assigned. |
+| 1 | internal | Fail-closed: unclassifiable cause, `*_not_implemented` codes, and every code not otherwise assigned. |
 | 2 | usage | CLI input/flag/argument/workspace-state validation. |
 | 3 | config | The project's own declared configuration is missing, corrupt, or escaping the workspace. |
 | 4 | sdk | SDK layer failure (`@pbuilder/sdk` missing or version mismatch). |
 | 5 | engine | Engine layer failure. |
 | 130 | cancelled | SIGINT (Ctrl-C), following the shell convention 128+2. |
 
-The family is derived from the outermost CLI error in the chain — never from a wrapped subprocess's own exit code.
+The family is derived from the outermost CLI error in the chain, never from a wrapped subprocess's own exit code.
 
 ## Error code reference
 
@@ -168,7 +168,7 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 
 ### SDK diagnostics
 
-`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement) and [SDK source](/reference/cli-commands/#sdk-source)). Each reason calls for a different repair — only `sdk_absent` means the SDK is actually missing.
+`builder execute` checks the workspace's SDK before running anything (see [SDK requirement](/reference/cli-commands/#sdk-requirement) and [SDK source](/reference/cli-commands/#sdk-source)). Each reason calls for a different repair, and only `sdk_absent` means the SDK is actually missing.
 
 #### Local installation
 
@@ -195,7 +195,7 @@ Pin a version when you need reproducible installs. The suggestions also offer th
 
 #### External root
 
-These codes appear only when an external root is named — by `--sdk-root`, `BUILDER_SDK_ROOT` or `sdk.root` in `project-builder.json`. Their messages say `sdk.root` whichever of the three named the root. `execute_sdk_version_mismatch` applies to an external root exactly as to a local install. No message, detail or JSON field ever contains the configured path: locations are reported relative to the root, such as `the configured root itself` or `2 levels above sdk.root`.
+These codes appear only when an external root is named by `--sdk-root`, `BUILDER_SDK_ROOT` or `sdk.root` in `project-builder.json`. Their messages say `sdk.root` whichever of the three named the root. `execute_sdk_version_mismatch` applies to an external root exactly as to a local install. No message, detail or JSON field ever contains the configured path: locations are reported relative to the root, such as `the configured root itself` or `2 levels above sdk.root`.
 
 | Code | Reason | Exit | Message | Repair |
 |---|---|---|---|---|
@@ -219,8 +219,8 @@ These codes appear only when an external root is named — by `--sdk-root`, `BUI
 
 | Warning | Meaning |
 |---|---|
-| `warn_sdk_root_group_writable` | A directory above the root is group-writable, so anyone in that group could replace the SDK. The run continues; the message names the depth and the remedy — `chmod g-w` that directory, or move the SDK under a directory only you can write to. Global installs under a shared prefix, such as Homebrew's, commonly trigger it. |
-| `warn_sdk_root_ambient` | The root came from `BUILDER_SDK_ROOT`, not from `--sdk-root`. The message names the variable, never the path — check the variable itself to see which SDK ran. |
+| `warn_sdk_root_group_writable` | A directory above the root is group-writable, so anyone in that group could replace the SDK. The run continues; the message names the depth and the remedy: `chmod g-w` that directory, or move the SDK under a directory only you can write to. Global installs under a shared prefix, such as Homebrew's, commonly trigger it. |
+| `warn_sdk_root_ambient` | The root came from `BUILDER_SDK_ROOT`, not from `--sdk-root`. The message names the variable, never the path, so check the variable itself to see which SDK ran. |
 
 ### `pbuilder-codegen` is not found, or a different version runs
 
@@ -228,10 +228,10 @@ This is not a `builder` error: it comes from your package runner (`npx`, `bunx`)
 
 | Situation | What happens |
 |---|---|
-| `@pbuilder/sdk` is not installed at all | The runner cannot find the binary — install the SDK |
-| The SDK comes from an external root (`sdk.root`, `--sdk-root` or `BUILDER_SDK_ROOT`) | `node_modules/@pbuilder/sdk` is a link that no package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. The runner reports the binary as missing even though the SDK works — or, if an SDK is installed globally, `npx` can silently run **that global copy** instead, possibly a different version. Recent pnpm versions install before `pnpm exec`, which writes a lockfile into the project |
+| `@pbuilder/sdk` is not installed at all | The runner cannot find the binary. Install the SDK |
+| The SDK comes from an external root (`sdk.root`, `--sdk-root` or `BUILDER_SDK_ROOT`) | `node_modules/@pbuilder/sdk` is a link that no package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. The runner reports the binary as missing even though the SDK works. If an SDK is installed globally, `npx` can instead silently run **that global copy**, possibly a different version. Recent pnpm versions install before `pnpm exec`, which writes a lockfile into the project |
 
-With an external root, run the script directly — see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from `sdk.root` by itself.
+With an external root, run the script directly; see [Type generation with `sdk.root`](/guides/type-generation/#when-the-sdk-comes-from-sdkroot). `builder new schematic` does not need the shim: it regenerates types from `sdk.root` by itself.
 
 ### Manifest root
 

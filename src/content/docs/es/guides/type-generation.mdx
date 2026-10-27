@@ -1,6 +1,6 @@
 ---
 title: Generación de tipos
-description: Regenera schema.generated.ts para un schematic o para todas las colecciones registradas de una vez — selección del proyecto, registros soportados, lectura del resumen en CI y reglas de los archivos de salida.
+description: Regenera schema.generated.ts para un schematic o para todas las colecciones registradas de una vez. Cubre la selección del proyecto, los registros soportados, la lectura del resumen en CI y las reglas de los archivos de salida.
 sidebar:
   order: 7
 ---
@@ -8,7 +8,7 @@ sidebar:
 import { Aside, Steps } from '@astrojs/starlight/components';
 
 Cada schematic mantiene un tipo `Input` en `schema.generated.ts`, derivado de su
-`schema.json`. `pbuilder-codegen` — un binario incluido en `@pbuilder/sdk` — escribe ese
+`schema.json`. `pbuilder-codegen`, un binario incluido en `@pbuilder/sdk`, escribe ese
 archivo. Cuando cambias schemas en varias colecciones, una sola ejecución los regenera a
 todos a partir de lo que registra `project-builder.json`; no hay una segunda lista de
 directorios que mantener sincronizada.
@@ -22,11 +22,11 @@ documentación.
 | Quieres regenerar… | Ejecuta | Qué selecciona |
 |---|---|---|
 | Todos los schematics registrados del proyecto en el que estás | `bunx pbuilder-codegen` | El `project-builder.json` más cercano, subiendo desde el directorio actual |
-| Todos los schematics registrados de un proyecto concreto | `bunx pbuilder-codegen --project <directory>` | Exactamente el `project-builder.json` de ese directorio, desde cualquier directorio de trabajo — sin búsqueda hacia arriba |
+| Todos los schematics registrados de un proyecto concreto | `bunx pbuilder-codegen --project <directory>` | Exactamente el `project-builder.json` de ese directorio, desde cualquier directorio de trabajo, sin búsqueda hacia arriba |
 | Un solo schematic | `bunx pbuilder-codegen <schematic-directory>` | Solo ese directorio |
 
 Usa los modos de proyecto después de editar varios schemas, en CI o como tu script
-`generate:types`. Usa el modo de un directorio mientras iteras sobre un schematic — es lo
+`generate:types`. Usa el modo de un directorio mientras iteras sobre un schematic. Es lo
 que enseña [Tu primer schematic](/es/getting-started/your-first-schematic/), y lo que
 `builder new schematic` ejecuta por ti automáticamente.
 
@@ -86,8 +86,8 @@ workspace/
 
 <Steps>
 
-1. **Ejecuta el codegen desde cualquier lugar dentro del workspace** — aquí, desde la
-   carpeta de un schematic:
+1. **Ejecuta el codegen desde cualquier lugar dentro del workspace.** Este ejemplo lo ejecuta
+   desde la carpeta de un schematic:
 
    ```sh
    cd schematics/hello
@@ -100,8 +100,8 @@ workspace/
 
    El código de salida es `0`.
 
-2. **Revisa las salidas.** Cada schema recibe un `schema.generated.ts` a su lado — para la
-   entrada del manifiesto, junto al `dist/widget.js` compilado que nombra el puntero:
+2. **Revisa las salidas.** Cada schema recibe un `schema.generated.ts` a su lado. Para la
+   entrada del manifiesto, eso significa junto al `dist/widget.js` compilado que nombra el puntero:
 
    ```text
    schematics/
@@ -140,7 +140,7 @@ workspace/
 
 - **Sin argumentos**, la búsqueda sube desde el directorio actual, y el **primer**
   `project-builder.json` encontrado es el que manda. Si ese archivo está mal formado, no se
-  puede leer, es un directorio o es un enlace roto, la ejecución falla — nunca recurre a un
+  puede leer, es un directorio o es un enlace roto, la ejecución falla. Nunca recurre a un
   archivo válido más arriba.
 - **Con `--project <directory>`**, se usa exactamente ese directorio. Pasa un directorio, no
   la ruta al archivo de configuración.
@@ -158,18 +158,18 @@ Dos formas de registro tienen archivos que generar:
 
 | Registro | Ejemplo | Reglas |
 |---|---|---|
-| Directorio del schematic | `"hello": { "path": "./schematics/hello" }` | El directorio debe contener exactamente un `factory.ts` o `factory.js` regular — ninguno o ambos es un error. El schema es el `schema.json` de ese directorio. |
+| Directorio del schematic | `"hello": { "path": "./schematics/hello" }` | El directorio debe contener exactamente un `factory.ts` o `factory.js` regular; no tener ninguno o tener ambos es un error. El schema es el `schema.json` de ese directorio. |
 | Manifiesto de colección | `"shared": { "path": "./schematics/collection.json" }` | Cada puntero de factory necesita un export explícito: `module#export`, dividido en el **último** `#`, con un módulo no vacío y un export con forma de identificador (`default` es válido). La ruta del módulo es relativa al manifiesto y debe ser un archivo real. El schema es el `schema.json` junto a ese módulo. |
 
 Ambos valores de `path` se resuelven contra el directorio del proyecto seleccionado; se
 aceptan rutas absolutas siempre que el resultado quede dentro del proyecto. Las factories
-nunca se importan ni se ejecutan — el codegen solo lee archivos. Se aceptan archivos JSON con
+nunca se importan ni se ejecutan; el codegen solo lee archivos. Se aceptan archivos JSON con
 una marca de orden de bytes (BOM) inicial.
 
 No soportado:
 
-- **Registros inline** — schematics embebidos en `project-builder.json`, como los que crea
-  `builder new schematic --inline` — no tienen archivo que escribir. Cada uno cuenta como un
+- **Registros inline** (schematics embebidos en `project-builder.json`, como los que crea
+  `builder new schematic --inline`) no tienen archivo que escribir. Cada uno cuenta como un
   fallo. Un nombre registrado a la vez inline y como directorio también falla.
 - Búsqueda de paquetes, inferencia de extensiones, herencia, rutas codificadas como URL y
   schematics que están en disco pero no registrados. El codegen no recorre carpetas.
@@ -183,7 +183,7 @@ pbuilder-codegen: generated G, failed F, duplicates D
 ```
 
 Las advertencias sobre entradas individuales van a **stderr**. El código de salida es `1` si
-alguna entrada falló, y `0` en caso contrario — incluida una ejecución sin trabajo.
+alguna entrada falló, y `0` en caso contrario, incluso en una ejecución sin trabajo.
 
 Una ejecución continúa después de que falla una entrada. En este ejemplo, `drafts/broken`
 tiene una propiedad sin `label`, y `legacy/broken-copy` vuelve a registrar el mismo
@@ -209,13 +209,13 @@ $ echo $?
 
 Cómo se cuentan las entradas:
 
-- **Duplicados** — los registros que resuelven a un destino ya intentado en esta ejecución
+- **Duplicados**: los registros que resuelven a un destino ya intentado en esta ejecución
   cuentan una vez en `duplicates`, **aunque el primer intento haya fallado**; no suman otro
   fallo. Los alias mediante enlaces simbólicos de directorio se reconocen como el mismo
   destino. Los archivos distintos unidos por hard links, no.
-- **Fallos** — cada registro que no se puede resolver, es inválido o es rechazado cuenta por
+- **Fallos**: cada registro que no se puede resolver, es inválido o es rechazado cuenta por
   separado.
-- **No es una transacción** — los archivos generados con éxito quedan escritos aunque otra
+- **No es una transacción**: los archivos generados con éxito quedan escritos aunque otra
   entrada falle. Una entrada que no pasa la validación conserva su `schema.generated.ts`
   anterior.
 
@@ -231,7 +231,7 @@ toda la ejecución haya tenido éxito:
 bunx pbuilder-codegen
 ```
 
-Si encadenas la salida con un pipe, conserva el código de salida — por ejemplo con
+Si encadenas la salida con un pipe, conserva el código de salida, por ejemplo con
 `set -o pipefail` en Bash. Para detectar además schemas cambiados sin regenerar, busca
 diferencias después:
 
@@ -242,15 +242,15 @@ git diff --exit-code -- '*schema.generated.ts'
 
 ## Cuando el SDK viene de `sdk.root`
 
-Con [`sdk.root`](/es/reference/cli-commands/#sdk-externo-sdkroot), `node_modules/@pbuilder/sdk` es un enlace que creó la CLI, no un paquete que instaló tu gestor de paquetes — así que no hay shim `node_modules/.bin/pbuilder-codegen`. Los ejecutores de paquetes fallan entonces de una de estas formas:
+Con [`sdk.root`](/es/reference/cli-commands/#sdk-externo-sdkroot), `node_modules/@pbuilder/sdk` es un enlace que creó la CLI, no un paquete que instaló tu gestor de paquetes, así que no hay shim `node_modules/.bin/pbuilder-codegen`. Los ejecutores de paquetes fallan entonces de una de estas formas:
 
 - `bunx pbuilder-codegen` y `npx pbuilder-codegen` reportan que falta el binario, aunque el SDK está presente y `builder execute` funciona.
-- Si además hay un SDK instalado globalmente, `npx` puede ejecutar **esa copia global** sin avisarte — posiblemente una versión distinta de la que indica `sdk.root`.
-- Las versiones recientes de pnpm ejecutan una instalación antes de `pnpm exec`. Eso hace que el comando funcione, pero escribe un `pnpm-lock.yaml` y un shim en tu proyecto — justo el tipo de cambio que `sdk.root` existe para evitar.
+- Si además hay un SDK instalado globalmente, `npx` puede ejecutar **esa copia global** sin avisarte, posiblemente una versión distinta de la que indica `sdk.root`.
+- Las versiones recientes de pnpm ejecutan una instalación antes de `pnpm exec`. Eso hace que el comando funcione, pero escribe un `pnpm-lock.yaml` y un shim en tu proyecto, que es justo el tipo de cambio que `sdk.root` existe para evitar.
 
 El script `generate:types` que agrega `builder init` llama a `pbuilder-codegen` por nombre, así que también se ve afectado.
 
-Ejecuta el script directamente con Node. Acepta las mismas formas — sin argumento, `--project <directory>` o un directorio de schematic:
+Ejecuta el script directamente con Node. Acepta las mismas formas: sin argumento, `--project <directory>` o un directorio de schematic:
 
 ```sh
 node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js
@@ -261,7 +261,7 @@ El enlace existe una vez que corrió un `builder execute` con commit. Antes de e
 
 Lo mismo aplica cuando el enlace se creó con [`--sdk-root` o `BUILDER_SDK_ROOT`](/es/reference/cli-commands/#--sdk-root-y-builder_sdk_root) en lugar de `sdk.root`. Antes de que exista el enlace, ejecuta el script desde ese valor: `node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js`.
 
-`builder new schematic` no necesita nada de esto con `sdk.root`: resuelve la raíz configurada por su cuenta y regenera los tipos del nuevo schematic. No lee `BUILDER_SDK_ROOT`: cuando la variable es tu única fuente de SDK, advierte que no encontró `@pbuilder/sdk` y omite `schema.generated.ts` — ejecuta el script como se indica arriba.
+`builder new schematic` no necesita nada de esto con `sdk.root`: resuelve la raíz configurada por su cuenta y regenera los tipos del nuevo schematic. No lee `BUILDER_SDK_ROOT`: cuando la variable es tu única fuente de SDK, advierte que no encontró `@pbuilder/sdk` y omite `schema.generated.ts`. Ejecuta el script como se indica arriba.
 
 ## Archivos de salida y límites de escritura
 
@@ -272,8 +272,8 @@ El codegen solo escribe donde la ejecución tiene permitido hacerlo:
 | Proyecto (`pbuilder-codegen`, `--project`) | El directorio del proyecto seleccionado |
 | Un directorio (`pbuilder-codegen <dir>`) | El ancestro más cercano del directorio de trabajo que tenga un `package.json`, o el propio directorio de trabajo si no hay ninguno |
 
-Tanto el directorio del schematic como el archivo de salida — una vez resueltos los enlaces
-simbólicos — deben quedar dentro de ese límite. Un destino fuera de él no se escribe: en una
+Una vez resueltos los enlaces simbólicos, tanto el directorio del schematic como el archivo de
+salida deben quedar dentro de ese límite. Un destino fuera de él no se escribe: en una
 ejecución de proyecto se reporta como `refusing to write outside the selected project root` y
 cuenta como fallo. Corrige el registro o ejecuta el codegen desde el proyecto al que pertenece
 el schematic.
@@ -281,7 +281,7 @@ el schematic.
 ### Salidas que son enlaces simbólicos
 
 En Linux y macOS, `schema.generated.ts` debe no existir o ser un archivo regular. Una salida
-que es un **enlace simbólico se rechaza — aunque su destino esté dentro del proyecto** — y lo
+que es un **enlace simbólico se rechaza, aunque su destino esté dentro del proyecto**, y lo
 mismo ocurre con cualquier otra entrada no regular:
 
 ```text
@@ -291,7 +291,7 @@ pbuilder-codegen: schematics/hello/schema.generated.ts: refusing symbolic-link o
 
 En una ejecución de proyecto, la misma entrada reporta
 `cannot write a regular, non-symbolic-link output`. `builder new schematic` lo muestra como
-`new_codegen_failed`. Reinstalar el SDK no ayuda — la causa es la disposición de los archivos.
+`new_codegen_failed`. Reinstalar el SDK no ayuda, porque la causa es la disposición de los archivos.
 
 Para migrar:
 
@@ -319,8 +319,8 @@ Para migrar:
 
 Los enlaces de directorio son distintos: un directorio de schematic al que se llega mediante un
 enlace simbólico sigue funcionando, siempre que el directorio resuelto y su salida queden dentro
-del límite de escritura. Crear una salida que falta y reemplazar una regular existente —
-incluso con contenido más corto — funciona como siempre.
+del límite de escritura. Crear una salida que falta y reemplazar una regular existente,
+incluso con contenido más corto, funciona como siempre.
 
 <Aside type="caution" title="Alcance por plataforma">
 Las comprobaciones de salidas que son enlaces simbólicos o entradas no regulares aplican en
@@ -332,10 +332,10 @@ ejecución está en curso.
 
 ## Relacionado
 
-- [Tu primer schematic](/es/getting-started/your-first-schematic/) — el flujo de un schematic
+- [Tu primer schematic](/es/getting-started/your-first-schematic/): el flujo de un schematic
   de principio a fin.
-- [`builder new schematic`](/es/reference/cli-commands/#builder-new-schematic) — crea un
+- [`builder new schematic`](/es/reference/cli-commands/#builder-new-schematic): crea un
   schematic y ejecuta el codegen para él.
-- [`builder init`](/es/reference/cli-commands/#ediciones-de-packagejson) — el script
+- [`builder init`](/es/reference/cli-commands/#ediciones-de-packagejson): el script
   `generate:types` que agrega, que ejecuta el codegen una vez por cada `schema.json` que
   encuentra bajo `schematics/`.

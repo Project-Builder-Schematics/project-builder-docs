@@ -1,15 +1,15 @@
 ---
 title: Scaffolding
-description: Mirror an entire folder of template files into the tree with scaffold() — dynamic file names, suffix stripping, rename tables, and glob filtering.
+description: Mirror an entire folder of template files into the tree with scaffold(), with dynamic file names, suffix stripping, rename tables, and glob filtering.
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-For anything bigger than a couple of files, don't write one `create()` per file — keep a folder
-of template files inside your schematic package and mirror it with **`scaffold`**. It is the
-workhorse for multi-file generators.
+For anything bigger than a couple of files, don't write one `create()` per file. Keep a folder
+of template files inside your schematic package and mirror it with **`scaffold`**, the verb
+most multi-file generators are built on.
 
 ## Mirroring a template folder
 
@@ -39,10 +39,10 @@ export default (input: Input) => {
 ```
 
 With `name: "userProfile"` this emits `src/services/user-profile/user-profile.service.ts`,
-`…/user-profile.spec.ts`, and `…/config/settings.json` — contents rendered against the same
+`…/user-profile.spec.ts`, and `…/config/settings.json`, with contents rendered against the same
 `options`, using the [template language](/guides/templates/).
 
-`from` is **package-local** — resolved relative to your schematic's folder, like `copyIn` and
+`from` is **package-local**: it resolves relative to your schematic's folder, like `copyIn` and
 `create({ templateFile })`. The CLI passes the package location automatically; in tests you pass
 `packageDir` yourself (typically `import.meta.dir`).
 
@@ -50,11 +50,11 @@ With `name: "userProfile"` this emits `src/services/user-profile/user-profile.se
 
 File and folder names carry dynamic values through **filename tokens**:
 
-- `__name__` becomes `{= .name =}` — the `name` option, rendered into the path.
-- `__name@pipe__` becomes `{= .name | pipe =}` — same 7 pipes as templates, so
+- `__name__` becomes `{= .name =}`, the `name` option rendered into the path.
+- `__name@pipe__` becomes `{= .name | pipe =}`. The same 7 pipes as templates apply, so
   `__name@dasherize__.service.ts` with `name: "userProfile"` lands as
   `user-profile.service.ts`.
-- The `to` destination is translated the same way — that's how one `scaffold` call fans out
+- The `to` destination is translated the same way. That's how one `scaffold` call fans out
   into a per-option directory (`to: "src/services/__name@dasherize__"` above).
 
 `scaffold` only rewrites the marker syntax; the rendering itself happens in the engine, exactly
@@ -73,7 +73,7 @@ looking like real source to your editor and tooling:
 
 ### `rename` tables
 
-`rename` is a static remap table matched against the *original* source-relative path — for the
+`rename` is a static remap table matched against the *original* source-relative path. Use it for the
 odd file whose destination doesn't follow the pattern. Because it runs first in the pinned
 order, the remapped name still goes through token translation and `.template` stripping
 afterwards.
@@ -84,8 +84,8 @@ afterwards.
 segment, `**` matches across segments, and `exclude` wins when both match a file.
 
 <Aside type="caution">
-Filters that eliminate **every** entry reject loudly — but an **empty `from` folder is a silent
-no-op**. And npm packaging commonly drops empty directories, so if a folder's presence matters,
+Filters that eliminate **every** entry reject loudly, but an **empty `from` folder is a silent
+no-op**. npm packaging also commonly drops empty directories, so if a folder's presence matters,
 ship a placeholder file in it.
 </Aside>
 

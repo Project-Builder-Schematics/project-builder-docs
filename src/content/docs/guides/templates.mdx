@@ -1,6 +1,6 @@
 ---
 title: Templates
-description: The template language behind create() and scaffold() — Go text/template syntax with {= =} delimiters, seven string pipes, and operator-first conditionals.
+description: The template language behind create() and scaffold(). It uses Go text/template syntax with {= =} delimiters, seven string pipes, and operator-first conditionals.
 sidebar:
   order: 2
 ---
@@ -14,14 +14,14 @@ single `options` object. This page covers the language you write inside them.
 The syntax comes from Go's `text/template`, **not** JavaScript template literals. `{= .name =}`
 is not `${name}`; loops are `range`, not `.map()`; comparisons are written operator-first
 (`eq a b`), not infix (`a === b`). JavaScript's `===`, `&&`, `||`, `!`, `<`, `>` **do not exist**
-in a template. Guessing from JS habits will mislead you — the sections below map each JS pattern
+in a template. Guessing from JS habits will mislead you. The sections below map each JS pattern
 to its template form.
 </Aside>
 
 ## Where rendering happens
 
 Rendering happens in the engine at `builder execute` time, never in the SDK. Your factory ships
-the template and options verbatim — so template errors (a typo'd option name, a type mismatch)
+the template and options verbatim, so template errors (a typo'd option name, a type mismatch)
 surface at run time, and the test harness stores the raw `{= .name =}` text, not rendered output.
 
 ```ts title="schematics/hello/factory.ts"
@@ -45,14 +45,14 @@ Three pieces are in play:
 |---|---|
 | `path` (first argument) | A **template string**, rendered to produce the output file path. |
 | `template` | A template string, rendered to produce the **file's byte content**. |
-| `options` | The **data context** — the single set of values shared by both renders. |
+| `options` | The **data context**: the single set of values shared by both renders. |
 
-The `templateFile` overload — `create(path, { templateFile, options })` — reads a package-local
+The `templateFile` overload, `create(path, { templateFile, options })`, reads a package-local
 file instead of an inline `template` string; everything on this page applies to it unchanged.
 
 ## Variables and nested access
 
-Templates use the delimiters `{=` and `=}` — **not** the more familiar `{{ }}`. Inside the
+Templates use the delimiters `{=` and `=}`, **not** the more familiar `{{ }}`. Inside the
 delimiters you reference your options through a leading dot:
 
 | You write | It means |
@@ -61,7 +61,7 @@ delimiters you reference your options through a leading dot:
 | `{= .user.address.city =}` | walk nested objects: `user` → `address` → `city` |
 | `{= . =}` | the current context itself (useful inside `range`/`with`) |
 
-Array- and object-valued options pass as plain native values — you never hand-encode them.
+Array- and object-valued options pass as plain native values; you never hand-encode them.
 
 Two small details:
 
@@ -70,7 +70,7 @@ Two small details:
 - **Comments.** `{= /* a note to yourself */ =}` never produces output.
 
 <Aside type="note">
-A key that is **present but `null`** does not render as blank — it fails with a typed error.
+A key that is **present but `null`** does not render as blank. It fails with a typed error.
 This is deliberate: a null in your output is almost always a mistake, so the engine stops rather
 than writing `<no value>`.
 </Aside>
@@ -89,7 +89,7 @@ Pipes transform a **string** value. You apply one with `|`:
 | `camelize` | `userProfile` | PascalCase, first word lowercased |
 | `classify` | `UserProfile` | PascalCase including the first word |
 
-**Chain pipes left to right** — order is observable:
+**Chain pipes left to right.** Order is observable:
 
 ```
 {= .name | underscore | upper =}
@@ -99,17 +99,17 @@ Pipes transform a **string** value. You apply one with `|`:
 
 Three rules to remember:
 
-- **Pipes are a closed set** — these 7 and no others; an unknown pipe name is an error that
+- **Pipes are a closed set.** There are these 7 and no others; an unknown pipe name is an error that
   lists the valid names.
 - **Pipes take strings only.** Applying a pipe to a number (or any non-string) is an error
-  naming the pipe and the offending kind — the engine never silently stringifies a value.
+  naming the pipe and the offending kind; the engine never silently stringifies a value.
 - **`classify` does not singularize.** Unlike the `classify` in Rails or Angular, a plural stays
-  plural — `users` becomes `Users`, not `User`. If you need the singular, pass the singular in
+  plural: `users` becomes `Users`, not `User`. If you need the singular, pass the singular in
   your options. There is no `pluralize` pipe either.
 
 ## Loops: `range`, not `for` or `.map()`
 
-Blocks are opened by a keyword and closed by `{= end =}` — there are no braces `{}`. There is
+Blocks are opened by a keyword and closed by `{= end =}`; there are no braces `{}`. There is
 no `for`, no `.map()`, no `.forEach()`, no arrow function:
 
 ```js
@@ -123,10 +123,10 @@ methods.map(m => `  ${m.name}() {}\n`).join("")
 ```
 
 with `methods: [{ "name": "load" }, { "name": "save" }]` this emits one line per element. Array
-order is preserved exactly — the engine never reorders your list.
+order is preserved exactly; the engine never reorders your list.
 
 **Inside the block, the dot `.` _becomes_ the current element.** There is no parameter name
-unless you ask for one — `.` is the item, and `.name` reads the `name` field of the current item:
+unless you ask for one: `.` is the item, and `.name` reads the `name` field of the current item:
 
 ```
 {= range .items =}[{= . =}]{= end =}
@@ -152,7 +152,7 @@ over `["a", "b"]` → `0:a 1:b `.
 Ranging over an **object** iterates its keys in **sorted order** (deterministic); ranging over
 an **array** keeps the array's own order.
 
-Putting it together — one `options` object driving both the path and a loop in the content:
+Putting it together, one `options` object drives both the path and a loop in the content:
 
 ```ts
 create("src/{= .name | dasherize =}/{= .name | dasherize =}.component.ts", {
@@ -166,7 +166,7 @@ create("src/{= .name | dasherize =}/{= .name | dasherize =}.component.ts", {
 });
 ```
 
-Path — `src/user-profile/user-profile.component.ts`
+Path: `src/user-profile/user-profile.component.ts`
 
 ```ts
 export class UserProfileComponent {
@@ -177,8 +177,8 @@ export class UserProfileComponent {
 
 ## Conditionals: `if`, but the operators come first
 
-The single biggest surprise. A comparison is a **function call with the operator name first**,
-then its operands — the opposite of JavaScript's infix style:
+This is the biggest surprise: a comparison is a **function call with the operator name first**,
+then its operands, the opposite of JavaScript's infix style:
 
 | JavaScript | Template |
 |---|---|
@@ -199,7 +199,7 @@ if (kind === "primary") { … }              // JavaScript
 {= if eq .kind "primary" =}…{= end =}       // template — "eq" first, then the two operands
 ```
 
-**Combine conditions by nesting the calls in parentheses** — there is no `&&` / `||`:
+**Combine conditions by nesting the calls in parentheses.** There is no `&&` / `||`:
 
 ```js
 if (a > 1 && b < 5) { … }                            // JavaScript
@@ -217,7 +217,7 @@ if (a > 1 && b < 5) { … }                            // JavaScript
 {= end =}
 ```
 
-Two data helpers round out the operator set — all written operator-first as function calls,
+Two data helpers round out the operator set. Both are written operator-first as function calls,
 never piped:
 
 | Operator | Meaning | JS equivalent |
@@ -232,7 +232,7 @@ never piped:
 
 The **guaranteed core** is `eq`, `ne`, `lt`, `gt`, `and`, `or`, `not`, `len`, `index`. Build
 every condition from these and it will keep working across engine versions. (`le` and `ge` work
-today but are outside the guaranteed core — for a stable guarantee, invert with `not (gt …)` /
+today but are outside the guaranteed core; for a stable guarantee, invert with `not (gt …)` /
 `not (lt …)`.)
 
 <Aside type="note">
@@ -243,8 +243,8 @@ is an **operator** (`eq .kind "primary"`). Operators are never piped.
 ### Truthiness — almost JS-falsy, with one trap
 
 `{= if .x =}` with no operator tests whether `.x` is "empty". `false`, `0`, `""`, and `null`
-are falsy, as in JS — but an **empty array or object is falsy here too**, where JS treats both
-as truthy. That's actually convenient — to check "does this list have items" you write
+are falsy, as in JS, but an **empty array or object is falsy here too**, where JS treats both
+as truthy. That's convenient: to check "does this list have items" you write
 `{= if .items =}` directly, with no `.length`.
 
 ### The number-type trap
@@ -281,14 +281,14 @@ and reuse it instead of repeating the pipe:
 ```
 
 <Aside type="note">
-**Not available: sub-templates.** `define`, `template`, and `block` are blocked at parse time —
-a template using them fails with a typed error and writes nothing. This is a deliberate safety
+**Not available: sub-templates.** `define`, `template`, and `block` are blocked at parse time.
+A template using them fails with a typed error and writes nothing. This is a deliberate safety
 limit, not an oversight.
 </Aside>
 
 ## Templating the output path
 
-The `path` argument uses the **same** language as `template` — the same fields, pipes, and
+The `path` argument uses the **same** language as `template`, with the same fields, pipes, and
 sandbox. That's how you get a cased directory and filename from one option:
 
 ```ts
@@ -302,8 +302,8 @@ example via `../`) is rejected with a typed error and **zero files are written**
 
 ## Whitespace: clean by default
 
-A line that contains **only** a control directive — `range`, `if`, `else`, `end`, `with`, an
-assignment, or a comment — is removed whole (its indentation and trailing newline) before
+A line that contains **only** a control directive (`range`, `if`, `else`, `end`, `with`, an
+assignment, or a comment) is removed whole (its indentation and trailing newline) before
 rendering. So this template:
 
 ```
@@ -313,19 +313,19 @@ rendering. So this template:
 ```
 
 produces one clean line per method, with no blank lines from the `range`/`end` lines. A
-genuinely empty line — no directive on it — is always preserved, and a line holding a field or
+genuinely empty line, with no directive on it, is always preserved, and a line holding a field or
 pipe expression (`{= .name =}`) is never trimmed.
 
 ## When something goes wrong
 
 Every failure is a **typed, positioned** error (it names a `File:Line:Column`) and, on failure,
-**no files are written** — the engine fails the whole render closed rather than producing a
+**no files are written**: the engine fails the whole render closed rather than producing a
 partial file. A mistyped option name gives you the exact line and column of the reference.
 Because the SDK never renders, all template errors surface at run time, never at the moment
 `create()` is called. See [error handling](/guides/error-handling/) for the full taxonomy.
 
 ## Next steps
 
-For anything bigger than a couple of files, don't write one `create()` per file — keep a folder
+For anything bigger than a couple of files, don't write one `create()` per file. Keep a folder
 of template files and mirror it with [`scaffold()`](/guides/scaffolding/). The rest of the
 mutation surface lives in [mutation verbs](/guides/mutation-verbs/).
