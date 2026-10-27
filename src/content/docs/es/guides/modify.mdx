@@ -58,7 +58,15 @@ await ts.find("src/index.ts")
 | Op | Qué hace |
 |---|---|
 | `addImport(name, from)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente: llamarla dos veces nunca duplica el import. |
+| `addDefaultImport(name, from)` | Agrega `import name from "from"`, fusionándose con una declaración de ese módulo que todavía no tiene default. Rechaza un segundo default con otro nombre. |
+| `addNamespaceImport(name, from)` | Agrega `import * as name from "from"`, fusionándose con una declaración que solo tiene default. Junto a imports nombrados abre su propia declaración. |
+| `addTypeImport(name, from)` | Agrega `import type { name } from "from"` como sentencia propia, nunca fusionada con un import de valor. No hace nada si el módulo ya importa `name`, como valor o como tipo. |
+| `addSideEffectImport(from)` | Agrega `import "from"`. No hace nada si ese import simple ya existe. |
+| `addReExport(name, from)` | Agrega `export { name } from "from"`, fusionándose con un re-export existente de ese módulo. Rechaza un nombre que el archivo ya exporta. |
+| `addExportAll(from, { as? })` | Agrega `export * from "from"`, o `export * as ns from "from"` con `{ as: "ns" }`. |
 | `removeImport(name, from)` | Elimina el binding nombrado; borra la sentencia completa cuando era el último. Idempotente sobre un binding ausente. |
+| `removeExport(name, from)` | Elimina un re-export nombrado; borra la sentencia cuando era el último. Idempotente si no existe. |
+| `removeExportAll(from, { as? })` | Elimina `export * from "from"` (o la forma con `as`). Idempotente si no existe. |
 | `addFunction(name, source, opts?)` | Agrega una función de nivel superior al final. `source` **incluye** las llaves (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Agrega una variable de nivel superior al final (`kind` por defecto es `const`). |
 | `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves, y la op las agrega. |
@@ -77,16 +85,61 @@ await ts.find("src/index.ts").addClass("Point", "  x = 0;");
 ```
 
 `addVariable` emite `{export }{kind} {name} = {initializer};`. `kind` acepta `"const"` (por
-defecto), `"let"` o `"var"`:
+defecto), `"let"` o `"var"`, y rechaza cualquier otro valor:
 
 ```ts
 await ts.find("src/index.ts").addVariable("counter", "0", { export: true, kind: "let" });
 // -> export let counter = 0;
 ```
 
+### Formas de import y archivos barrel
+
+Cada forma de import tiene su propia op. Ejecutar una dos veces cambia el archivo una sola vez:
+
+```ts
+await ts
+  .find("src/main.ts")
+  .addDefaultImport("express", "express")
+  .addTypeImport("Request", "express")
+  .addSideEffectImport("reflect-metadata");
+// -> import express from "express";
+// -> import type { Request } from "express";
+// -> import "reflect-metadata";
+```
+
+Las ops de re-export arman archivos barrel. Genera un archivo y después expórtalo desde
+`index.ts`:
+
+```ts
+import { create } from "@pbuilder/sdk/commons";
+import * as ts from "@pbuilder/sdk/typescript";
+
+create("src/user.service.ts", { template: "export class UserService {}", options: {} });
+await ts
+  .find("src/index.ts")
+  .addReExport("UserService", "./user.service")
+  .addExportAll("./dto");
+// -> export { UserService } from "./user.service";
+// -> export * from "./dto";
+```
+
+`addReExport` y `addExportAll` rechazan un nombre que el archivo ya exporta por cualquier vía
+(otro re-export, un `export * as` o una declaración exportada), porque dos exports con el mismo
+nombre son TypeScript inválido. `addReExport` y `removeExport` comparan por el nombre de
+origen, así que `export { name as Y }` ya cuenta. `removeExport` nunca toca un `export { x }`
+local ni un `export *`, y cada forma de `export *` solo se elimina a sí misma.
+
+**Validación de nombres.** Cada op revisa `name` antes de tocar el archivo. Tiene que ser un
+identificador JavaScript ASCII simple (`^[A-Za-z_$][A-Za-z0-9_$]*$`), no una palabra reservada
+ni restringida en modo estricto (`class`, `await`, `eval`, `arguments`, …), y no puede ser
+`__proto__`, `constructor` ni `prototype`. Un nombre rechazado deja el archivo sin cambios, y
+`removeImport` lo rechaza aunque no hubiera nada que eliminar.
+
 **Reglas de colisión.** Las ops `add*` fallan ruidosamente ante una colisión de nombre con una
 declaración de valor o un binding de import existente, porque dos declaraciones de valor compartiendo
-un nombre es TypeScript inválido. Un `type`/`interface` que comparte el nombre **no** colisiona
+un nombre es TypeScript inválido. Un binding de import es cualquier forma de import: nombrado,
+default (`import X from "m"`) y de namespace (`import * as X from "m"`), incluidos los de solo
+tipo. Un `type`/`interface` que comparte el nombre **no** colisiona
 (TypeScript permite legalmente que un valor y un tipo compartan identificador).
 
 <Aside type="caution" title="Strings de source insertados tal cual">

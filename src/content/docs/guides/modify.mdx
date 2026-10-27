@@ -55,7 +55,15 @@ await ts.find("src/index.ts")
 | Op | What it does |
 |---|---|
 | `addImport(name, from)` | Adds `import { name } from "from"`, merging into an existing clause from the same module. Idempotent: calling it twice never duplicates the import. |
+| `addDefaultImport(name, from)` | Adds `import name from "from"`, merging into a declaration of that module with no default yet. Rejects a second default under another name. |
+| `addNamespaceImport(name, from)` | Adds `import * as name from "from"`, merging into a default-only declaration. Beside named imports it opens its own declaration. |
+| `addTypeImport(name, from)` | Adds `import type { name } from "from"` as its own statement, never merged into a value import. A no-op when the module already imports `name`, by value or as a type. |
+| `addSideEffectImport(from)` | Adds `import "from"`. A no-op when that bare import already exists. |
+| `addReExport(name, from)` | Adds `export { name } from "from"`, merging into an existing re-export of that module. Rejects a name the file already exports. |
+| `addExportAll(from, { as? })` | Adds `export * from "from"`, or `export * as ns from "from"` with `{ as: "ns" }`. |
 | `removeImport(name, from)` | Removes the named binding; deletes the whole statement when it was the last one. Idempotent on an absent binding. |
+| `removeExport(name, from)` | Removes a named re-export; deletes the statement when it was the last one. Idempotent on an absent one. |
+| `removeExportAll(from, { as? })` | Removes `export * from "from"` (or the `as` form). Idempotent on an absent one. |
 | `addFunction(name, source, opts?)` | Appends a top-level function. `source` **includes** the braces (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Appends a top-level variable (`kind` defaults to `const`). |
 | `addClass(name, source, opts?)` | Appends a top-level class. `source` **excludes** the braces, and the op adds them. |
@@ -74,17 +82,61 @@ await ts.find("src/index.ts").addClass("Point", "  x = 0;");
 ```
 
 `addVariable` emits `{export }{kind} {name} = {initializer};`. `kind` accepts `"const"`
-(default), `"let"`, or `"var"`:
+(default), `"let"`, or `"var"`, and rejects any other value:
 
 ```ts
 await ts.find("src/index.ts").addVariable("counter", "0", { export: true, kind: "let" });
 // -> export let counter = 0;
 ```
 
+### Import forms and barrel files
+
+Each import form has its own op. Running one twice changes the file once:
+
+```ts
+await ts
+  .find("src/main.ts")
+  .addDefaultImport("express", "express")
+  .addTypeImport("Request", "express")
+  .addSideEffectImport("reflect-metadata");
+// -> import express from "express";
+// -> import type { Request } from "express";
+// -> import "reflect-metadata";
+```
+
+The re-export ops build barrel files. Generate a file, then export it from `index.ts`:
+
+```ts
+import { create } from "@pbuilder/sdk/commons";
+import * as ts from "@pbuilder/sdk/typescript";
+
+create("src/user.service.ts", { template: "export class UserService {}", options: {} });
+await ts
+  .find("src/index.ts")
+  .addReExport("UserService", "./user.service")
+  .addExportAll("./dto");
+// -> export { UserService } from "./user.service";
+// -> export * from "./dto";
+```
+
+`addReExport` and `addExportAll` reject a name the file already exports by any route (another
+re-export, an `export * as`, or an exported declaration), because two exports sharing a name
+are invalid TypeScript. `addReExport` and `removeExport` match by source name, so
+`export { name as Y }` already counts. `removeExport` never touches a local `export { x }` or
+an `export *`, and each `export *` form only removes itself.
+
+**Name validation.** Every op checks `name` before it touches the file. It must be a plain
+ASCII JavaScript identifier (`^[A-Za-z_$][A-Za-z0-9_$]*$`), not a reserved or
+strict-mode-restricted word (`class`, `await`, `eval`, `arguments`, …), and not `__proto__`,
+`constructor`, or `prototype`. A rejected name leaves the file unchanged, and `removeImport`
+rejects it even when there was nothing to remove.
+
 **Collision rules.** The `add*` ops fail loud on a name collision with an existing value
-declaration or import binding, because two value declarations sharing a name is invalid TypeScript. A
-`type`/`interface` sharing the name does **not** collide (TypeScript legally permits a value and
-a type to share an identifier).
+declaration or import binding, because two value declarations sharing a name is invalid
+TypeScript. An import binding is any import form: named, default (`import X from "m"`) and
+namespace (`import * as X from "m"`), type-only ones included. A `type`/`interface` sharing the
+name does **not** collide (TypeScript legally permits a value and a type to share an
+identifier).
 
 <Aside type="caution" title="Verbatim source strings">
 `source`/`initializer` strings are inserted **verbatim**, never validated or sanitized, so the
