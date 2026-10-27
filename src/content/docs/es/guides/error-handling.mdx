@@ -49,8 +49,9 @@ La [guía de testing](/es/getting-started/testing/) cubre el harness en sí.
 
 No todo fallo es un `AuthoringError`. Cuando tu factory lanza un `Error` común
 (`throw new Error(...)`, o un error de una librería que llama), el runner imprime su mensaje en
-stderr como `pbuilder-runner: <mensaje>`, con un tope de 2.000 caracteres. Antes de imprimirlo,
-reescribe cada ruta absoluta del mensaje para que no se filtre nada de la máquina:
+stderr como `pbuilder-runner: <mensaje>`, cortado a los 2.000 caracteres. Antes de imprimirlo,
+reescribe las rutas absolutas del mensaje para que no revelen dónde está cada cosa en tu
+máquina:
 
 | Ruta en tu mensaje | Se muestra como |
 |---|---|
@@ -72,8 +73,8 @@ se ve como
 pbuilder-runner: ENOENT: no such file or directory, open '<project-root>/src/a.ts'
 ```
 
-`<project-root>` y `<sdk>` son marcadores que el runner inserta a propósito, no un bug de tu
-factory ni una plantilla rota.
+El runner inserta `<project-root>` y `<sdk>` a propósito. Ver uno en un error no significa que
+tu factory o una plantilla estén rotas.
 
 <Aside type="caution">
 La reescritura es best-effort y solo cubre formas de ruta. Cualquier otra cosa que interpoles en

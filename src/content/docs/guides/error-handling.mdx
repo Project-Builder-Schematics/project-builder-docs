@@ -48,8 +48,9 @@ The [testing guide](/getting-started/testing/) covers the harness itself.
 
 Not every failure is an `AuthoringError`. When your factory throws an ordinary `Error`
 (`throw new Error(...)`, or an error from a library it calls), the runner prints its message on
-stderr as `pbuilder-runner: <message>`, capped at 2,000 characters. Before printing, it
-rewrites every absolute path in the message so that nothing about the machine leaks:
+stderr as `pbuilder-runner: <message>`, cut off at 2,000 characters. Before printing, it
+rewrites the absolute paths in the message so they don't reveal where things live on your
+machine:
 
 | Path in your message | Shown as |
 |---|---|
@@ -71,8 +72,8 @@ shows up as
 pbuilder-runner: ENOENT: no such file or directory, open '<project-root>/src/a.ts'
 ```
 
-`<project-root>` and `<sdk>` are placeholders the runner inserts on purpose, not a bug in your
-factory or a broken template.
+The runner inserts `<project-root>` and `<sdk>` on purpose. Seeing one in an error doesn't
+mean your factory or a template is broken.
 
 <Aside type="caution">
 The rewrite is best-effort and only covers path shapes. Anything else you interpolate into a
