@@ -44,6 +44,42 @@ if (result.error instanceof AuthoringError) {
 
 The [testing guide](/getting-started/testing/) covers the harness itself.
 
+## When a factory throws a plain `Error`
+
+Not every failure is an `AuthoringError`. When your factory throws an ordinary `Error`
+(`throw new Error(...)`, or an error from a library it calls), the runner prints its message on
+stderr as `pbuilder-runner: <message>`, capped at 2,000 characters. Before printing, it
+rewrites every absolute path in the message so that nothing about the machine leaks:
+
+| Path in your message | Shown as |
+|---|---|
+| Under the project root | `<project-root>/...`, for example `open '<project-root>/src/a.ts'` |
+| Under the `@pbuilder/sdk` package | `<sdk>/...` |
+| A Windows, UNC or WSL path | `<outside-project>` |
+| Any other POSIX absolute path | a `../`-relative path from the project root |
+| A URL | left as it is, except that a `file://` URL keeps `file://` while its path is rewritten |
+
+So a factory that fails with
+
+```text
+ENOENT: no such file or directory, open '/home/ana/acme/src/a.ts'
+```
+
+shows up as
+
+```text
+pbuilder-runner: ENOENT: no such file or directory, open '<project-root>/src/a.ts'
+```
+
+`<project-root>` and `<sdk>` are placeholders the runner inserts on purpose, not a bug in your
+factory or a broken template.
+
+<Aside type="caution">
+The rewrite is best-effort and only covers path shapes. Anything else you interpolate into a
+message, such as an environment variable's value or a token, is printed as is. Keep secrets out
+of error messages.
+</Aside>
+
 ## Fields
 
 - **`verb`** — the author-facing verb whose call was rejected: `"create"`, `"modify"`,

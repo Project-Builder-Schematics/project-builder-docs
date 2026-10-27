@@ -45,6 +45,42 @@ if (result.error instanceof AuthoringError) {
 
 La [guía de testing](/es/getting-started/testing/) cubre el harness en sí.
 
+## Cuando una factory lanza un `Error` común
+
+No todo fallo es un `AuthoringError`. Cuando tu factory lanza un `Error` común
+(`throw new Error(...)`, o un error de una librería que llama), el runner imprime su mensaje en
+stderr como `pbuilder-runner: <mensaje>`, con un tope de 2.000 caracteres. Antes de imprimirlo,
+reescribe cada ruta absoluta del mensaje para que no se filtre nada de la máquina:
+
+| Ruta en tu mensaje | Se muestra como |
+|---|---|
+| Dentro de la raíz del proyecto | `<project-root>/...`, por ejemplo `open '<project-root>/src/a.ts'` |
+| Dentro del paquete `@pbuilder/sdk` | `<sdk>/...` |
+| Una ruta de Windows, UNC o WSL | `<outside-project>` |
+| Cualquier otra ruta absoluta POSIX | una ruta relativa con `../` desde la raíz del proyecto |
+| Una URL | queda tal cual, salvo que una URL `file://` conserva `file://` y su ruta se reescribe |
+
+Así, una factory que falla con
+
+```text
+ENOENT: no such file or directory, open '/home/ana/acme/src/a.ts'
+```
+
+se ve como
+
+```text
+pbuilder-runner: ENOENT: no such file or directory, open '<project-root>/src/a.ts'
+```
+
+`<project-root>` y `<sdk>` son marcadores que el runner inserta a propósito, no un bug de tu
+factory ni una plantilla rota.
+
+<Aside type="caution">
+La reescritura es best-effort y solo cubre formas de ruta. Cualquier otra cosa que interpoles en
+un mensaje, como el valor de una variable de entorno o un token, se imprime tal cual. Mantén los
+secretos fuera de los mensajes de error.
+</Aside>
+
 ## Campos
 
 - **`verb`** — el verbo de cara al autor cuya llamada fue rechazada: `"create"`, `"modify"`,
