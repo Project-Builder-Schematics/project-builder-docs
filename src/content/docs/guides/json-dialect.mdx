@@ -208,7 +208,8 @@ await json.find("config.json").removeItem(["x"], 0);
 
 ### `removeValue(path, value)`
 
-Removes every item deep-equal to `value`. No match, or no array at `path`, is a no-op.
+Removes every item deep-equal to `value`. No match, or nothing at `path`, is a no-op. A value at
+`path` that is not an array rejects.
 
 ```ts
 // config.json before: { "x": ["a", "b", "a"] }

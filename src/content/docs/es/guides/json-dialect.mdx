@@ -213,8 +213,8 @@ await json.find("config.json").removeItem(["x"], 0);
 
 ### `removeValue(path, value)`
 
-Elimina todos los elementos profundamente iguales a `value`. Si no hay coincidencias, o no hay un
-array en `path`, no hace nada.
+Elimina todos los elementos profundamente iguales a `value`. Si no hay coincidencias, o no hay nada
+en `path`, no hace nada. Si en `path` hay un valor que no es un array, rechaza.
 
 ```ts
 // config.json before: { "x": ["a", "b", "a"] }
