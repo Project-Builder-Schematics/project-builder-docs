@@ -1,0 +1,114 @@
+---
+title: Dialecto NestJS
+description: Registra providers, controllers, imports y exports de módulo en un @Module de NestJS con @pbuilder/sdk/nestjs, sumado a todas las ops del dialecto TypeScript.
+sidebar:
+  order: 12
+---
+
+`@pbuilder/sdk/nestjs` edita los archivos `.ts` de un proyecto NestJS. Su handle tiene todas
+las ops de `@pbuilder/sdk/typescript` más cuatro ops que importan una clase y la registran en
+el decorador `@Module` del archivo. Todas las ops se encadenan sobre un handle y el archivo se
+escribe una sola vez; ver [Modify](/es/guides/modify/#cómo-funciona-un-handle-de-dialecto)
+para cómo funciona un handle.
+
+```ts
+import * as nestjs from "@pbuilder/sdk/nestjs";
+
+export const run = async () => {
+  await nestjs
+    .find("src/app.module.ts")
+    .addModuleImport("UsersModule", "./users/users.module")
+    .addProvider("UsersService", "./users/users.service");
+};
+```
+
+```ts
+// antes
+@Module({ providers: [AppService] })
+export class AppModule {}
+
+// después
+import { UsersModule } from "./users/users.module";
+import { UsersService } from "./users/users.service";
+
+@Module({ providers: [AppService, UsersService], imports: [UsersModule] })
+export class AppModule {}
+```
+
+## Ops heredadas de TypeScript
+
+El handle tiene todas las ops del [dialecto TypeScript](/es/guides/modify/): `addImport`,
+`addFunction`, `addVariable`, `addClass` y `removeImport`. Una op que el dialecto TypeScript
+sume más adelante también queda disponible acá.
+
+## Ops de `@Module`
+
+Cada op recibe `(name, from)` y hace dos cosas:
+
+1. Agrega `import { name } from "from"` con las mismas reglas que el `addImport` de
+   TypeScript. Un import existente de `name` desde `from` se reutiliza, y un `name` que ya
+   está ligado de otra forma en el archivo se rechaza.
+2. Agrega `name` al final de un array de la metadata del `@Module` del archivo. Si `@Module()`
+   no tiene argumento, o la metadata no tiene ese array, la op lo crea. Si el array ya tiene
+   una entrada llamada `name`, la op la deja como está.
+
+| Op | Agrega a |
+|---|---|
+| `addProvider(name, from)` | `providers` |
+| `addController(name, from)` | `controllers` |
+| `addModuleImport(name, from)` | `imports`, los otros módulos de Nest que importa este módulo |
+| `addExport(name, from)` | `exports` |
+
+`addModuleImport` se llama así porque `addImport` ya es la op heredada de TypeScript, que
+agrega una sentencia `import`.
+
+## Preservación del formato
+
+Una entrada nueva sigue el formato de la lista a la que se suma. Una lista de una línea queda
+en una línea, una lista multilínea recibe una línea nueva con la indentación de su última
+entrada, y una coma final se mantiene. Todo lo que está fuera del texto insertado queda
+idéntico byte a byte.
+
+## Rechazos
+
+Una op se rechaza, y el archivo queda sin cambios, cuando:
+
+- el archivo no tiene ninguna clase decorada con `@Module`, o tiene más de una;
+- el argumento de `@Module` no es un object literal (por ejemplo `@Module(METADATA)`);
+- la propiedad destino no es un array literal (por ejemplo `providers: PROVIDERS`);
+- `name` no es un identificador válido, o ya está ligado de otra forma en el archivo.
+
+Igual que el dialecto TypeScript, `find(path)` acepta cualquier ruta `.ts`. Un archivo sin
+`@Module` solo falla cuando corre una de estas ops.
+
+## Ediciones a medida con `.modify()`
+
+Usa `.modify(fn)` para entradas que no son un nombre de clase simple, como
+`ConfigModule.forRoot()` o `{ provide: TOKEN, useValue: 1 }`, y para los archivos que las ops
+rechazan. El callback recibe el `SourceFile` vivo de ts-morph, y el export `astLibrary` del
+módulo es ts-morph:
+
+```ts
+import * as nestjs from "@pbuilder/sdk/nestjs";
+
+await nestjs
+  .find("src/app.module.ts")
+  .addImport("ConfigModule", "@nestjs/config")
+  .modify((ast) => {
+    const imports = ast
+      .getClassOrThrow("AppModule")
+      .getDecoratorOrThrow("Module")
+      .getArguments()[0]!
+      .asKindOrThrow(nestjs.astLibrary.SyntaxKind.ObjectLiteralExpression)
+      .getPropertyOrThrow("imports")
+      .asKindOrThrow(nestjs.astLibrary.SyntaxKind.PropertyAssignment)
+      .getInitializerIfKindOrThrow(nestjs.astLibrary.SyntaxKind.ArrayLiteralExpression);
+    imports.addElement("ConfigModule.forRoot()");
+  });
+```
+
+## Próximos pasos
+
+- [Modify](/es/guides/modify/): los dialectos TypeScript y React y cómo funciona un handle.
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y qué versión respalda cada
+  dialecto.

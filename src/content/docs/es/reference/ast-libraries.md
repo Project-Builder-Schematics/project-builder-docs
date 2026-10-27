@@ -13,6 +13,7 @@ Cada [dialecto](/es/guides/modify/) parsea su tipo de archivo con una librería 
 |---|---|---|---|---|---|
 | TypeScript | `@pbuilder/sdk/typescript` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
 | React / TSX | `@pbuilder/sdk/react` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
+| NestJS | `@pbuilder/sdk/nestjs` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
 | JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1`, versión exacta en las `dependencies` del SDK | [jsonc-parser en GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` recibe un `JsonDocument` (`{ text }`); la librería completa se exporta como `astLibrary` |
 | YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1`, versión exacta en las `dependencies` del SDK | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` recibe un `YamlStream` (`{ documents }`) de instancias `Document`; la librería completa se exporta como `astLibrary` |
 

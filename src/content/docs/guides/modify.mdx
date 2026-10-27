@@ -14,7 +14,8 @@ prints the result back. Each file type gets the AST library that fits it best. T
 `@pbuilder/sdk/typescript` and `@pbuilder/sdk/react` dialects covered on this page are both built
 on TypeScript's own AST (surfaced through ts-morph), because TS and TSX share a grammar. JSON and
 YAML files have dialects of their own: see [JSON dialect](/guides/json-dialect/) and
-[YAML dialect](/guides/yaml-dialect/).
+[YAML dialect](/guides/yaml-dialect/). For NestJS modules, the
+[NestJS dialect](/guides/nestjs-dialect/) adds `@Module` ops on top of the TypeScript ones.
 
 ## How a dialect handle works
 
@@ -153,6 +154,7 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 |---|---|
 | Add or remove an import, add a top-level declaration, set one JSX prop | The dialect's [named ops](#the-typescript-dialect) |
 | Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
+| Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
 | Edit a JSON or YAML file | The [JSON](/guides/json-dialect/) or [YAML](/guides/yaml-dialect/) dialect |
 | Edit a file type no dialect covers, such as Markdown or CSS | [`find` from `@pbuilder/sdk/commons`](#files-without-a-dialect) |
 
@@ -370,6 +372,8 @@ Two differences from a dialect edit:
 
 - [JSON dialect](/guides/json-dialect/) and [YAML dialect](/guides/yaml-dialect/): named ops
   for JSON, JSONC and YAML files that keep comments and formatting.
+- [NestJS dialect](/guides/nestjs-dialect/): register classes in a NestJS `@Module`.
+- [NestJS dialect](/guides/nestjs-dialect/): register classes in a NestJS `@Module`.
 - [AST libraries](/reference/ast-libraries/): which library and version back each dialect,
   and how `astLibrary` exposes them.
 - **Building a dialect of your own** is a contributor-level surface. Every dialect must export
