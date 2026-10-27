@@ -1,25 +1,25 @@
 ---
 title: Manejo de errores
-description: El contrato AuthoringError que lanza todo verbo rechazado — sus campos verb, path y reason, la garantía fail-closed que lo respalda, y cómo escribir factories que fallan bien.
+description: El contrato AuthoringError que lanza todo verbo rechazado. Sus campos verb, path y reason, la garantía fail-closed que lo respalda, y cómo escribir factories que fallan bien.
 sidebar:
   order: 6
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Un verbo de autoría que resulta rechazado — por el engine, o por el propio SDK antes de
-cualquier ida y vuelta — lanza `AuthoringError`. Lleva todo lo que necesitas para recuperarte,
-en vocabulario de autor: nada de terminología interna del engine.
+Un verbo de autoría que resulta rechazado, ya sea por el engine o por el propio SDK antes de
+cualquier ida y vuelta, lanza `AuthoringError`. Lleva todo lo que necesitas para recuperarte y
+usa vocabulario de autor, sin terminología interna del engine.
 
 ## Fail-closed por diseño
 
 Un run fallido no escribe **nada**. Los verbos solo agendan directivas contra el árbol de
 staging del engine; las escrituras a disco ocurren en la fase de apply, después de que tu
-factory retorna — así que un `AuthoringError` lanzado (o cualquier error) antes del retorno deja
+factory retorna. Por eso, un `AuthoringError` lanzado (o cualquier error) antes del retorno deja
 el proyecto de destino exactamente como estaba. No hay estado de escritura parcial que limpiar,
 y por eso los verbos mismos son estrictos: `create` rechaza una ruta existente,
 `replaceContent` rechaza una faltante, y las sobrescrituras requieren un `{ force: true }`
-explícito — consulta [Verbos de mutación](/es/guides/mutation-verbs/) para la semántica exacta
+explícito. Consulta [Verbos de mutación](/es/guides/mutation-verbs/) para la semántica exacta
 de cada verbo.
 
 ## Cómo aparecen los errores
@@ -84,22 +84,22 @@ secretos fuera de los mensajes de error.
 
 ## Campos
 
-- **`verb`** — el verbo de cara al autor cuya llamada fue rechazada: `"create"`, `"modify"`,
+- **`verb`**: el verbo de cara al autor cuya llamada fue rechazada: `"create"`, `"modify"`,
   `"remove"`, `"rename"`, `"move"`, `"copy"` o `"copyIn"`. `undefined` para rechazos a nivel de
   batch que no tienen una única llamada infractora.
-- **`path`** — la ruta del lado origen, declarada por el autor, de la llamada fallida.
+- **`path`**: la ruta del lado origen, declarada por el autor, de la llamada fallida.
   `undefined` cuando `verb` es `undefined`.
-- **`reason`** — la causa cerrada del rechazo (ver abajo).
-- **`origin`** — derivado de `reason`: `"write-rejected"` (el engine rechazó una escritura) o
+- **`reason`**: la causa cerrada del rechazo (ver abajo).
+- **`origin`**: derivado de `reason`: `"write-rejected"` (el engine rechazó una escritura) o
   `"authoring-rejected"` (el SDK atrapó un mal uso antes de cualquier ida y vuelta al engine).
-- **`appliedCount`** — cuántas directivas se aplicaron dentro del run fallido antes del
-  infractor. Solo un diagnóstico — un run rechazado descarta todo, así que esto nunca es una
-  promesa de persistencia parcial.
+- **`appliedCount`**: cuántas directivas se aplicaron dentro del run fallido antes del
+  infractor. Es solo un diagnóstico. Un run rechazado descarta todo, así que este número nunca
+  promete persistencia parcial.
 
 <Aside type="note">
 **La peculiaridad de la etiqueta `"modify"`.** `"modify"` etiqueta la mutación de wire
-subyacente, y la comparten TANTO las llamadas a `.replaceContent()` (el reemplazo total de
-commons/dialectos) COMO el escape de AST `.modify(fn)` de un handle de dialecto — las dos
+subyacente, y la comparten tanto las llamadas a `.replaceContent()` (el reemplazo total de
+commons/dialectos) como el escape de AST `.modify(fn)` de un handle de dialecto. Las dos
 llamadas se traducen a la misma directiva de wire, así que un rechazo en cualquiera de las dos
 aparece como `verb: "modify"`. Es deliberado, no un nombre obsoleto que sobrevivió a un
 renombrado. Escribe tus aserciones contra `"modify"`, nunca contra `"replaceContent"`.
@@ -107,7 +107,7 @@ renombrado. Escribe tus aserciones contra `"modify"`, nunca contra `"replaceCont
 
 ## Valores de `reason`
 
-`reason` es una unión cerrada — se espera que los bloques `switch` sean exhaustivos, y obtienen
+`reason` es una unión cerrada. Se espera que los bloques `switch` sean exhaustivos, y obtienen
 un error de compilación si falta un valor:
 
 | `reason` | Significado |
@@ -125,15 +125,15 @@ un error de compilación si falta un valor:
 | `source-unreadable` | Una fuente local del paquete existe pero no pudo leerse. |
 
 <Aside type="caution">
-`source-outside-package` se eliminó en `@pbuilder/sdk` `0.2.0` — el SDK ya no re-deriva un techo
+`source-outside-package` se eliminó en `@pbuilder/sdk` `0.2.0`. El SDK ya no re-deriva un techo
 de contención para las fuentes locales del paquete. Migración: elimina el brazo
-`case "source-outside-package":` de cualquier `switch (err.reason)` exhaustivo — TypeScript te
+`case "source-outside-package":` de cualquier `switch (err.reason)` exhaustivo. TypeScript te
 lo va a señalar.
 </Aside>
 
 ## Capturar y recuperarse
 
-La misma forma que arriba, ahora exhaustiva — cada valor de `reason` recibe un case:
+Es la misma forma que arriba, ahora exhaustiva, con un case para cada valor de `reason`:
 
 ```ts
 switch (err.reason) {
@@ -157,32 +157,31 @@ switch (err.reason) {
 
 ## Escribir buenos caminos de fallo
 
-El contrato de errores premia a los factories que tratan el rechazo como un resultado diseñado,
-no una sorpresa:
+El contrato de errores premia a los factories que tratan el rechazo como un resultado esperado
+y diseñado:
 
 - **Previene `path-collision` leyendo primero.** El rechazo más común es una re-ejecución que
   choca con un archivo creado por el run anterior. Ramifica sobre
-  [la tricotomía de `find().read()`](/es/guides/mutation-verbs/#leer-archivos-findpathread) —
-  crear cuando está ausente, actualizar cuando está presente — en lugar de recurrir a
+  [la tricotomía de `find().read()`](/es/guides/mutation-verbs/#leer-archivos-findpathread)
+  (crear cuando está ausente, actualizar cuando está presente) en lugar de recurrir a
   `{ force: true }`, que convierte cada re-ejecución en una sobrescritura silenciosa.
 - **Pasa `force: true` solo cuando sobrescribir es la intención.** Las colisiones fail-closed
   son el SDK protegiendo la salida anterior; forzarlas elimina esa protección para todas las
   ejecuciones futuras, no solo esta.
-- **Deja que los estados inesperados fallen ruidosamente.** Como un run rechazado descarta
-  todo, lanzar siempre es seguro — el árbol queda intacto. Un factory que detecta un estado que
+- **Deja que los estados inesperados fallen ruidosamente.** Un run rechazado descarta todo
+  y deja el árbol intacto, así que lanzar siempre es seguro. Un factory que detecta un estado que
   no entiende debería lanzar en lugar de adivinar.
 - **Haz `switch` exhaustivo sobre `reason`.** La unión cerrada implica que el compilador te
-  avisa cuando una nueva versión del SDK agrega (o elimina) una causa de rechazo — la
-  eliminación de `source-outside-package` de arriba es exactamente ese mecanismo funcionando
-  como se pretende.
+  avisa cuando una nueva versión del SDK agrega (o elimina) una causa de rechazo, como
+  muestra la eliminación de `source-outside-package` de arriba.
 - **En tests, escribe aserciones sobre los campos estructurados.** `result.error.verb`, `.path`
-  y `.reason` fijan *cuál* directiva falló y *por qué* — mucho más resistente a mutaciones que
+  y `.reason` fijan *cuál* directiva falló y *por qué*, lo que las hace mucho más resistentes a mutaciones que
   hacer matching sobre el texto de `message`. Recuerda la peculiaridad de la etiqueta
   `"modify"` cuando la llamada fallida es un `replaceContent`.
 
 ## Próximos pasos
 
-- [Verbos de mutación](/es/guides/mutation-verbs/) — los siete verbos de autoría y la regla de
+- [Verbos de mutación](/es/guides/mutation-verbs/): los siete verbos de autoría y la regla de
   la tricotomía de lectura.
-- [Dry-run](/es/guides/dry-run/) — previsualiza los cambios planificados de un factory antes de
+- [Dry-run](/es/guides/dry-run/): previsualiza los cambios planificados de un factory antes de
   que algo se confirme.

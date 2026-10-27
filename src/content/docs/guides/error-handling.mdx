@@ -1,24 +1,24 @@
 ---
 title: Error handling
-description: The AuthoringError contract every rejected verb throws — its verb, path, and reason fields, the fail-closed guarantee behind it, and how to write factories that fail well.
+description: The AuthoringError contract that every rejected verb throws. Its verb, path, and reason fields, the fail-closed guarantee behind it, and how to write factories that fail well.
 sidebar:
   order: 6
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-An authoring verb that gets rejected — by the engine, or by the SDK itself before any
-round-trip — throws `AuthoringError`. It carries everything you need to recover, in author
-vocabulary: no engine-internal terminology.
+An authoring verb that gets rejected, either by the engine or by the SDK itself before any
+round-trip, throws `AuthoringError`. It carries everything you need to recover and uses author
+vocabulary, with no engine-internal terminology.
 
 ## Fail-closed by design
 
 A failed run writes **nothing**. Verbs only schedule directives against the engine's staging
-tree; disk writes happen in the apply phase, after your factory returns — so a thrown
-`AuthoringError` (or any error) before return leaves the target project exactly as it was.
+tree; disk writes happen in the apply phase, after your factory returns. A thrown
+`AuthoringError` (or any error) before return therefore leaves the target project exactly as it was.
 There is no partial-write state to clean up, which is why the verbs themselves are strict:
 `create` rejects an existing path, `replaceContent` rejects a missing one, and overwrites
-require an explicit `{ force: true }` — see
+require an explicit `{ force: true }`. See
 [Mutation verbs](/guides/mutation-verbs/) for each verb's exact semantics.
 
 ## How errors surface
@@ -83,29 +83,29 @@ of error messages.
 
 ## Fields
 
-- **`verb`** — the author-facing verb whose call was rejected: `"create"`, `"modify"`,
+- **`verb`**: the author-facing verb whose call was rejected: `"create"`, `"modify"`,
   `"remove"`, `"rename"`, `"move"`, `"copy"`, or `"copyIn"`. `undefined` for batch-level
   rejections that have no single offending call.
-- **`path`** — the author-declared, source-side path for the failing call. `undefined` when
+- **`path`**: the author-declared, source-side path for the failing call. `undefined` when
   `verb` is `undefined`.
-- **`reason`** — the closed cause of the rejection (see below).
-- **`origin`** — derived from `reason`: `"write-rejected"` (the engine refused a write) or
+- **`reason`**: the closed cause of the rejection (see below).
+- **`origin`**: derived from `reason`: `"write-rejected"` (the engine refused a write) or
   `"authoring-rejected"` (the SDK caught a misuse before any engine round-trip).
-- **`appliedCount`** — how many directives applied within the failing run before the
-  offender. A diagnostic only — a rejected run discards everything, so this is never a
-  partial-persistence promise.
+- **`appliedCount`**: how many directives applied within the failing run before the
+  offender. It is a diagnostic only. A rejected run discards everything, so this count never
+  promises partial persistence.
 
 <Aside type="note">
 **The `"modify"` label quirk.** `"modify"` labels the underlying wire mutation, and is
-shared by BOTH `.replaceContent()` calls (the commons/dialect wholesale replace) and a
-dialect handle's `.modify(fn)` AST escape hatch — the two calls lower to the same wire
+shared by both `.replaceContent()` calls (the commons/dialect wholesale replace) and a
+dialect handle's `.modify(fn)` AST escape hatch. The two calls lower to the same wire
 directive, so a rejection on either surfaces as `verb: "modify"`. This is deliberate, not a
 stale name left over from a rename. Assert against `"modify"`, never `"replaceContent"`.
 </Aside>
 
 ## `reason` values
 
-`reason` is a closed union — exhaustive `switch` blocks are expected and get a compile
+`reason` is a closed union. Exhaustive `switch` blocks are expected, and they get a compile
 error if a value is missed:
 
 | `reason` | Meaning |
@@ -123,15 +123,15 @@ error if a value is missed:
 | `source-unreadable` | A package-local source exists but could not be read. |
 
 <Aside type="caution">
-`source-outside-package` was removed in `@pbuilder/sdk` `0.2.0` — the SDK no longer
+`source-outside-package` was removed in `@pbuilder/sdk` `0.2.0`. The SDK no longer
 re-derives a containment ceiling for package-local sources. Migration: drop the
-`case "source-outside-package":` arm from any exhaustive `switch (err.reason)` — TypeScript
+`case "source-outside-package":` arm from any exhaustive `switch (err.reason)`. TypeScript
 will point at it.
 </Aside>
 
 ## Catching and recovering
 
-Same shape as above, now exhaustive — every `reason` value gets a case:
+This is the same shape as above, now exhaustive, with a case for every `reason` value:
 
 ```ts
 switch (err.reason) {
@@ -155,30 +155,30 @@ switch (err.reason) {
 
 ## Writing good failure paths
 
-The error contract rewards factories that treat rejection as a designed outcome, not a
-surprise:
+The error contract rewards factories that treat rejection as an expected,
+designed outcome:
 
 - **Prevent `path-collision` by reading first.** The most common rejection is a re-run
   hitting a file the previous run created. Branch on
-  [`find().read()`'s trichotomy](/guides/mutation-verbs/#reading-files-findpathread) —
-  create when absent, update when present — instead of reaching for `{ force: true }`, which
+  [`find().read()`'s trichotomy](/guides/mutation-verbs/#reading-files-findpathread)
+  (create when absent, update when present) instead of reaching for `{ force: true }`, which
   turns every re-run into a silent overwrite.
 - **Pass `force: true` only when overwriting is the intent.** Fail-closed collisions are the
   SDK protecting earlier output; forcing them away removes that protection for every future
   run, not just this one.
-- **Let unexpected states fail loud.** Because a rejected run discards everything, throwing
-  is always safe — the tree is untouched. A factory that detects a state it doesn't
+- **Let unexpected states fail loud.** A rejected run discards everything and leaves the tree
+  untouched, so throwing is always safe. A factory that detects a state it doesn't
   understand should throw rather than guess.
 - **Switch exhaustively on `reason`.** The closed union means the compiler tells you when a
-  new SDK version adds (or removes) a rejection cause — the `source-outside-package` removal
-  above is exactly that mechanism working as intended.
+  new SDK version adds (or removes) a rejection cause, as the `source-outside-package` removal
+  above shows.
 - **In tests, assert on the structured fields.** `result.error.verb`, `.path`, and `.reason`
-  pin down *which* directive failed and *why* — far more mutation-resistant than matching on
-  `message` text. Remember the `"modify"` label quirk when the failing call is a
+  pin down *which* directive failed and *why*, which makes them far more mutation-resistant than
+  matching on `message` text. Remember the `"modify"` label quirk when the failing call is a
   `replaceContent`.
 
 ## Next steps
 
-- [Mutation verbs](/guides/mutation-verbs/) — the seven authoring verbs and the
+- [Mutation verbs](/guides/mutation-verbs/): the seven authoring verbs and the
   read-trichotomy rule.
-- [Dry-run](/guides/dry-run/) — preview a factory's planned changes before anything commits.
+- [Dry-run](/guides/dry-run/): preview a factory's planned changes before anything commits.
