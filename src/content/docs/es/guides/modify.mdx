@@ -15,7 +15,8 @@ recibe la librería de AST que mejor le calza. Los dialectos `@pbuilder/sdk/type
 `@pbuilder/sdk/react` que cubre esta página están ambos construidos sobre el AST propio de
 TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática. Los archivos
 JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-dialect/) y
-[Dialecto YAML](/es/guides/yaml-dialect/).
+[Dialecto YAML](/es/guides/yaml-dialect/). Para módulos de NestJS, el
+[Dialecto NestJS](/es/guides/nestjs-dialect/) suma ops de `@Module` a las de TypeScript.
 
 ## Cómo funciona un handle de dialecto
 
@@ -161,6 +162,7 @@ edición:
 |---|---|
 | Agregar o quitar un import, agregar una declaración de nivel superior, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
 | Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
+| Registrar un provider, controller, import de módulo o export en un `@Module` de NestJS | El [dialecto NestJS](/es/guides/nestjs-dialect/) |
 | Editar un archivo JSON o YAML | El dialecto [JSON](/es/guides/json-dialect/) o [YAML](/es/guides/yaml-dialect/) |
 | Editar un tipo de archivo que ningún dialecto cubre, como Markdown o CSS | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
 
@@ -383,6 +385,8 @@ Dos diferencias con una edición de dialecto:
 
 - [Dialecto JSON](/es/guides/json-dialect/) y [Dialecto YAML](/es/guides/yaml-dialect/): ops
   nombradas para archivos JSON, JSONC y YAML que conservan comentarios y formato.
+- [Dialecto NestJS](/es/guides/nestjs-dialect/): registra clases en un `@Module` de NestJS.
+- [Dialecto NestJS](/es/guides/nestjs-dialect/): registra clases en un `@Module` de NestJS.
 - [Librerías AST](/es/reference/ast-libraries/): qué librería y versión respaldan a cada
   dialecto, y cómo las expone `astLibrary`.
 - **Construir un dialecto propio** es una superficie para contribuidores. Todo dialecto debe
