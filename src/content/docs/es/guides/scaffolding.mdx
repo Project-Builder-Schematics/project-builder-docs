@@ -1,15 +1,15 @@
 ---
 title: Scaffolding
-description: Replica una carpeta entera de archivos de plantilla en el árbol con scaffold() — nombres de archivo dinámicos, eliminación de sufijos, tablas de rename y filtrado con globs.
+description: Replica una carpeta entera de archivos de plantilla en el árbol con scaffold(), con nombres de archivo dinámicos, eliminación de sufijos, tablas de rename y filtrado con globs.
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Para cualquier cosa más grande que un par de archivos, no escribas un `create()` por archivo —
-mantén una carpeta de archivos de plantilla dentro del paquete de tu schematic y replícala con
-**`scaffold`**. Es el caballo de batalla de los generadores multi-archivo.
+Para cualquier cosa más grande que un par de archivos, no escribas un `create()` por archivo.
+Mantén una carpeta de archivos de plantilla dentro del paquete de tu schematic y replícala con
+**`scaffold`**, el verbo sobre el que se construyen la mayoría de los generadores multi-archivo.
 
 ## Replicar una carpeta de plantillas
 
@@ -39,10 +39,10 @@ export default (input: Input) => {
 ```
 
 Con `name: "userProfile"` esto emite `src/services/user-profile/user-profile.service.ts`,
-`…/user-profile.spec.ts` y `…/config/settings.json` — con los contenidos renderizados contra el
+`…/user-profile.spec.ts` y `…/config/settings.json`, con los contenidos renderizados contra el
 mismo `options`, usando el [lenguaje de plantillas](/es/guides/templates/).
 
-`from` es **local al paquete** — se resuelve relativo a la carpeta de tu schematic, como
+`from` es **local al paquete**: se resuelve relativo a la carpeta de tu schematic, como
 `copyIn` y `create({ templateFile })`. El CLI pasa la ubicación del paquete automáticamente; en
 tests pasas `packageDir` tú mismo (típicamente `import.meta.dir`).
 
@@ -51,11 +51,11 @@ tests pasas `packageDir` tú mismo (típicamente `import.meta.dir`).
 Los nombres de archivos y carpetas transportan valores dinámicos mediante **tokens de nombre de
 archivo**:
 
-- `__name__` se convierte en `{= .name =}` — la opción `name`, renderizada en la ruta.
-- `__name@pipe__` se convierte en `{= .name | pipe =}` — los mismos 7 pipes que en las
-  plantillas, así que `__name@dasherize__.service.ts` con `name: "userProfile"` termina como
+- `__name__` se convierte en `{= .name =}`, la opción `name` renderizada en la ruta.
+- `__name@pipe__` se convierte en `{= .name | pipe =}`. Se aplican los mismos 7 pipes que en
+  las plantillas, así que `__name@dasherize__.service.ts` con `name: "userProfile"` termina como
   `user-profile.service.ts`.
-- El destino `to` se traduce de la misma manera — así es como una sola llamada a `scaffold` se
+- El destino `to` se traduce de la misma manera. Así es como una sola llamada a `scaffold` se
   expande en un directorio por opción (`to: "src/services/__name@dasherize__"` arriba).
 
 `scaffold` solo reescribe la sintaxis de los marcadores; el renderizado en sí ocurre en el
@@ -75,7 +75,7 @@ plantilla parezcan código fuente real ante tu editor y tu tooling:
 ### Tablas de `rename`
 
 `rename` es una tabla de remapeo estática que se compara contra la ruta *original* relativa a la
-fuente — para el archivo suelto cuyo destino no sigue el patrón. Como corre primero en el orden
+fuente. Úsala para el archivo suelto cuyo destino no sigue el patrón. Como corre primero en el orden
 fijo, el nombre remapeado igualmente pasa después por la traducción de tokens y la eliminación
 de `.template`.
 
@@ -86,8 +86,8 @@ segmento de ruta, `**` coincide a través de segmentos, y `exclude` gana cuando 
 con un archivo.
 
 <Aside type="caution">
-Los filtros que eliminan **todas** las entradas rechazan ruidosamente — pero una **carpeta
-`from` vacía es un no-op silencioso**. Y el empaquetado de npm suele descartar los directorios
+Los filtros que eliminan **todas** las entradas rechazan ruidosamente, pero una **carpeta
+`from` vacía es un no-op silencioso**. Además, el empaquetado de npm suele descartar los directorios
 vacíos, así que si la presencia de una carpeta importa, incluye un archivo placeholder en ella.
 </Aside>
 

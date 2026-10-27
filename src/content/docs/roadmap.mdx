@@ -1,6 +1,6 @@
 ---
 title: Roadmap
-description: From local schematics to a full orchestrator — the four levels of Project Builder, where we are today, and how workbenches prove each step.
+description: The four levels of Project Builder, from local schematics to a full orchestrator, where we are today, and how workbenches prove each step.
 sidebar:
   order: 1
 ---
@@ -14,29 +14,29 @@ distribution, and orchestration only make sense once the foundation is proven.
 ## Level 1 — Local schematics *(we are here)*
 
 Everything these docs cover today: authoring typed, testable, deterministic schematics
-and running them inside your own repository — the seven mutation verbs, templates,
+and running them inside your own repository. That includes the seven mutation verbs, templates,
 AST-aware dialects, and the in-memory testing harness.
 
-And here's the part that matters: level 1 isn't just **built** — it's being **proven**.
+Level 1 is built, and it is now being proven in the field.
 The [workbenches](https://hyperxq.github.io/Project-Builder-workbenches-/) are real
-projects running real schematics, measuring effectiveness in the field before the next
-level starts. Done is not the bar; *demonstrably effective* is.
+projects running real schematics, and they measure effectiveness before the next
+level starts. Finishing level 1 is not enough to move on; it has to be *demonstrably effective*.
 
 ## Level 2 — Interconnected schematics
 
 Schematics that compose: one schematic invoking others, chaining generation into larger
-flows. The determinism guarantee extends across the chain — a composed run is still
-all-or-nothing, still reproducible.
+flows. The determinism guarantee extends across the chain: a composed run is still
+all-or-nothing and still reproducible.
 
 ## Level 3 — External schematics
 
-Consuming schematics beyond your own repository — private registries for your
-organization, public packages for the ecosystem. Your team's proven patterns become
+Consuming schematics from outside your own repository: private registries for your
+organization and public packages for the ecosystem. Your team's proven patterns become
 installable building blocks.
 
 ## Level 4 — Project Builder
 
-The full vision, and the name of the project for a reason: an **orchestrator of
-schematics that is, itself, easy to orchestrate**. Pipelines of generation spanning
-projects and teams — with the same guarantee that has held since level 1: same input,
-same bytes.
+The full vision, and the reason for the project's name: an **orchestrator of
+schematics that is, itself, easy to orchestrate**. Generation pipelines span
+projects and teams, with the same guarantee that has held since level 1: the same input
+produces the same bytes.

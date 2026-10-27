@@ -1,14 +1,14 @@
 ---
 title: Colecciones externas
-description: Ejecuta schematics que viven fuera del directorio de trabajo — por ejemplo desde un git worktree — con --manifest o BUILDER_MANIFEST, mientras los archivos generados siguen cayendo donde ejecutas el comando.
+description: Ejecuta schematics que viven fuera del directorio de trabajo, por ejemplo desde un git worktree, con --manifest o BUILDER_MANIFEST, mientras los archivos generados siguen cayendo donde ejecutas el comando.
 sidebar:
   order: 9
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-Por defecto, `builder execute` lee `project-builder.json` — y cada colección, factory y schema
-que registra — desde el directorio de trabajo. `--manifest` dirige esas lecturas a otro lugar
+Por defecto, `builder execute` lee `project-builder.json`, y cada colección, factory y schema
+que registra, desde el directorio de trabajo. `--manifest` dirige esas lecturas a otro lugar
 de la misma máquina, mientras que los archivos generados siguen cayendo en el directorio de
 trabajo.
 
@@ -28,7 +28,7 @@ Sin `--manifest`, ambas raíces son el directorio de trabajo; por eso normalment
 la diferencia.
 
 <Aside type="caution" title="Solo directorios locales">
-`--manifest` y `BUILDER_MANIFEST` aceptan una ruta de esta máquina — nada más. Se rechaza
+`--manifest` y `BUILDER_MANIFEST` aceptan solo una ruta de esta máquina. Se rechaza
 cualquier valor que empiece con un esquema de URL (`https://`, `git://`, `ssh://`, `file://`)
 o con una letra de unidad. No se descarga, clona ni cachea nada.
 </Aside>
@@ -61,7 +61,7 @@ Mantén los schematics en un directorio propio, fuera de los checkouts de la apl
 
 <Aside type="danger" title="La raíz del manifiesto no debe tener su propio SDK">
 Una factory resuelve `@pbuilder/sdk` primero desde su propia ubicación. Si la raíz del
-manifiesto — o cualquier directorio por encima — tiene un `node_modules/@pbuilder/sdk`, la
+manifiesto, o cualquier directorio por encima, tiene un `node_modules/@pbuilder/sdk`, la
 factory carga esa copia mientras la ejecución usa la copia del workspace. Dos copias nunca se
 mezclan: la ejecución falla con `engine_native_developer_fault` y una nota sobre un
 *split module graph*, aunque ambas copias sean de la misma versión.
@@ -108,7 +108,7 @@ directorio propio.
 
 </Steps>
 
-El mismo comando funciona desde el checkout principal — todos los checkouts, sean worktrees o
+El mismo comando funciona desde el checkout principal. Todos los checkouts, sean worktrees o
 no, usan el directorio compartido y el SDK compartido.
 
 <Aside type="caution" title="Un checkout con su propio SDK">
@@ -130,13 +130,13 @@ El orden en que `execute` elige un SDK está en
 - **Relativo o absoluto.** Un valor relativo se resuelve contra el directorio de trabajo. La
   ruta se canonicaliza una sola vez, siguiendo los enlaces simbólicos.
 - **Indicar el directorio de trabajo** equivale a no pasar el flag.
-- **Ubicación.** En `execute`, `--manifest` debe ir antes de `<collection>:<schematic>` —
-  después de él se rechaza con `invalid_input` en lugar de pasarse al schematic. `info` lo
+- **Ubicación.** En `execute`, `--manifest` debe ir antes de `<collection>:<schematic>`.
+  Después de él se rechaza con `invalid_input` en lugar de pasarse al schematic. `info` lo
   acepta antes o después de su argumento.
 
 ## Defínelo una vez con variables de entorno
 
-Las herramientas que lanzan `builder` dentro de un checkout — scripts, editores, agentes —
+Las herramientas que lanzan `builder` dentro de un checkout (scripts, editores, agentes)
 pueden definir `BUILDER_MANIFEST` y `BUILDER_SDK_ROOT` en lugar de pasar los flags. Definidas
 una vez, permiten que cada checkout ejecute los schematics compartidos con comandos simples:
 
@@ -151,7 +151,7 @@ builder execute default:hello --name=orders
 - Cuando `BUILDER_MANIFEST` apunta a un lugar distinto del directorio de trabajo, cada
   ejecución imprime la advertencia `warn_manifest_root_ambient` con la ruta resuelta, para que
   una configuración ambiental nunca pase desapercibida. Una raíz de `BUILDER_SDK_ROOT` imprime
-  `warn_sdk_root_ambient`, que nombra la variable pero **no** la ruta — revisa la propia
+  `warn_sdk_root_ambient`, que nombra la variable pero **no** la ruta, así que revisa la propia
   variable para saber qué SDK se ejecutó.
 - La shell expande `~` en las líneas `export` de arriba. Un archivo de configuración de un
   editor o agente no lo hace, así que escribe ahí rutas completas.
@@ -183,14 +183,14 @@ manifiesto bajo `/tmp` se rechaza. Usa un directorio dentro de tu home.
   antes de escribir nada. Para crear schematics en el directorio compartido, haz `cd` a él y
   ejecuta `builder new schematic` allí. El directorio compartido no tiene SDK, y
   `new schematic` no lee `BUILDER_SDK_ROOT`, así que el andamiaje omite `schema.generated.ts`
-  con una advertencia. Regenera los tipos con el script de la propia raíz del SDK — el codegen
+  con una advertencia. Regenera los tipos con el script de la propia raíz del SDK. El codegen
   escribe dentro del proyecto que indiques:
 
   ```sh
   node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js --project ~/work/app-schematics
   ```
 - **La configuración del SDK del manifiesto externo se ignora.** Un `sdk.root` o `sdk.version`
-  en el `project-builder.json` externo no se usa — el SDK lo aportan `--sdk-root`,
+  en el `project-builder.json` externo no se usa. El SDK lo aportan `--sdk-root`,
   `BUILDER_SDK_ROOT` o el SDK instalado del workspace, y el `package.json` propio del workspace
   fija el requisito de versión. Cuando el manifiesto externo declara un `sdk.root`, la
   ejecución advierte con `warn_manifest_sdk_root_ignored`.
@@ -203,14 +203,14 @@ Cada ruta que registra el manifiesto externo debe ser **relativa** a la raíz de
 quedar dentro de ella:
 
 - Un `path` absoluto falla con `collection_absolute_path`.
-- Una ruta que resuelve fuera de la raíz del manifiesto — por ejemplo
-  `../app/schematics/hello` — falla por escapar de la raíz del manifiesto indicada.
+- Una ruta que resuelve fuera de la raíz del manifiesto, por ejemplo
+  `../app/schematics/hello`, falla por escapar de la raíz del manifiesto indicada.
 
 ## Relacionado
 
 - [`builder execute`](/es/reference/cli-commands/#builder-execute) y
-  [`builder info`](/es/reference/cli-commands/#builder-info) — referencia de flags.
-- [Salida y errores de la CLI](/es/reference/cli-output-and-errors/#raíz-del-manifiesto) —
+  [`builder info`](/es/reference/cli-commands/#builder-info): referencia de flags.
+- [Salida y errores de la CLI](/es/reference/cli-output-and-errors/#raíz-del-manifiesto):
   cada error y advertencia de `--manifest`.
-- [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/) — usa un SDK en un
+- [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/): usa un SDK en un
   checkout sin editar `package.json`.

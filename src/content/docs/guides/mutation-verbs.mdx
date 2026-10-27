@@ -1,39 +1,39 @@
 ---
 title: Mutation verbs
-description: The seven authoring verbs a factory mutates the tree with, plus the find().read() read-back — signatures, examples, and the idempotency rules that keep factories safe to re-run.
+description: The seven authoring verbs a factory mutates the tree with, plus the find().read() read-back, with signatures, examples, and the idempotency rules that keep factories safe to re-run.
 sidebar:
   order: 1
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Every author verb lives on `@pbuilder/sdk/commons` — the same entry every schematic imports
+Every author verb lives on `@pbuilder/sdk/commons`, the same entry every schematic imports
 from. Each verb **schedules** a directive; nothing touches disk until the run flushes (on the
 next `read()`, or at run end). Disk writes happen only in the engine's apply phase, after
-your factory returns — a thrown error before return means nothing is written at all.
+your factory returns. A thrown error before return means nothing is written at all.
 
 The seven verbs share one closed `AuthoringVerb` label union: `create`, `replaceContent`,
-`remove`, `rename`, `move`, `copy`, and `copyIn` — the last a by-reference sibling of `copy`
+`remove`, `rename`, `move`, `copy`, and `copyIn`. The last is a by-reference sibling of `copy`
 that copies straight from the package rather than rendering a template. (`scaffold` is an
 eighth, separately shipped mutation that fans out into `create`/`copyIn` directives per
-entry — it has [its own guide](/guides/scaffolding/).)
+entry; it has [its own guide](/guides/scaffolding/).)
 
 ## At a glance
 
 | Verb | What it schedules | Returns | On an existing target |
 |---|---|---|---|
 | [`create`](#create) | A new file, rendered from a template | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
-| [`replaceContent`](#replacecontent) | Wholesale content replacement of an **existing** file | `WritableHandle` | Target **must** exist — `path-not-found` otherwise |
-| [`remove`](#remove) | A file deletion | `void` | Idempotent — never rejects |
+| [`replaceContent`](#replacecontent) | Wholesale content replacement of an **existing** file | `WritableHandle` | Target **must** exist; `path-not-found` otherwise |
+| [`remove`](#remove) | A file deletion | `void` | Idempotent; never rejects |
 | [`rename`](#rename) | A basename-only rename | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
 | [`move`](#move) | A move to a different directory | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
 | [`copy`](#copy) | A tree-to-tree copy | `WritableHandle` | Rejects (`path-collision`) unless `{ force: true }` |
 | [`copyIn`](#copyin) | A package-local file copied into the tree **verbatim** | `void` | Rejects (`path-collision`) unless `{ force: true }` |
-| [`modify`](#modify--the-structural-mutation) | A structural, AST-aware edit — reached **through dialects** | dialect handle | Target must exist and parse |
+| [`modify`](#modify--the-structural-mutation) | A structural, AST-aware edit, reached **through dialects** | dialect handle | Target must exist and parse |
 
 The verbs that write to a new path are fail-closed on collision and accept `{ force: true }`
-for a deliberate overwrite — `create` inside its options object, the rest as a trailing
-argument. Rejections surface as a structured `AuthoringError` — see the
+for a deliberate overwrite: `create` inside its options object, the rest as a trailing
+argument. Rejections surface as a structured `AuthoringError`; see the
 [error handling guide](/guides/error-handling/).
 
 ## `create`
@@ -53,7 +53,7 @@ function create(
 Schedules a file-creation directive and returns a `WritableHandle` for chaining. `path` and
 `template` are both **template strings**, rendered independently against the same `options`;
 the full template mini-language (delimiters, the 7 pipes, loops, conditionals) lives in
-[the templates guide](/guides/templates/) — this page only covers the call itself. The
+[the templates guide](/guides/templates/). This page only covers the call itself. The
 generic `S` overload narrows `options` to a schema's keys at the type level only; the
 runtime behavior is identical to the plain overload.
 
@@ -66,7 +66,7 @@ create("src/index.ts", {
 });
 ```
 
-The third overload swaps the inline `template` string for `templateFile` — a package-local
+The third overload swaps the inline `template` string for `templateFile`, a package-local
 path (resolved against the run's `packageDir`), read at emission time; its content becomes
 the same `template` field the engine renders:
 
@@ -79,7 +79,7 @@ create("src/index.ts", {
 ```
 
 <Aside type="tip">
-**Always pass `options: {}`**, even when the template has no tokens. The type requires it —
+**Always pass `options: {}`**, even when the template has no tokens. The type requires it,
 and in untyped call sites (plain JS, `any`) omitting it puts `undefined` in the directive
 batch, rejecting the write as unrepresentable.
 </Aside>
@@ -87,16 +87,16 @@ batch, rejecting the write as unrepresentable.
 **Edge and error semantics:**
 
 - An existing target path rejects unless `{ force: true }` is passed (fail-closed on
-  overwrite) — `AuthoringError` with `verb: "create"`, `reason: "path-collision"`.
-- `templateFile` is only usable inside a run started with `packageDir` — there is no
+  overwrite): `AuthoringError` with `verb: "create"`, `reason: "path-collision"`.
+- `templateFile` is only usable inside a run started with `packageDir`; there is no
   resolution anchor otherwise (`reason: "invalid-input"`, never a silent cwd fallback). The
   CLI passes `packageDir` automatically; in tests you pass it yourself (see
   [Testing](/getting-started/testing/)).
 - A `templateFile` that is binary (a null byte or invalid UTF-8 anywhere in the file) or
-  larger than the 4 MiB inline-render limit fails loud with `reason: "invalid-input"` — it
+  larger than the 4 MiB inline-render limit fails loud with `reason: "invalid-input"`; it
   never silently falls back to a by-reference copy.
 - A `templateFile` that is missing, is not a regular file, or can't be read surfaces
-  `reason: "source-not-found" | "source-not-regular-file" | "source-unreadable"` — the same
+  `reason: "source-not-found" | "source-not-regular-file" | "source-unreadable"`, the same
   three reasons `copyIn` and `scaffold` share for their own package-local reads. A literal
   `../` segment or an absolute `templateFile` path rejects `reason: "invalid-input"`
   instead, before any read (see the [package-local rule](#package-local-sources) below).
@@ -107,7 +107,7 @@ batch, rejecting the write as unrepresentable.
 function replaceContent(path: string, content: string): WritableHandle;
 ```
 
-Schedules an in-place, wholesale content replacement for an **existing** file — `content` is
+Schedules an in-place, wholesale content replacement for an **existing** file. `content` is
 a raw string, not a template. A rejected run (the target does not exist, `reason:
 "path-not-found"`) throws `AuthoringError`.
 
@@ -119,9 +119,9 @@ replaceContent("src/config.json", '{ "version": "2.0.0" }');
 
 <Aside type="note">
 A rejected `.replaceContent()` reports `verb: "modify"` on its `AuthoringError`, not
-`"replaceContent"` — it lowers to the same wire mutation as a dialect handle's `.modify(fn)`
+`"replaceContent"`, because it lowers to the same wire mutation as a dialect handle's `.modify(fn)`
 escape hatch (see [the Modify guide](/guides/modify/)). This is
-deliberate, not a stale rename — details in the
+deliberate, not a stale rename; details are in the
 [error handling guide](/guides/error-handling/).
 </Aside>
 
@@ -131,7 +131,7 @@ deliberate, not a stale rename — details in the
 function remove(path: string): void;
 ```
 
-Schedules a file deletion. Idempotent: removing an absent file is not an error — in practice
+Schedules a file deletion. Idempotent: removing an absent file is not an error, so in practice
 `remove` never rejects.
 
 ```ts
@@ -147,8 +147,8 @@ function rename(path: string, newName: string, opts?: { force?: boolean }): Writ
 ```
 
 Schedules a basename-only rename, returning a handle for the new path (the directory is
-unchanged — only the last path segment is replaced). Renaming onto an existing path is
-rejected unless `{ force: true }` is passed — `reason: "path-collision"`.
+unchanged; only the last path segment is replaced). Renaming onto an existing path is
+rejected unless `{ force: true }` is passed (`reason: "path-collision"`).
 
 ```ts
 import { rename } from "@pbuilder/sdk/commons";
@@ -178,7 +178,7 @@ move("src/utils/helper.ts", "src/shared");
 function copy(from: string, to: string, opts?: { force?: boolean }): WritableHandle;
 ```
 
-Schedules a tree-to-tree copy, returning a handle you can chain further edits onto — the
+Schedules a tree-to-tree copy, returning a handle you can chain further edits onto. The
 fake test harness stages its content, so a chained `.read()` on the returned handle sees it.
 Copying onto an existing destination is rejected unless `{ force: true }` (`reason:
 "path-collision"`).
@@ -196,7 +196,7 @@ function copyIn(from: string, to: string, opts?: { force?: boolean }): void;
 ```
 
 Copies ONE package-local file (`from`, resolved against the run's `packageDir`) into the
-tree, always by-reference — never classified or rendered, even when the source is plain
+tree, always by-reference. It is never classified or rendered, even when the source is plain
 text containing template-like sequences. This is `copy`'s sibling for package-local sources;
 contrast with `create({ templateFile })`, which explicitly **renders** a package-local
 source instead.
@@ -209,7 +209,7 @@ copyIn("assets/logo.svg", "src/generated/logo.svg");
 
 <Aside type="note">
 Unlike `copy`, `copyIn` returns `void`, not a `WritableHandle`: a by-reference destination's
-bytes exist only after the engine applies the directive — the fake test harness never
+bytes exist only after the engine applies the directive. The fake test harness never
 materializes them, so a handle chaining over tree content would lie about content that was
 never staged. This asymmetry with `copy` (which *does* stage tree-to-tree content the fake
 can chain over) is deliberate.
@@ -217,22 +217,22 @@ can chain over) is deliberate.
 
 **Edge and error semantics:**
 
-- `from`/`to` are mandatory — a missing one rejects `reason: "invalid-input"` before any
+- `from`/`to` are mandatory; a missing one rejects `reason: "invalid-input"` before any
   emission.
-- Only usable inside a run started with `packageDir` — otherwise `reason: "invalid-input"`,
+- Only usable inside a run started with `packageDir`; otherwise `reason: "invalid-input"`,
   never a cwd fallback.
 - The source is screened lexically (`../`/absolute rejects `reason: "invalid-input"`
   pre-read), then validated for existence and regular-file-ness, surfacing `reason:
-  "source-not-found" | "source-not-regular-file" | "source-unreadable"` — the same three
+  "source-not-found" | "source-not-regular-file" | "source-unreadable"`, the same three
   reasons `create({ templateFile })` and `scaffold` share.
 - A destination collision without `{ force: true }` rejects `reason: "path-collision"`,
-  `verb: "copyIn"` — the author never called `copy`, but the label still names the actual
+  `verb: "copyIn"`. The author never called `copy`, but the label still names the actual
   offending call.
 
 ## `modify` — the structural mutation
 
-The eighth mutation is the one that doesn't come from `@pbuilder/sdk/commons` — and that's
-by design. Every verb above treats a file as **text**; `modify` is a **structural** edit,
+The eighth mutation is the one that doesn't come from `@pbuilder/sdk/commons`, by
+design. Every verb above treats a file as **text**; `modify` is a **structural** edit,
 and to edit a file structurally you first have to understand it, which means parsing it
 into an AST. That understanding lives in the [dialects](/guides/modify/):
 
@@ -246,7 +246,7 @@ await ts.find("src/index.ts")
   });
 ```
 
-Whichever way you author it — a named op like `addImport` or the `.modify()` escape hatch —
+Whichever way you author it (a named op like `addImport` or the `.modify()` escape hatch),
 the whole chain coalesces and reaches the engine as **one `modify` instruction carrying the
 final file content**. The engine never sees the AST. `replaceContent` lowers to the same
 wire mutation, which is why its errors report `verb: "modify"`.
@@ -263,17 +263,17 @@ package's own disk, resolved against the run's `packageDir`. The author rule:
 > reads lives inside its package.
 
 The SDK screens the *literal* path shape (no `..` segment, no absolute form) before touching
-disk — symlinks are followed without target verification, a deliberate, documented residual
+disk. Symlinks are followed without target verification, a deliberate, documented residual
 covered in the SDK's `SECURITY.md`, not an oversight.
 
 ## Reading files: `find(path).read()`
 
 `find(path)` locates an existing file and returns a handle for reading or removing it.
-`read()` resolves to exactly one of three states — never a truthiness check:
+`read()` resolves to exactly one of three states; never test it with a truthiness check:
 
-- **`absent`** — the path does not exist. `read()` resolves `undefined`.
-- **`empty`** — the file exists but its content is the exact empty string `""`.
-- **`present`** — any other string, including falsy-looking ones like `"0"` or `"false"`.
+- **`absent`**: the path does not exist. `read()` resolves `undefined`.
+- **`empty`**: the file exists but its content is the exact empty string `""`.
+- **`present`**: any other string, including falsy-looking ones like `"0"` or `"false"`.
 
 ```ts
 import { find, create, replaceContent } from "@pbuilder/sdk/commons";
@@ -289,7 +289,7 @@ if (content === undefined) {
 ```
 
 <Aside type="caution">
-Branch on the three outcomes with strict `=== undefined` / `=== ""` comparisons — never
+Branch on the three outcomes with strict `=== undefined` / `=== ""` comparisons, never
 `if (!content)`, which silently merges `undefined`, `""`, `"0"`, and `"false"`.
 </Aside>
 
@@ -312,32 +312,32 @@ switch (classifyContent(content)) {
 }
 ```
 
-Reads come back from the engine's **staging tree**, not from disk — so reading a path you
-created earlier in the same run sees the staged content. That read-back is what turns a
-schematic into a conversation: idempotent, content-aware edits instead of blind overwrites.
+Reads come back from the engine's **staging tree**, not from disk, so reading a path you
+created earlier in the same run sees the staged content. That read-back lets a
+schematic make idempotent, content-aware edits instead of blind overwrites.
 
 ## Check before mutating
 
 Factories re-run against already-generated projects, so mutations must be **idempotent**:
 check whether your marker, import, or entry is already present before inserting it. The
-verbs are built for this discipline —
+verbs are built for this:
 
 - `create` is fail-closed on an existing path (`path-collision`): a re-run never silently
   clobbers earlier output. Reach for `{ force: true }` only when overwriting is the intent.
 - `find().read()` tells you exactly what state the tree is in, so you can branch: create
-  when absent, seed when empty, patch when present — the trichotomy example above is the
+  when absent, seed when empty, patch when present. The trichotomy example above is the
   canonical shape.
 - `remove` is already idempotent; a re-run that removes an already-removed file is a no-op.
 
 A production factory appending to a list, for example, would also skip the append when the
-entry is already listed — read the content, check for the entry, and only then
+entry is already listed: read the content, check for the entry, and only then
 `replaceContent`. The [testing guide](/getting-started/testing/) shows how to assert
 idempotence with seeded trees.
 
 ## Next steps
 
-- [Templates](/guides/templates/) — the `{= =}` mini-language `create` renders with.
-- [Scaffolding](/guides/scaffolding/) — mirror a whole folder of templates with `scaffold`.
-- [Dry-run](/guides/dry-run/) — preview a factory's planned changes before anything commits.
-- [Error handling](/guides/error-handling/) — what `AuthoringError` looks like and how to
+- [Templates](/guides/templates/): the `{= =}` mini-language `create` renders with.
+- [Scaffolding](/guides/scaffolding/): mirror a whole folder of templates with `scaffold`.
+- [Dry-run](/guides/dry-run/): preview a factory's planned changes before anything commits.
+- [Error handling](/guides/error-handling/): what `AuthoringError` looks like and how to
   assert against it.

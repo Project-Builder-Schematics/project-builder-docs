@@ -1,14 +1,14 @@
 ---
 title: External collections
-description: Run schematics that live outside the working directory — for example from a git worktree — with --manifest or BUILDER_MANIFEST, while generated files still land where you run the command.
+description: Run schematics that live outside the working directory, for example from a git worktree, with --manifest or BUILDER_MANIFEST, while generated files still land where you run the command.
 sidebar:
   order: 9
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
-By default, `builder execute` reads `project-builder.json` — and every collection, factory and
-schema it registers — from the working directory. `--manifest` points those reads somewhere
+By default, `builder execute` reads `project-builder.json`, and every collection, factory and
+schema it registers, from the working directory. `--manifest` points those reads somewhere
 else on the same machine, while generated files still land in the working directory.
 
 The motivating case is **git worktrees**: your schematics are not committed to the
@@ -26,7 +26,7 @@ Without `--manifest` both roots are the working directory, which is why you norm
 notice the difference.
 
 <Aside type="caution" title="Local directories only">
-`--manifest` and `BUILDER_MANIFEST` accept a path on this machine — nothing else. Any value
+`--manifest` and `BUILDER_MANIFEST` accept only a path on this machine. Any value
 that starts with a URL scheme (`https://`, `git://`, `ssh://`, `file://`) or a drive letter
 is rejected. Nothing is fetched, cloned or cached.
 </Aside>
@@ -58,8 +58,8 @@ Keep the schematics in a directory of their own, outside the application checkou
 ```
 
 <Aside type="danger" title="The manifest root must not carry its own SDK">
-A factory resolves `@pbuilder/sdk` from its own location first. If the manifest root — or any
-directory above it — has a `node_modules/@pbuilder/sdk`, the factory loads that copy while
+A factory resolves `@pbuilder/sdk` from its own location first. If the manifest root, or any
+directory above it, has a `node_modules/@pbuilder/sdk`, the factory loads that copy while
 the run uses the workspace's copy. Two copies are never mixed: the run fails with
 `engine_native_developer_fault` and a note about a *split module graph*, even when both
 copies are the same version.
@@ -104,7 +104,7 @@ cannot be run from a worktree with `--manifest`. Move them to a directory of the
 
 </Steps>
 
-The same command works from the main checkout — every checkout, worktree or not, uses the
+The same command works from the main checkout. Every checkout, worktree or not, uses the
 shared directory and the shared SDK.
 
 <Aside type="caution" title="A checkout with its own SDK">
@@ -126,13 +126,13 @@ The order in which `execute` picks an SDK is in
 - **Relative or absolute.** A relative value resolves against the working directory. The
   path is canonicalised once, following symbolic links.
 - **Naming the working directory** is the same as not passing the flag.
-- **Placement.** For `execute`, `--manifest` must come before `<collection>:<schematic>` —
-  after it, it is rejected with `invalid_input` instead of being passed to the schematic.
+- **Placement.** For `execute`, `--manifest` must come before `<collection>:<schematic>`.
+  After it, it is rejected with `invalid_input` instead of being passed to the schematic.
   `info` accepts it before or after its argument.
 
 ## Set it once with environment variables
 
-Tools that spawn `builder` inside a checkout — scripts, editors, agents — can set
+Tools that spawn `builder` inside a checkout (scripts, editors, agents) can set
 `BUILDER_MANIFEST` and `BUILDER_SDK_ROOT` instead of passing the flags. Set once, they let
 every checkout run the shared schematics with plain commands:
 
@@ -147,7 +147,7 @@ builder execute default:hello --name=orders
 - When `BUILDER_MANIFEST` points somewhere other than the working directory, every run prints
   the `warn_manifest_root_ambient` warning with the resolved path, so an ambient setting never
   goes unnoticed. A root from `BUILDER_SDK_ROOT` prints `warn_sdk_root_ambient`, which names
-  the variable but **not** the path — check the variable itself to see which SDK ran.
+  the variable but **not** the path, so check the variable itself to see which SDK ran.
 - The shell expands `~` in the `export` lines above. A settings file for an editor or agent
   does not, so write full paths there.
 - Stopped using `BUILDER_SDK_ROOT`? The link it left in each checkout makes the next run fail
@@ -178,14 +178,14 @@ On macOS and many Linux systems `/tmp` is writable by its group, so a manifest r
   `manifest_scoped_authoring_refused` before writing anything. To author in the shared
   directory, `cd` into it and run `builder new schematic` there. The shared directory has no
   SDK, and `new schematic` does not read `BUILDER_SDK_ROOT`, so the scaffold skips
-  `schema.generated.ts` with a warning. Regenerate types with the SDK root's own script —
-  codegen writes inside the project you name:
+  `schema.generated.ts` with a warning. Regenerate types with the SDK root's own script.
+  Codegen writes inside the project you name:
 
   ```sh
   node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js --project ~/work/app-schematics
   ```
 - **SDK settings in the external manifest are ignored.** An `sdk.root` or `sdk.version` in
-  the external `project-builder.json` is not used — `--sdk-root`, `BUILDER_SDK_ROOT` or the
+  the external `project-builder.json` is not used. `--sdk-root`, `BUILDER_SDK_ROOT` or the
   workspace's own installed SDK supply the SDK, and the workspace's own `package.json` sets
   the version requirement. When the external manifest declares an `sdk.root`, the run warns
   with `warn_manifest_sdk_root_ignored`.
@@ -198,14 +198,14 @@ Every path the external manifest registers must be **relative** to the manifest 
 inside it:
 
 - An absolute `path` fails with `collection_absolute_path`.
-- A path that resolves outside the manifest root — for example `../app/schematics/hello` —
+- A path that resolves outside the manifest root, for example `../app/schematics/hello`,
   fails as escaping the named manifest root.
 
 ## Related
 
 - [`builder execute`](/reference/cli-commands/#builder-execute) and
-  [`builder info`](/reference/cli-commands/#builder-info) — flag reference.
-- [CLI output and errors](/reference/cli-output-and-errors/#manifest-root) — every
+  [`builder info`](/reference/cli-commands/#builder-info): flag reference.
+- [CLI output and errors](/reference/cli-output-and-errors/#manifest-root): every
   `--manifest` error and warning.
-- [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/) — use an SDK in a
+- [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/): use an SDK in a
   checkout without editing `package.json`.

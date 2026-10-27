@@ -1,6 +1,6 @@
 ---
 title: Probar schematics
-description: Ejecuta un factory en memoria con el harness de testing del SDK y haz aserciones sobre los archivos que escribe — sin CLI, sin engine, sin disco.
+description: Ejecuta un factory en memoria con el harness de testing del SDK y haz aserciones sobre los archivos que escribe, sin CLI, engine ni disco.
 sidebar:
   order: 5
 ---
@@ -13,8 +13,8 @@ Bun no es necesario para el ejemplo de factory en memoria que aparece a continua
 se ejecuta en Node con Vitest, Jest o Rstest.
 </Aside>
 
-Ejecuta tu factory con `runFactoryForTest` y comprueba el árbol resultante — sin CLI,
-sin un proceso del engine y sin archivos generados en disco.
+Ejecuta tu factory con `runFactoryForTest` y comprueba el árbol resultante. No necesitas CLI
+ni un proceso del engine, y no se generan archivos en disco.
 
 ## Un primer test
 
@@ -192,12 +192,12 @@ El otro campo de las opciones, `packageDir` (el directorio absoluto del paquete 
 verbos locales al paquete (`scaffold`, `copyIn`, `create({ templateFile })`) y activa en la
 ejecución la validación de entradas derivada del schema contra el `schema.json` adyacente.
 Sin él, esos verbos no tienen contra qué resolverse. (Cuando la CLI ejecuta tu schematic,
-pasa la ubicación del paquete automáticamente — esto solo importa al testear. Consulta
+pasa la ubicación del paquete automáticamente, así que esto solo importa al testear. Consulta
 [Scaffolding](/es/guides/scaffolding/) para conocer los verbos en sí.)
 
 ## Qué simula el harness — y qué no
 
-Las plantillas se guardan **tal cual** en el árbol de prueba — el renderizado ocurre en el
+Las plantillas se guardan **tal cual** en el árbol de prueba. El renderizado ocurre en el
 engine al momento de `builder execute`, y el harness no lo simula. Así que hacer
 aserciones sobre un `create` con plantilla significa hacerlas sobre el texto crudo
 `{= .name =}`, no sobre la salida renderizada.
@@ -217,15 +217,15 @@ omítelas al ejecutar con Bun.
 ### ¿Errores del editor con `bun:test`?
 
 `bun test` elimina los tipos en lugar de verificarlos, así que corre bien de cualquier
-manera — pero tu editor necesita algunos ajustes de tsconfig para resolver los imports.
+manera, pero tu editor necesita algunos ajustes de tsconfig para resolver los imports.
 Agrega `typescript` y `@types/bun` como dependencias de desarrollo y asegúrate de que tu
 `tsconfig.json` tenga:
 
-- `moduleResolution: "NodeNext"` (o `"bundler"`) — la resolución legada por defecto de
+- `moduleResolution: "NodeNext"` (o `"bundler"`): la resolución legada por defecto de
   TypeScript no puede leer el mapa `exports` de un paquete, que es la única vía hacia los
   subpaths de `@pbuilder/sdk` (`./testing`, `./commons` y compañía). Sin esto, tu editor
   reporta `Cannot find module '@pbuilder/sdk/commons'` aunque el import sea correcto.
-- `allowImportingTsExtensions: true` — los factories importan los tipos generados con una
+- `allowImportingTsExtensions: true`: los factories importan los tipos generados con una
   extensión `.ts` explícita (`./schema.generated.ts`), que TypeScript rechaza por defecto.
 - Si restringes los tipos ambientales con `types`, incluye `"bun"` junto a las entradas
   existentes para que el editor pueda resolver `bun:test` desde `@types/bun`.

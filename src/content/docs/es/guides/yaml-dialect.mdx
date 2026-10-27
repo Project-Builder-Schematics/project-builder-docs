@@ -1,0 +1,400 @@
+---
+title: Dialecto YAML
+description: Edita archivos .yaml y .yml por ruta con @pbuilder/sdk/yaml. Cubre ops estructurales, comentarios, anclas y alias, estilos, tags, archivos de varios documentos y el escape .modify().
+sidebar:
+  order: 11
+---
+
+`@pbuilder/sdk/yaml` edita archivos `.yaml` y `.yml` con ops con nombre que apuntan a un nodo
+por su ruta. Las ops cambian solo el nodo indicado, así que los comentarios, el orden de las
+claves, las anclas, los tags y los estilos sobreviven a la edición, cosa que no pasaría si
+reescribieras el archivo entero con `replaceContent`. El handle funciona como el de cualquier
+otro dialecto (un AST vivo, una escritura por flush); consulta
+[Modify](/es/guides/modify/#cómo-funciona-un-handle-de-dialecto) para ese modelo.
+
+```ts
+import * as yaml from "@pbuilder/sdk/yaml";
+
+// compose.yaml antes:
+// services:
+//   web:
+//     image: node
+await yaml
+  .find("compose.yaml")
+  .setValue(["services", "web", "ports"], ["3000:3000"])
+  .setComment(["services", "web"], "Frontend");
+// -> services:
+// ->   # Frontend
+// ->   web:
+// ->     image: node
+// ->     ports:
+// ->       - 3000:3000
+```
+
+El dialecto tiene 25 ops con nombre: las 15 ops estructurales que comparte con el
+[dialecto JSON](/es/guides/json-dialect/), más ops para comentarios, anclas y alias,
+presentación y documentos.
+
+## Rutas y valores
+
+- **`find(path)` acepta solo `.yaml` y `.yml`.** El nombre base debe terminar en una de esas
+  extensiones después de un nombre no vacío. Cualquier otra ruta lanza un error de forma
+  síncrona, antes de que corra ninguna op.
+- **Una ruta es un array de segmentos.** Un `string` nombra una clave de un mapping, un `number`
+  indexa una sequence, y `[]` es la raíz del documento: `["services", "web", "ports", 0]`. Las
+  claves con puntos o barras no necesitan escape. Un segmento que no es un string ni un entero no
+  negativo se rechaza.
+- **Los valores tienen el tipo `YamlValue` y se validan en tiempo de ejecución.** Un valor es
+  dato JSON: `null`, booleanos, números finitos, strings, arrays y objetos planos. `undefined`,
+  funciones, `NaN` e `Infinity`, instancias de clases como `Date` y valores cíclicos se rechazan
+  antes de que cambie el archivo, y el error nombra la ruta dentro del valor. Las fechas, los
+  binarios y los valores con tags propios se alcanzan con
+  [`.modify()`](#ediciones-personalizadas-con-modify).
+- **Las lecturas siguen los alias; las escrituras no.** Una op que escribiría *a través* de un
+  alias se rechaza y lo nombra. En su lugar, edita el nodo anclado.
+- **Todo rechazo es todo o nada.** El mensaje de error empieza con
+  `dialect operation failed: `, y la Session no emite ninguna directiva para el archivo.
+
+## Archivos con varios documentos
+
+Toda op excepto `addDocument` y `removeDocument` acepta un último argumento opcional
+`{ document?: number }` que elige un documento de un archivo separado por `---`. Por defecto es
+`0`, y un índice fuera de rango se rechaza.
+
+```yaml title="config.yaml (antes)"
+a:   1 # keep spacing
+---
+b: 2
+```
+
+```ts title="factory.ts"
+await yaml.find("config.yaml").setValue(["b"], 3, { document: 1 });
+```
+
+```yaml title="config.yaml (después)"
+a:   1 # keep spacing
+---
+b: 3
+```
+
+Un archivo vacío es un stream con cero documentos. Las ops que crean los padres que faltan
+(`setValue`, `merge`, `appendItem`, `updateValue`) crean el documento `0`; las demás ops que
+aceptan `{ document }` se rechazan.
+
+## Cómo se imprime el archivo
+
+- **Un documento que ninguna op tocó se imprime idéntico byte a byte** a su fuente, incluido el
+  espaciado como `a:   1` arriba.
+- **Un documento tocado lo vuelve a serializar la librería [`yaml`](https://eemeli.org/yaml/).**
+  Conserva los comentarios, el orden de las claves, las anclas, los alias, los tags y los
+  estilos de scalars y colecciones. El contenido nuevo usa la indentación detectada en el
+  documento (dos espacios si no detecta ninguna), la indentación de sequences y el relleno de las
+  colecciones flow.
+- **La librería normaliza algunas formas de escribir en un documento tocado:**
+  - los scalars folded (`>`) largos se unen en una sola línea;
+  - números escritos como `0x1F` se imprimen como `0x1f`;
+  - las entradas explícitas `? key` pasan a `key: value`;
+  - un comentario al final del documento gana una línea en blanco antes.
+- **Un BOM UTF-8, los finales de línea CRLF y la falta de salto de línea final se conservan.**
+- **Un archivo con un error de sintaxis YAML, o con un alias a un ancla no definida, falla al
+  parsear.**
+
+Las directivas (`%YAML`, `%TAG`) y las líneas en blanco no tienen op con nombre. Edítalas con
+[`.modify()`](#ediciones-personalizadas-con-modify).
+
+## Ops estructurales
+
+Son las 15 ops del [dialecto JSON](/es/guides/json-dialect/), con las mismas firmas y las
+mismas reglas. Lee "objeto" como **mapping** y "array" como **sequence**. Cada una acepta además
+la opción `{ document }` como último argumento.
+
+| Op | Llamada | Antes | Después |
+|---|---|---|---|
+| `setValue(path, value, { before?, after? })` | `setValue(["port"], 8080)` | `port: 80` | `port: 8080` |
+| `addKey(path, value, { before?, after? })` | `addKey(["pkg", "private"], true)` | `pkg: {name: app}` | `pkg: {name: app, private: true}` |
+| `removeKey(path)` | `removeKey(["x", "b"])` | `x: {a: 1, b: 2}` | `x: {a: 1}` |
+| `renameKey(path, newKey)` | `renameKey(["x", "b"], "beta")` | `x: {a: 1, b: 2}` | `x: {a: 1, beta: 2}` |
+| `insertItem(path, index, value)` | `insertItem(["x"], 1, "b")` | `x: [a, c]` | `x: [a, b, c]` |
+| `appendItem(path, value, { unique? })` | `appendItem(["plugins"], "b", { unique: true })` | `plugins: [a]` | `plugins: [a, b]` |
+| `removeItem(path, index)` | `removeItem(["x"], 0)` | `x: [a, b]` | `x: [b]` |
+| `removeValue(path, value)` | `removeValue(["x"], "a")` | `x: [a, b, a]` | `x: [b]` |
+| `replaceItem(path, index, value)` | `replaceItem(["x"], 0, "z")` | `x: [a, b]` | `x: [z, b]` |
+| `moveItem(path, from, to)` | `moveItem(["x"], 0, 2)` | `x: [1, 2, 3]` | `x: [2, 3, 1]` |
+| `merge(path, object)` | `merge(["a"], { y: 2 })` | `a: {x: 1}` | `a: {x: 1, y: 2}` |
+| `updateValue(path, fn)` | `updateValue(["version"], (v) => (typeof v === "number" ? v + 1 : 1))` | `version: 1` | `version: 2` |
+| `moveValue(from, to)` | `moveValue(["a", "x"], ["b", "x"])` | `a: {x: 1}`<br />`b: {}` | `a: {}`<br />`b: {x: 1}` |
+| `copyValue(from, to)` | `copyValue(["a"], ["b"])` | `a: &x hello` | `a: &x hello`<br />`b: hello` |
+| `sortKeys(path, { recursive? })` | `sortKeys(["x"])` | `x: {b: 1, a: 2}` | `x: {a: 2, b: 1}` |
+
+Lo que YAML agrega a las reglas compartidas:
+
+- **Los padres que faltan se crean como mappings, nunca como sequences.** Un padre que falta y se
+  direcciona con un índice se rechaza.
+- **Un nodo reemplazado conserva sus comentarios y su ancla**, y un scalar reemplazado por otro
+  del mismo tipo conserva sus comillas. `replaceItem` conserva el comentario del ítem:
+  `- a # first` pasa a `- z # first`.
+- **`removeKey` quita el comentario que está sobre la clave** junto con la clave.
+- **`moveValue` lleva los comentarios, las anclas y los tags con el nodo.** Un movimiento que
+  dejaría un alias antes de su ancla se rechaza.
+- **`copyValue` copia el dato resuelto, no el ancla.** La copia de la tabla no tiene `&x`.
+- **`sortKeys` mueve los comentarios de cada clave con ella.**
+
+Un `merge` más largo muestra cómo sobreviven los comentarios: dos mappings se fusionan de forma
+recursiva, cualquier otra cosa (sequences incluidas) se reemplaza, y las claves que no se tocan
+conservan sus comentarios.
+
+```yaml title="config.yaml (antes)"
+a:
+  x: 1 # keep x
+  y:
+    - 1
+b: true
+```
+
+```ts title="factory.ts"
+await yaml.find("config.yaml").merge([], { a: { y: [2], z: 3 } });
+```
+
+```yaml title="config.yaml (después)"
+a:
+  x: 1 # keep x
+  y:
+    - 2
+  z: 3
+b: true
+```
+
+## Comentarios
+
+### `setComment(path, comment, { position? })`
+
+`position` es `"before"` (por defecto: líneas `#` sobre el nodo) o `"inline"` (después del nodo,
+en la misma línea). La op reemplaza cualquier comentario que ya esté en esa posición. Un
+`comment` de varias líneas escribe una línea `#` por línea, y un comentario idéntico no cambia
+nada. `[]` direcciona el documento: `"before"` es su comentario inicial, y no tiene posición
+inline.
+
+```yaml title="server.yaml (antes)"
+port: 80
+```
+
+```ts title="factory.ts"
+await yaml.find("server.yaml").setComment(["port"], "HTTP port");
+```
+
+```yaml title="server.yaml (después)"
+# HTTP port
+port: 80
+```
+
+### `removeComment(path, { position? })`
+
+Quita el comentario de esa posición. Si no hay comentario, no hace nada.
+
+```ts
+// server.yaml antes: port: 80 # http
+await yaml.find("server.yaml").removeComment(["port"], { position: "inline" });
+// -> port: 80
+```
+
+## Anclas y alias
+
+### `setAnchor(path, name)`
+
+Pone `&name` en el nodo de `path`. Rechaza un nombre con espacios o indicadores flow (`,[]{}`),
+un nombre que ya lleva otro nodo y una ruta cuyo valor es un alias. Poner la misma ancla no hace
+nada; poner otra distinta renombra el ancla y redirige sus alias.
+
+### `setAlias(path, anchor)`
+
+Asigna `*anchor` como valor de `path`, creando los padres que faltan como `setValue`. Se rechaza
+cuando ningún nodo lleva `anchor`, y cuando el alias quedaría antes de su ancla en el orden del
+documento.
+
+```yaml title="compose.yaml (antes)"
+base:
+  image: node
+web: {}
+```
+
+```ts title="factory.ts"
+await yaml.find("compose.yaml").setAnchor(["base"], "base").setAlias(["web"], "base");
+```
+
+```yaml title="compose.yaml (después)"
+base: &base
+  image: node
+web: *base
+```
+
+### `removeAnchor(path)`
+
+Quita el ancla y reemplaza cada alias que apunta a ella por una copia del valor, así el dato no
+cambia. Un nodo sin ancla no hace nada.
+
+```yaml title="compose.yaml (antes)"
+base: &base
+  image: node
+web: *base
+```
+
+```ts title="factory.ts"
+await yaml.find("compose.yaml").removeAnchor(["base"]);
+```
+
+```yaml title="compose.yaml (después)"
+base:
+  image: node
+web:
+  image: node
+```
+
+### `addMergeKey(path, anchor)`
+
+Agrega `<<: *anchor` como primera entrada del mapping de `path`. Se rechaza cuando ningún nodo
+lleva `anchor`, cuando el nodo anclado no es un mapping y cuando el valor de `path` no es un
+mapping. Si ya hay una merge key para esa ancla, no hace nada. Una segunda fuente de merge
+distinta convierte la entrada en `<<: [*a, *b]`.
+
+```yaml title="compose.yaml (antes)"
+base: &base
+  image: node
+web:
+  port: 80
+```
+
+```ts title="factory.ts"
+await yaml.find("compose.yaml").addMergeKey(["web"], "base");
+```
+
+```yaml title="compose.yaml (después)"
+base: &base
+  image: node
+web:
+  <<: *base
+  port: 80
+```
+
+## Presentación
+
+### `setStyle(path, style)`
+
+Las colecciones aceptan `"block"` o `"flow"`. Los scalars de tipo string aceptan `"plain"`,
+`"single"`, `"double"`, `"literal"` o `"folded"`. Solo cambia la presentación; el dato parseado
+sigue igual. La op rechaza:
+
+- un estilo de colección sobre un scalar, o un estilo de scalar sobre una colección;
+- un estilo con comillas o de bloque sobre algo que no es un string;
+- `"plain"` sobre un string que no se puede escribir plain, como `'123'` o `'x: y'`;
+- un alias, que no tiene estilo.
+
+```ts
+// config.yaml antes: x: [1, 2]
+await yaml.find("config.yaml").setStyle(["x"], "block");
+// -> x:
+// ->   - 1
+// ->   - 2
+```
+
+### `setTag(path, tag)`
+
+Asigna el tag del nodo y conserva su valor y su estilo; `null` quita el tag. Acepta tags locales
+(`!Ref`), tags del core (`!!str`), tags verbatim (`!<tag:example.com,2026:x>`) y handles con
+nombre declarados por una directiva `%TAG`. Cualquier otra cosa se rechaza. Asignar el tag
+actual no hace nada.
+
+```yaml title="template.yaml (antes)"
+bucket: my-bucket
+```
+
+```ts title="factory.ts"
+await yaml.find("template.yaml").setTag(["bucket"], "!Ref");
+```
+
+```yaml title="template.yaml (después)"
+bucket: !Ref my-bucket
+```
+
+## Documentos
+
+Estas dos ops no aceptan la opción `{ document }`; trabajan sobre la lista de documentos del
+archivo.
+
+### `addDocument(value, { index? })`
+
+Inserta un documento con `value` en `index`, por defecto al final. `index` debe estar en
+`0..length`.
+
+```ts
+// config.yaml antes: a: 1
+await yaml.find("config.yaml").addDocument({ b: 2 });
+// -> a: 1
+// -> ---
+// -> b: 2
+```
+
+### `removeDocument(index)`
+
+Quita el documento de `index`. Un índice fuera de rango se rechaza. Los documentos que quedan
+conservan sus bytes.
+
+```ts
+// config.yaml antes: a: 1, ---, b: 2
+await yaml.find("config.yaml").removeDocument(1);
+// -> a: 1
+```
+
+## Ediciones personalizadas con `.modify()`
+
+Para todo lo que las ops con nombre no cubren, incluidas las directivas y las líneas en blanco,
+usa `.modify(fn)`. El callback recibe el `YamlStream` vivo: su array `documents` tiene una
+instancia `Document` de `yaml` por cada documento del archivo, los mismos objetos que editan las
+ops con nombre. El módulo exporta la librería como `astLibrary`, así que no necesitas agregar
+`yaml` a tus propias dependencias. Un archivo vacío tiene `documents: []`.
+
+Esta factory marca el archivo como YAML 1.2 y pone una línea en blanco antes de la clave `port`:
+
+```yaml title="server.yaml (antes)"
+name: app
+port: 80
+```
+
+```ts title="factory.ts"
+import { find, astLibrary } from "@pbuilder/sdk/yaml";
+
+export default async () => {
+  await find("server.yaml").modify((stream) => {
+    const document = stream.documents[0];
+    if (document === undefined || !astLibrary.isMap(document.contents)) return;
+
+    document.directives!.yaml.explicit = true;
+    for (const pair of document.contents.items) {
+      if (astLibrary.isScalar(pair.key) && pair.key.value === "port") {
+        pair.key.spaceBefore = true;
+      }
+    }
+  });
+};
+```
+
+```yaml title="server.yaml (después)"
+%YAML 1.2
+---
+name: app
+
+port: 80
+```
+
+Una edición hecha con `.modify()` cuenta como tocar su documento, así que ese documento se vuelve
+a serializar con las normalizaciones de
+[Cómo se imprime el archivo](#cómo-se-imprime-el-archivo). Las reglas generales de las ediciones
+personalizadas (opera solo sobre el AST que recibes, `.modify()` no es un sandbox) están en
+[Modify](/es/guides/modify/#reglas-para-las-ediciones-personalizadas).
+
+## Para ir más lejos
+
+- [Dialecto JSON](/es/guides/json-dialect/): las reglas completas de las 15 ops estructurales.
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y qué versión respaldan cada
+  dialecto.
+- La [guía del dialecto YAML](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/yaml-dialect.md)
+  del SDK (en inglés).

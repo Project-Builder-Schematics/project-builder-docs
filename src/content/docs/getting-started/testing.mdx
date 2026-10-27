@@ -1,6 +1,6 @@
 ---
 title: Testing schematics
-description: Run a factory in memory with the SDK's testing harness and assert on the files it writes — no CLI, no engine, no disk.
+description: Run a factory in memory with the SDK's testing harness and assert on the files it writes, with no CLI, engine, or disk.
 sidebar:
   order: 5
 ---
@@ -13,8 +13,8 @@ Bun is not required for the in-memory factory example below: it runs on Node wit
 Vitest, Jest, or Rstest.
 </Aside>
 
-Run your factory through `runFactoryForTest`, then assert on the resulting tree — no
-CLI, no engine process, and no generated files on disk.
+Run your factory through `runFactoryForTest`, then assert on the resulting tree. This needs
+no CLI or engine process, and no generated files land on disk.
 
 ## A first test
 
@@ -192,12 +192,12 @@ The options bag's other field, `packageDir` (the schematic package's absolute di
 package-local verbs (`scaffold`, `copyIn`, `create({ templateFile })`) and opts the run
 into schema-derived input validation against the adjacent `schema.json`. Without it those
 verbs have nothing to resolve against. (When the CLI runs your schematic, it passes the
-package location automatically — this is only a testing concern. See
+package location automatically, so this is only a testing concern. See
 [Scaffolding](/guides/scaffolding/) for the verbs themselves.)
 
 ## What the harness does — and doesn't — fake
 
-Templates are stored **verbatim** in the test tree — rendering happens in the engine at
+Templates are stored **verbatim** in the test tree. Rendering happens in the engine at
 `builder execute` time, and the harness doesn't fake it. So asserting on a templated
 `create` means asserting on the raw `{= .name =}` text, not rendered output.
 
@@ -214,15 +214,15 @@ assertions above are specific to the Node smoke test; omit them when running on 
 
 ### Editor errors on `bun:test`?
 
-`bun test` strips types rather than checking them, so it runs fine either way — but your
+`bun test` strips types rather than checking them, so it runs fine either way, but your
 editor needs a few tsconfig settings to resolve the imports. Add `typescript` and
 `@types/bun` as dev dependencies, then make sure your `tsconfig.json` has:
 
-- `moduleResolution: "NodeNext"` (or `"bundler"`) — TypeScript's default legacy resolution
+- `moduleResolution: "NodeNext"` (or `"bundler"`): TypeScript's default legacy resolution
   cannot read a package's `exports` map, which is the only route to `@pbuilder/sdk`'s
   subpaths (`./testing`, `./commons`, and friends). Without this, your editor reports
   `Cannot find module '@pbuilder/sdk/commons'` even though the import is correct.
-- `allowImportingTsExtensions: true` — factories import the generated types with an
+- `allowImportingTsExtensions: true`: factories import the generated types with an
   explicit `.ts` extension (`./schema.generated.ts`), which TypeScript rejects by default.
 - If you restrict ambient types with `types`, include `"bun"` alongside any existing
   entries so the editor can resolve `bun:test` from `@types/bun`.

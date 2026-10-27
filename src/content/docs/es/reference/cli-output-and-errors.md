@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-La CLI `builder` es AI-first por diseño: cada comando tiene un modo JSON legible por máquinas, y cada error lleva un código estructurado con sugerencias accionables. Esta página documenta el contrato de salida de cara al usuario — formatos, temas, verbosidad — y la referencia completa de errores y códigos de salida.
+La CLI `builder` es AI-first por diseño: cada comando tiene un modo JSON legible por máquinas, y cada error lleva un código estructurado con sugerencias accionables. Esta página documenta el contrato de salida de cara al usuario (formatos, temas, verbosidad) y la referencia completa de errores y códigos de salida.
 
 ## Formatos de salida
 
@@ -34,7 +34,7 @@ builder execute default:my-component --output=./dist
 
 ## Verbosidad
 
-`--verbose` (global, solo en modo texto) imprime la salida de diagnóstico completa — sanitizada — para fallas de subprocesos y del motor, y habilita líneas de log de nivel debug. Varios remedios de error sugieren re-ejecutar con `--verbose` para ver la salida completa del subproceso (por ejemplo tras una falla de instalación del gestor de paquetes o una falla de codegen). La salida JSON no se ve afectada por `--verbose`.
+`--verbose` (global, solo en modo texto) imprime la salida de diagnóstico completa y sanitizada para fallas de subprocesos y del motor, y habilita líneas de log de nivel debug. Varios remedios de error sugieren re-ejecutar con `--verbose` para ver la salida completa del subproceso (por ejemplo tras una falla de instalación del gestor de paquetes o una falla de codegen). La salida JSON no se ve afectada por `--verbose`.
 
 ## Temas
 
@@ -58,7 +58,7 @@ BUILDER_THEME=light builder info
 BUILDER_THEME=dark builder --theme=light info
 ```
 
-La autodetección es perezosa: un `--theme` o `BUILDER_THEME` explícito la omite por completo. En configuraciones inusuales de automatización con PTY, la consulta del color de fondo puede demorar el arranque hasta 5 segundos antes de recurrir al fallback — establece `BUILDER_THEME` para evitar la detección. Cuando stdout está en un pipe o la terminal no reporta soporte de color, la salida se degrada con gracia a texto plano.
+La autodetección es perezosa: un `--theme` o `BUILDER_THEME` explícito la omite por completo. En configuraciones inusuales de automatización con PTY, la consulta del color de fondo puede demorar el arranque hasta 5 segundos antes de recurrir al fallback; establece `BUILDER_THEME` para evitar la detección. Cuando stdout está en un pipe o la terminal no reporta soporte de color, la salida se degrada con gracia a texto plano.
 
 ## Contrato de errores
 
@@ -66,13 +66,13 @@ Cada error que emite la CLI incluye:
 
 - un **`code`** estable y legible por máquinas (p. ej. `init_config_exists`),
 - un **mensaje** legible para humanos, y
-- una lista de **suggestions** no vacía — las entradas `Fix:` son remedios directos, las entradas `Note:` son contexto.
+- una lista de **suggestions** no vacía, donde las entradas `Fix:` son remedios directos y las entradas `Note:` son contexto.
 
 Algunos códigos también incluyen un **`reason`** que distingue variantes del mismo código, y un **`detail`** breve y sin rutas (por ejemplo, qué campo falló). Ambos aparecen en la salida JSON; las tablas siguientes indican el reason cuando cambia el remedio.
 
 En modo texto, los errores se renderizan como un bloque fijo en **stderr**, independientemente de a dónde se redirija stdout. En modo JSON, `builder execute` escribe en su lugar un envelope de error JSON estructurado en stdout (y el bloque de texto se suprime), de modo que los consumidores automatizados siempre encuentran el error en el stream que están parseando.
 
-Los prompts interactivos para entradas **sensibles** de un schematic se rechazan fuera de una TTY (`engine_non_tty_ask_unavailable`) — en scripts y CI, pasa el valor explícitamente con `builder execute <collection>:<schematic> --<name>=<value>`.
+Los prompts interactivos para entradas **sensibles** de un schematic se rechazan fuera de una TTY (`engine_non_tty_ask_unavailable`). En scripts y CI, pasa el valor explícitamente con `builder execute <collection>:<schematic> --<name>=<value>`.
 
 ## Códigos de salida
 
@@ -81,14 +81,14 @@ Cada error terminal se resuelve en exactamente una familia de salida:
 | Código | Familia | Significado |
 |---|---|---|
 | 0 | success | Sin error. |
-| 1 | internal | Fail-closed — causa no clasificable, códigos `*_not_implemented`, y todo código no asignado de otra manera. |
+| 1 | internal | Fail-closed: causa no clasificable, códigos `*_not_implemented`, y todo código no asignado de otra manera. |
 | 2 | usage | Validación de entrada/flag/argumento/estado del workspace en la CLI. |
 | 3 | config | La configuración declarada por el propio proyecto falta, está corrupta o escapa del workspace. |
 | 4 | sdk | Falla en la capa del SDK (`@pbuilder/sdk` ausente o con versión incompatible). |
 | 5 | engine | Falla en la capa del motor. |
 | 130 | cancelled | SIGINT (Ctrl-C), siguiendo la convención de shell 128+2. |
 
-La familia se deriva del error de CLI más externo en la cadena — nunca del código de salida propio de un subproceso envuelto.
+La familia se deriva del error de CLI más externo en la cadena, nunca del código de salida propio de un subproceso envuelto.
 
 ## Referencia de códigos de error
 
@@ -168,7 +168,7 @@ Un `init` fallido deja en disco las salidas escritas antes del fallo. Una vez co
 
 ### Errores del SDK
 
-`builder execute` verifica el SDK del workspace antes de ejecutar nada (ver [Requisito del SDK](/es/reference/cli-commands/#requisito-del-sdk) y [Origen del SDK](/es/reference/cli-commands/#origen-del-sdk)). Cada reason requiere una reparación distinta — solo `sdk_absent` significa que el SDK realmente falta.
+`builder execute` verifica el SDK del workspace antes de ejecutar nada (ver [Requisito del SDK](/es/reference/cli-commands/#requisito-del-sdk) y [Origen del SDK](/es/reference/cli-commands/#origen-del-sdk)). Cada reason requiere una reparación distinta, y solo `sdk_absent` significa que el SDK realmente falta.
 
 #### Instalación local
 
@@ -195,7 +195,7 @@ Fija una versión cuando necesites instalaciones reproducibles. Las sugerencias 
 
 #### Raíz externa
 
-Estos códigos solo aparecen cuando se indica una raíz externa — con `--sdk-root`, `BUILDER_SDK_ROOT` o `sdk.root` en `project-builder.json`. Sus mensajes dicen `sdk.root` sea cual sea de las tres la que indicó la raíz. `execute_sdk_version_mismatch` aplica a una raíz externa igual que a una instalación local. Ningún mensaje, detail ni campo JSON contiene la ruta configurada: las ubicaciones se reportan respecto de la raíz, como `the configured root itself` o `2 levels above sdk.root`.
+Estos códigos solo aparecen cuando se indica una raíz externa con `--sdk-root`, `BUILDER_SDK_ROOT` o `sdk.root` en `project-builder.json`. Sus mensajes dicen `sdk.root` sea cual sea de las tres la que indicó la raíz. `execute_sdk_version_mismatch` aplica a una raíz externa igual que a una instalación local. Ningún mensaje, detail ni campo JSON contiene la ruta configurada: las ubicaciones se reportan respecto de la raíz, como `the configured root itself` o `2 levels above sdk.root`.
 
 | Código | Reason | Salida | Mensaje | Reparación |
 |---|---|---|---|---|
@@ -219,8 +219,8 @@ Estos códigos solo aparecen cuando se indica una raíz externa — con `--sdk-r
 
 | Advertencia | Significado |
 |---|---|
-| `warn_sdk_root_group_writable` | Un directorio por encima de la raíz es escribible por el grupo, así que cualquiera de ese grupo podría reemplazar el SDK. La ejecución continúa; el mensaje indica la profundidad y el remedio — `chmod g-w` a ese directorio, o mover el SDK bajo un directorio en el que solo tú puedas escribir. Las instalaciones globales bajo un prefijo compartido, como el de Homebrew, suelen dispararla. |
-| `warn_sdk_root_ambient` | La raíz vino de `BUILDER_SDK_ROOT`, no de `--sdk-root`. El mensaje nombra la variable, nunca la ruta — revisa la propia variable para saber qué SDK se ejecutó. |
+| `warn_sdk_root_group_writable` | Un directorio por encima de la raíz es escribible por el grupo, así que cualquiera de ese grupo podría reemplazar el SDK. La ejecución continúa; el mensaje indica la profundidad y el remedio: `chmod g-w` a ese directorio, o mover el SDK bajo un directorio en el que solo tú puedas escribir. Las instalaciones globales bajo un prefijo compartido, como el de Homebrew, suelen dispararla. |
+| `warn_sdk_root_ambient` | La raíz vino de `BUILDER_SDK_ROOT`, no de `--sdk-root`. El mensaje nombra la variable, nunca la ruta, así que revisa la propia variable para saber qué SDK se ejecutó. |
 
 ### `pbuilder-codegen` no se encuentra o se ejecuta otra versión
 
@@ -228,10 +228,10 @@ No es un error de `builder`: viene de tu ejecutor de paquetes (`npx`, `bunx`) cu
 
 | Situación | Qué pasa |
 |---|---|
-| `@pbuilder/sdk` no está instalado | El ejecutor no encuentra el binario — instala el SDK |
-| El SDK viene de una raíz externa (`sdk.root`, `--sdk-root` o `BUILDER_SDK_ROOT`) | `node_modules/@pbuilder/sdk` es un enlace que ningún gestor de paquetes instaló, así que no hay shim `node_modules/.bin/pbuilder-codegen`. El ejecutor reporta que falta el binario aunque el SDK funciona — o, si hay un SDK instalado globalmente, `npx` puede ejecutar en silencio **esa copia global**, posiblemente de otra versión. Las versiones recientes de pnpm instalan antes de `pnpm exec`, lo que escribe un lockfile en el proyecto |
+| `@pbuilder/sdk` no está instalado | El ejecutor no encuentra el binario. Instala el SDK |
+| El SDK viene de una raíz externa (`sdk.root`, `--sdk-root` o `BUILDER_SDK_ROOT`) | `node_modules/@pbuilder/sdk` es un enlace que ningún gestor de paquetes instaló, así que no hay shim `node_modules/.bin/pbuilder-codegen`. El ejecutor reporta que falta el binario aunque el SDK funciona. Si hay un SDK instalado globalmente, `npx` puede ejecutar en silencio **esa copia global** en su lugar, posiblemente de otra versión. Las versiones recientes de pnpm instalan antes de `pnpm exec`, lo que escribe un lockfile en el proyecto |
 
-Con una raíz externa, ejecuta el script directamente — ver [Generación de tipos con `sdk.root`](/es/guides/type-generation/#cuando-el-sdk-viene-de-sdkroot). `builder new schematic` no necesita el shim: regenera los tipos desde `sdk.root` por su cuenta.
+Con una raíz externa, ejecuta el script directamente; ver [Generación de tipos con `sdk.root`](/es/guides/type-generation/#cuando-el-sdk-viene-de-sdkroot). `builder new schematic` no necesita el shim: regenera los tipos desde `sdk.root` por su cuenta.
 
 ### Raíz del manifiesto
 

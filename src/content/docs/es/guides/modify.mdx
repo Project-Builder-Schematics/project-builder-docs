@@ -1,25 +1,27 @@
 ---
 title: Modify
-description: Haz ediciones conscientes del AST sobre archivos TypeScript y TSX con los dialectos incorporados — imports idempotentes, ops estructuradas y el escape .modify().
+description: Haz ediciones conscientes del AST sobre archivos TypeScript y TSX con los dialectos incorporados, incluidos los imports idempotentes, las ops estructuradas y el escape .modify().
 sidebar:
   order: 4
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Cuando la mutación a nivel de string no alcanza — "agrega un import a este módulo", "asigna una
-prop a este elemento JSX" — los **dialectos** proveen operaciones estructuradas y conscientes
+Cuando la mutación a nivel de string no alcanza ("agrega un import a este módulo", "asigna una
+prop a este elemento JSX"), los **dialectos** proveen operaciones estructuradas y conscientes
 del AST para un tipo de archivo. Un dialecto nunca edita texto con buscar-y-reemplazar: parsea
 el archivo a un **AST**, muta el árbol e imprime el resultado de vuelta. Cada tipo de archivo
-recibe la librería de AST que mejor le calza — los dos dialectos que se distribuyen hoy,
-`@pbuilder/sdk/typescript` y `@pbuilder/sdk/react`, están ambos construidos sobre el AST propio
-de TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática.
+recibe la librería de AST que mejor le calza. Los dialectos `@pbuilder/sdk/typescript` y
+`@pbuilder/sdk/react` que cubre esta página están ambos construidos sobre el AST propio de
+TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática. Los archivos
+JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-dialect/) y
+[Dialecto YAML](/es/guides/yaml-dialect/).
 
 ## Cómo funciona un handle de dialecto
 
 El punto de entrada de un dialecto es su propio `find(path)`: abre un **handle coalescente y
 awaitable**. Cada op que encadenas muta el mismo AST vivo, y el handle se serializa a
-exactamente **una** directiva estilo `replaceContent` cuando hace flush — encadenar tres ops no
+exactamente **una** directiva estilo `replaceContent` cuando hace flush. Encadenar tres ops no
 produce tres escrituras.
 
 ```ts
@@ -32,13 +34,13 @@ await ts.find("src/index.ts")
 
 Una lectura (`.read()` sobre el handle, o cualquier lectura sobre cualquier ruta) drena primero
 la directiva abierta; una cadena con una lectura a mitad de cadena produce exactamente dos
-directivas, acumulativas — ninguna edición se pierde.
+directivas acumulativas, y ninguna edición se pierde.
 
-El handle es un **thenable** — la única desviación asíncrona respecto de los verbos, por lo
+El handle es un **thenable**, la única desviación asíncrona respecto de los verbos, por lo
 demás síncronos, del SDK. `await` no es requisito para la corrección: el límite del run drena
 todos los handles pendientes antes de que el run haga flush, así que un `await` olvidado
 igualmente confirma su edición, y una cadena que lanza igualmente hace aflorar su error
-contenido en el límite del run — nunca como un unhandled rejection. Haz `await` de la cadena tú
+contenido en el límite del run en lugar de como un unhandled rejection. Haz `await` de la cadena tú
 mismo cuando necesites secuenciar una lectura después de tu propia escritura, o para observar un
 fallo localmente en tu propio `try`/`catch`.
 
@@ -54,11 +56,11 @@ await ts.find("src/index.ts")
 
 | Op | Qué hace |
 |---|---|
-| `addImport(name, from)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente — llamarla dos veces nunca duplica el import. |
+| `addImport(name, from)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente: llamarla dos veces nunca duplica el import. |
 | `removeImport(name, from)` | Elimina el binding nombrado; borra la sentencia completa cuando era el último. Idempotente sobre un binding ausente. |
 | `addFunction(name, source, opts?)` | Agrega una función de nivel superior al final. `source` **incluye** las llaves (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Agrega una variable de nivel superior al final (`kind` por defecto es `const`). |
-| `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves — la op las agrega. |
+| `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves, y la op las agrega. |
 | `.modify(fn)` | El escape universal: acceso directo a [ts-morph](https://ts-morph.com) sobre el AST del archivo para todo lo que las ops nombradas no cubren. |
 
 Nota el contraste deliberado entre las dos convenciones de `source`:
@@ -73,7 +75,7 @@ await ts.find("src/index.ts").addClass("Point", "  x = 0;");
 // -> class Point {\n  x = 0;\n}
 ```
 
-`addVariable` emite `{export }{kind} {name} = {initializer};` — `kind` acepta `"const"` (por
+`addVariable` emite `{export }{kind} {name} = {initializer};`. `kind` acepta `"const"` (por
 defecto), `"let"` o `"var"`:
 
 ```ts
@@ -82,20 +84,20 @@ await ts.find("src/index.ts").addVariable("counter", "0", { export: true, kind: 
 ```
 
 **Reglas de colisión.** Las ops `add*` fallan ruidosamente ante una colisión de nombre con una
-declaración de valor o un binding de import existente — dos declaraciones de valor compartiendo
+declaración de valor o un binding de import existente, porque dos declaraciones de valor compartiendo
 un nombre es TypeScript inválido. Un `type`/`interface` que comparte el nombre **no** colisiona
 (TypeScript permite legalmente que un valor y un tipo compartan identificador).
 
 <Aside type="caution" title="Strings de source insertados tal cual">
-Los strings de `source`/`initializer` se insertan **tal cual** — nunca se validan ni se
-sanitizan — así que el autor es dueño de su sintaxis, y cualquier cosa derivada de entrada no
+Los strings de `source`/`initializer` se insertan **tal cual**, sin validarse ni
+sanitizarse, así que el autor es dueño de su sintaxis, y cualquier cosa derivada de entrada no
 confiable (opciones de schema, respuestas del CLI, datos de red) es responsabilidad del autor
 sanitizarla.
 </Aside>
 
 ## El dialecto de React
 
-`@pbuilder/sdk/react` muta archivos `.tsx` — `find()` requiere la extensión `.tsx` explícita
+`@pbuilder/sdk/react` muta archivos `.tsx`, y `find()` requiere la extensión `.tsx` explícita
 (las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El paquete de ops de la
 v1 es deliberadamente mínimo: dos ops estructuradas, con `.modify(fn)` como escape para todo lo
 demás:
@@ -114,12 +116,12 @@ await react
 
 | Op | Qué hace |
 |---|---|
-| `addImport(name, from)` | El mismo contrato que la del dialecto de TypeScript — idempotente, solo bindings nombrados (sin imports default ni de namespace en la v1). |
-| `setJsxProp(element, prop, value?)` | Asigna una prop en **el único** elemento con ese nombre de tag — cero o múltiples coincidencias rechazan ruidosamente. `value` toma tres formas: `'"hi"'` (string), `'{count}'` (expresión), u omitido (shorthand booleano). |
+| `addImport(name, from)` | El mismo contrato que la del dialecto de TypeScript: idempotente, solo bindings nombrados (sin imports default ni de namespace en la v1). |
+| `setJsxProp(element, prop, value?)` | Asigna una prop en **el único** elemento con ese nombre de tag. Cero o múltiples coincidencias rechazan ruidosamente. `value` toma tres formas: `'"hi"'` (string), `'{count}'` (expresión), u omitido (shorthand booleano). |
 
 Como `addImport` es solo de bindings nombrados, `addImport("React", "react")` siempre imprime
-`import { React } from "react"`, nunca `import React from "react"` — los imports default y de
-namespace son alcance futuro, no un descuido.
+`import { React } from "react"`, nunca `import React from "react"`. Los imports default y de
+namespace se dejaron a propósito para un alcance futuro.
 
 Dos sutilezas específicas de React:
 
@@ -129,13 +131,13 @@ Dos sutilezas específicas de React:
   `<Button {...rest} onClick={safe} />`, y `safe` gana incluso si `rest` también provee un
   `onClick`.
 - **Rechazo por colisión.** `addImport` rechaza cuando `name` ya está ligado en otra parte del
-  archivo bajo un binding distinto — otro módulo, un alias del mismo módulo o un specifier
+  archivo bajo un binding distinto: otro módulo, un alias del mismo módulo o un specifier
   type-only, o una declaración de valor de nivel superior (`function`/`const`/`class`/…) que
   comparte el nombre. No hay argumento de alias para esquivarlo; renombrar el binding existente
   o elegir otro `name` corre por tu cuenta.
 
 <Aside type="caution" title="El límite de confianza de value">
-El `value` de `setJsxProp` se emite tal cual dentro de código ejecutable — el mismo límite de
+El `value` de `setJsxProp` se emite tal cual dentro de código ejecutable, con el mismo límite de
 confianza que los strings `source` de TypeScript. El SDK no realiza validación, escapado ni
 sanitización sobre él. En contraste, `element` y `prop` son argumentos de nombre validados y no
 son un canal de código confiable.
@@ -152,16 +154,17 @@ ahí?".
 ## Ediciones personalizadas con `.modify()`
 
 Las ops nombradas cubren las ediciones comunes. Cuando el cambio que necesitas no está en ese
-vocabulario, usa `.modify(fn)` — todo handle de dialecto lo tiene. Elige la herramienta según la
-edición, no por costumbre:
+vocabulario, usa `.modify(fn)`, que todo handle de dialecto tiene. Elige la herramienta según la
+edición:
 
 | Necesitas… | Usa |
 |---|---|
 | Agregar o quitar un import, agregar una declaración de nivel superior, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
 | Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
-| Editar un tipo de archivo que ningún dialecto cubre — JSON, YAML, Markdown, CSS… | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
+| Editar un archivo JSON o YAML | El dialecto [JSON](/es/guides/json-dialect/) o [YAML](/es/guides/yaml-dialect/) |
+| Editar un tipo de archivo que ningún dialecto cubre, como Markdown o CSS | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
 
-El callback recibe **solo el AST** — un `SourceFile` de ts-morph en los dos dialectos actuales,
+El callback recibe **solo el AST**: un `SourceFile` de ts-morph en los dos dialectos de esta página,
 la misma instancia viva que mutan las ops nombradas. No hay un segundo argumento. Las ops
 nombradas y las llamadas a `.modify()` encadenadas en un mismo handle siguen generando **una
 sola** escritura, en el orden de la cadena.
@@ -181,7 +184,7 @@ astLibrary.Node.isStringLiteral(node);           // runtime helper
 type Routes = astLibrary.ArrayLiteralExpression; // type-only access
 ```
 
-Usa el `astLibrary` del dialecto cuyo handle estás editando — `@pbuilder/sdk/typescript` para
+Usa el `astLibrary` del dialecto cuyo handle estás editando: `@pbuilder/sdk/typescript` para
 `.ts`, `@pbuilder/sdk/react` para `.tsx`. No necesitas agregar ts-morph a tus propias
 dependencias para trabajar con el AST. Cada dialecto es dueño de su librería y su versión; qué
 librería respalda a cada dialecto está en [Librerías AST](/es/reference/ast-libraries/).
@@ -233,7 +236,7 @@ Ejecutarla otra vez con la misma entrada deja el archivo sin cambios.
 ### Ejemplo: agregar un `<Route>` (React)
 
 `setJsxProp` edita props, no hijos. Esta factory combina una op nombrada con `.modify()` para
-importar una página y agregar un `<Route>` dentro de `<Routes>` — una sola escritura para ambas
+importar una página y agregar un `<Route>` dentro de `<Routes>`, con una sola escritura para ambas
 cosas:
 
 ```tsx title="src/App.tsx (antes)"
@@ -295,7 +298,7 @@ export function App() {
 }
 ```
 
-Ambos ejemplos verifican antes de editar, así que una re-ejecución no escribe nada — la misma
+Ambos ejemplos verifican antes de editar, así que una re-ejecución no escribe nada. Es la misma
 [idempotencia](#idempotencia-seguro-de-re-ejecutar) que te dan las ops nombradas.
 
 ### Reglas para las ediciones personalizadas
@@ -305,15 +308,15 @@ Ambos ejemplos verifican antes de editar, así que una re-ejecución no escribe 
   separado: un `Node` o `SourceFile` creado con ella no es intercambiable con el AST del
   callback, aunque sea la misma versión. No pases objetos a través de esa frontera, y no asumas
   que los objetos AST de dialectos distintos son intercambiables.
-- **`.modify()` se ejecuta con todos los privilegios del proceso — no es un sandbox.** Tus
+- **`.modify()` se ejecuta con todos los privilegios del proceso y no es un sandbox.** Tus
   propios callbacks son de tu confianza; trata con el mismo criterio a los dialectos u op-packs
   de terceros construidos sobre él.
 - **Los strings que insertas son código.** El texto que pasas a `addElement`, `setBodyText` y
-  métodos similares se inserta tal cual — sanitiza todo lo que venga de la entrada del usuario.
+  métodos similares se inserta tal cual, así que sanitiza todo lo que venga de la entrada del usuario.
 
 <Aside type="note" title="Mezclar ops de AST con replaceContent">
 El `.replaceContent(content)` de un handle de dialecto se rechaza mientras una op de AST
-(nombrada o `.modify()`) sigue pendiente en el mismo handle — la sobrescritura completa perdería
+(nombrada o `.modify()`) sigue pendiente en el mismo handle, porque la sobrescritura completa perdería
 en silencio la edición en buffer. La salida documentada es `.read()`, que drena primero la
 edición pendiente:
 
@@ -326,11 +329,14 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Archivos sin dialecto
 
-Hoy existen dialectos para `.ts` y `.tsx`. Cualquier otro archivo — `package.json`, una
-configuración YAML, un índice en Markdown, una hoja de estilos — se puede editar igual con `find`
+Hoy existen dialectos para `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml` y `.yml`. Cualquier otro
+archivo (un índice en Markdown, una hoja de estilos, un archivo `.env`) se puede editar igual con `find`
 de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `read()` y los verbos
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
 transfórmalo con el parser que corresponda al formato y escribe el resultado.
+
+El ejemplo usa un archivo JSON porque la ida y vuelta es corta. En una factory real, edita JSON
+con el [dialecto JSON](/es/guides/json-dialect/), que conserva el formato y los comentarios del archivo.
 
 ```json title="config/features.json (antes)"
 {
@@ -366,7 +372,7 @@ export default async (input: { flag: string }) => {
 
 Dos diferencias con una edición de dialecto:
 
-- **El formato es responsabilidad tuya.** Volver a serializar reescribe todo el archivo — aquí,
+- **El formato es responsabilidad tuya.** Volver a serializar reescribe todo el archivo. Aquí,
   `JSON.stringify` reacomoda el array. Usa un parser que preserve el formato cuando la
   disposición importe.
 - **Maneja los tres estados de lectura.** `read()` resuelve `undefined` para un archivo que no
@@ -375,15 +381,17 @@ Dos diferencias con una edición de dialecto:
 
 ## Para ir más lejos
 
-- [Librerías AST](/es/reference/ast-libraries/) — qué librería y versión respaldan a cada
+- [Dialecto JSON](/es/guides/json-dialect/) y [Dialecto YAML](/es/guides/yaml-dialect/): ops
+  nombradas para archivos JSON, JSONC y YAML que conservan comentarios y formato.
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y versión respaldan a cada
   dialecto, y cómo las expone `astLibrary`.
 - **Construir un dialecto propio** es una superficie para contribuidores. Todo dialecto debe
   exportar su librería completa como `astLibrary`, y su fixture de conformance debe pasar el
-  módulo real y un ejercicio de la librería — ver la
+  módulo real y un ejercicio de la librería. Ver la
   [guía de autoría de dialectos](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration)
   del SDK.
 
-La familia de dialectos está pensada para crecer: el soporte para más tipos de archivo como
-**HTML y CSS** (cada uno respaldado por su propia librería de parser/AST), y dialectos para
-frameworks como **Angular, Vue y Svelte**, están planificados. Mientras tanto, edita esos
+El soporte para más tipos de archivo como HTML y CSS (cada uno respaldado por su propia
+librería de parser/AST), y dialectos para frameworks como Angular, Vue y Svelte, están
+planificados. Mientras tanto, edita esos
 archivos con `find` de `@pbuilder/sdk/commons`.

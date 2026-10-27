@@ -9,19 +9,19 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 Cada paso de abajo es ejecutable exactamente como está escrito. Inicializarás un
 workspace, generarás el esqueleto de un schematic, declararás sus entradas tipadas,
-escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia en acción.
+escribirás el factory y lo ejecutarás dos veces para ver la idempotencia en acción.
 [Instala la CLI y Bun](/es/getting-started/installation/) primero si aún no lo has hecho.
 
 <Steps>
 
-1. **Inicializa un workspace** (dentro de cualquier proyecto — nuevo o existente):
+1. **Inicializa un workspace** (dentro de cualquier proyecto, nuevo o existente):
 
    ```sh
    builder init
    ```
 
    Esto crea `project-builder.json` (la configuración del workspace), una carpeta
-   `schematics/` y una skill de IA en `.claude/skills/pbuilder/` — una referencia de
+   `schematics/` y una skill de IA en `.claude/skills/pbuilder/`: una referencia de
    comandos que tu agente de código detecta automáticamente, sin configuración adicional.
    También instala `@pbuilder/sdk` como dependencia de desarrollo, creando primero un
    `package.json` si la carpeta no tiene uno.
@@ -43,7 +43,7 @@ escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia 
 
    `project-builder.json` ahora lo lista bajo `collections.default.hello`.
 
-3. **Declara las entradas** — reemplaza el contenido del `schema.json` generado con lo
+3. **Declara las entradas.** Reemplaza el contenido del `schema.json` generado con lo
    siguiente; toda propiedad necesita un `label` (el codegen falla sin él):
 
    ```json title="schematics/hello/schema.json"
@@ -69,10 +69,10 @@ escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia 
    bunx pbuilder-codegen schematics/hello
    ```
 
-   Esto reescribe `schema.generated.ts` con un tipo `Input` derivado de tu schema — tu
+   Esto reescribe `schema.generated.ts` con un tipo `Input` derivado de tu schema, así que tu
    factory queda tipado contra el schema, nunca contra una forma escrita a mano. Para
    regenerar todos los schematics registrados de una vez, ejecuta `bunx pbuilder-codegen`
-   sin argumentos — ver [Generación de tipos](/es/guides/type-generation/).
+   sin argumentos (ver [Generación de tipos](/es/guides/type-generation/)).
 
 5. **Escribe el factory:**
 
@@ -97,11 +97,11 @@ escribirás el factory y lo ejecutarás — dos veces, para ver la idempotencia 
    };
    ```
 
-   El engine invoca el **export por defecto** del módulo — ese es el factory. Este
+   El engine invoca el **export por defecto** del módulo, que es el factory. Este
    construye sus cadenas de salida en TypeScript; el
    [lenguaje de plantillas](/es/guides/templates/) es la alternativa declarativa.
 
-6. **Ejecútalo** — `default:hello` es `<collection>:<schematic>` tal como quedó registrado
+6. **Ejecútalo.** `default:hello` es `<collection>:<schematic>` tal como quedó registrado
    en `project-builder.json`; las entradas se pasan como flags de la CLI:
 
    ```sh
@@ -126,46 +126,46 @@ Ahora ejecútalo otra vez **con una entrada distinta**:
 builder execute default:hello --name=orders
 ```
 
-`services.txt` crece una línea en lugar de ser aplastado — ese es el bucle de relectura
-del paso 5 haciendo su trabajo. Volver a ejecutarlo con el **mismo** nombre, en cambio, se
+`services.txt` crece una línea en lugar de ser aplastado, gracias al bucle de relectura
+del paso 5. Volver a ejecutarlo con el **mismo** nombre, en cambio, se
 rechaza con `path-collision`: `create` es fail-closed sobre una ruta existente (pasa
 `force: true` para sobrescribir deliberadamente), y como una ejecución fallida no escribe
 nada, tu árbol queda exactamente como estaba.
 
 <Aside type="tip">
 Haz que las mutaciones sean idempotentes. Los factories se vuelven a ejecutar contra
-proyectos ya generados — comprueba si tu marcador, import o entrada ya está presente antes
+proyectos ya generados, así que comprueba si tu marcador, import o entrada ya está presente antes
 de insertarlo. El factory de arriba muestra la mecánica de relectura; un factory de
 producción también omitiría el append cuando el nombre ya está en la lista.
 </Aside>
 
 <Aside type="note">
-Si tu editor marca el import con extensión `.ts` o `bun:test`, solo son ajustes de
-tsconfig que faltan — consulta [Probar schematics](/es/getting-started/testing/); Bun por
+Si tu editor marca el import con extensión `.ts` o `bun:test`, la causa son ajustes de
+tsconfig que faltan (consulta [Probar schematics](/es/getting-started/testing/)); Bun por
 sí solo corre bien sin ellos.
 </Aside>
 
 ## Dos reglas que ahorran tiempo de depuración
 
 - **Pasa siempre `options: {}` a `create`**, incluso cuando la plantilla no tiene tokens.
-  El tipo lo exige — y en sitios de llamada sin tipos (JS plano, `any`) omitirlo pone
+  El tipo lo exige, y en sitios de llamada sin tipos (JS plano, `any`) omitirlo pone
   `undefined` en el lote de directivas, y la escritura se rechaza por no ser
   representable.
 - **`find().read()` es una tricotomía**: `undefined` significa que el archivo no existe,
-  `""` significa que existe y está vacío. Ramifica con `=== undefined` — nunca con
+  `""` significa que existe y está vacío. Ramifica con `=== undefined`, nunca con
   `if (!content)`, que confunde ambos casos.
 
 ## Próximos pasos
 
-- **Pruébalo** sin la CLI ni un engine en ejecución —
+- **Pruébalo** sin la CLI ni un engine en ejecución:
   [Probar schematics](/es/getting-started/testing/).
-- [Verbos de mutación](/es/guides/mutation-verbs/) — todo lo que un factory puede hacerle
+- [Verbos de mutación](/es/guides/mutation-verbs/): todo lo que un factory puede hacerle
   al árbol.
-- [Plantillas](/es/guides/templates/) — el lenguaje de plantillas declarativo dentro de
+- [Plantillas](/es/guides/templates/): el lenguaje de plantillas declarativo dentro de
   `create()`.
-- [Scaffolding](/es/guides/scaffolding/) — replica una carpeta completa de plantillas en
+- [Scaffolding](/es/guides/scaffolding/): replica una carpeta completa de plantillas en
   lugar de escribir un `create()` por archivo.
-- [Dry-run](/es/guides/dry-run/) — previsualiza los cambios planeados de un factory antes
+- [Dry-run](/es/guides/dry-run/): previsualiza los cambios planeados de un factory antes
   de que algo se confirme.
-- [Manejo de errores](/es/guides/error-handling/) — el contrato estructurado
+- [Manejo de errores](/es/guides/error-handling/): el contrato estructurado
   `AuthoringError` de una ejecución rechazada.
