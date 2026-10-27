@@ -13,10 +13,12 @@ Each [dialect](/guides/modify/) parses its file type with an AST library of its 
 |---|---|---|---|---|---|
 | TypeScript | `@pbuilder/sdk/typescript` | ts-morph | `28.0.0` — exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
 | React / TSX | `@pbuilder/sdk/react` | ts-morph | `28.0.0` — exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
+| JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1` — exact pin in the SDK's `dependencies` | [jsonc-parser on GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` receives a `JsonDocument` (`{ text }`); the full library is exported as `astLibrary` |
+| YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1` — exact pin in the SDK's `dependencies` | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` receives a `YamlStream` (`{ documents }`) of `Document` instances; the full library is exported as `astLibrary` |
 
 The version column is the dependency the SDK's `package.json` declares, not a runtime check of what your package manager installed. It is also unrelated to the TypeScript compiler the SDK uses for its own development.
 
-No other dialects exist yet. HTML, CSS and framework-specific dialects are planned; until they ship, edit those files with [`find` from `@pbuilder/sdk/commons`](/guides/modify/#files-without-a-dialect).
+HTML, CSS and framework-specific dialects are planned; until they ship, edit those files with [`find` from `@pbuilder/sdk/commons`](/guides/modify/#files-without-a-dialect).
 
 ## `astLibrary`
 
@@ -32,11 +34,11 @@ type Decl = astLibrary.VariableDeclaration;  // types
 
 - It is the whole library, forwarded natively — not a curated subset.
 - The `.modify()` callback still receives only the AST. `astLibrary` is imported, never passed in.
-- You do not need a direct ts-morph dependency to work with a dialect's AST.
+- You do not need a direct dependency on ts-morph, jsonc-parser or yaml to work with a dialect's AST.
 
 ## Ownership and compatibility
 
-- **Each dialect owns its library**, its version and where it is loaded from. The two current dialects happen to declare the same library at the same version; that is not a rule for future dialects.
+- **Each dialect owns its library**, its version and where it is loaded from. The TypeScript and React dialects happen to declare the same library at the same version; that is not a rule for other dialects.
 - **Use the `astLibrary` of the dialect you are editing with.** Matching library names or version strings do not make objects from different installations — or from different dialects — interchangeable.
 - **A ts-morph you install yourself is a separate copy.** Nodes created from it must not be mixed with the callback's AST.
 

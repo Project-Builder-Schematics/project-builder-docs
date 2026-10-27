@@ -1,0 +1,416 @@
+---
+title: JSON dialect
+description: Edit .json and .jsonc files by path with @pbuilder/sdk/json, using fifteen named ops that change only the bytes they must, plus the .modify() escape hatch.
+sidebar:
+  order: 10
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@pbuilder/sdk/json` edits `.json` and `.jsonc` files structurally. Instead of reading
+`package.json`, parsing it, and writing the whole file back with `replaceContent`, you address a
+value by its **path** and call a named op. Each op changes only the bytes it must: comments, key
+order, blank lines, indentation, line endings, a UTF-8 BOM, and the trailing newline all survive.
+
+The handle works like every other dialect handle: ops chained on it coalesce into one write, and
+`await` follows the rules in [How a dialect handle works](/guides/modify/#how-a-dialect-handle-works).
+
+## Opening a file
+
+```json title="package.json (before)"
+{
+  "name": "app"
+}
+```
+
+```ts title="factory.ts"
+import * as json from "@pbuilder/sdk/json";
+
+export default async () => {
+  await json
+    .find("package.json")
+    .setValue(["scripts", "build"], "tsc")
+    .appendItem(["files"], "dist", { unique: true });
+};
+```
+
+```json title="package.json (after)"
+{
+  "name": "app",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ]
+}
+```
+
+`find(path)` accepts a file name that ends in `.json` or `.jsonc` and has a name before the
+extension. Any other path, such as `config.yaml`, `README`, or a bare `.json`, throws
+synchronously. A file that is not valid JSON fails with `could not parse "<path>"`; comments and
+trailing commas are allowed. An empty file is a document with no value, and `setValue` creates
+its root.
+
+The snippets in the rest of this page leave out the factory wrapper.
+
+## Paths and values
+
+A path is an array of segments. A `string` segment names an object key, a `number` segment
+indexes an array, and `[]` is the document root:
+
+```ts
+["scripts", "build"]  // the "build" key inside "scripts"
+["plugins", 0]        // the first item of "plugins"
+[]                    // the whole document
+```
+
+Keys that contain dots or slashes need no escaping, because a path is never a joined string.
+Number segments must be non-negative integers.
+
+Values are typed `JsonValue`: `null`, booleans, finite numbers, strings, arrays, and plain
+objects. Both `JsonValue` and `JsonPath` are exported as types from `@pbuilder/sdk/json`.
+
+An `as never` cast or an untyped JavaScript factory can still pass any value past the type, so every
+value is also validated at runtime, before the document changes. These values reject, and the
+error names the path inside the value:
+
+- `undefined`, functions, symbols, and `bigint`
+- `NaN` and `Infinity`
+- class instances such as `Date` and `Map`
+- cyclic values
+
+```ts
+await json.find("config.json").setValue(["when"], new Date() as never);
+// rejects: value at [] is a Date instance, which JSON cannot represent.
+```
+
+## Rejections
+
+Every rejection is an error whose message starts with `dialect operation failed: ` and names the
+op and path, for example:
+
+```text
+dialect operation failed: addKey(["a"]) — the key already exists with a different value.
+```
+
+A rejected op emits no directive.
+
+A path that does not fit the document also rejects: a segment that crosses a scalar, a `number`
+segment on an object, or a `string` segment on an array. Only `setValue`, `merge`, `appendItem`,
+`updateValue`, and the destinations of `moveValue` and `copyValue` create missing parents, and
+they only create objects. A path whose missing parent would have to be an array rejects.
+
+## Keys
+
+### `setValue(path, value, options?)`
+
+Upserts the value at `path`, creating missing parent objects. `setValue([], value)` replaces the
+whole document. Setting a value deep-equal to the current one leaves the bytes unchanged.
+
+```ts
+// package.json before:
+// {
+//   "name": "app"
+// }
+await json.find("package.json").setValue(["scripts", "build"], "tsc");
+// -> {
+// ->   "name": "app",
+// ->   "scripts": {
+// ->     "build": "tsc"
+// ->   }
+// -> }
+```
+
+`options` is `{ before?: string; after?: string }`. It places a newly created key next to an
+existing sibling, with the same rules as `addKey`, and needs a path that ends in an object key.
+
+### `addKey(path, value, options?)`
+
+Adds an object key that does not exist yet. When the key exists with a deep-equal value, the op is
+a no-op, so it is safe to re-run. When it exists with a different value, the op rejects. The
+parent object must exist.
+
+`{ before }` or `{ after }` places the new key next to a sibling. An absent sibling, or both
+options at once, reject. The option has no effect when the key already exists.
+
+```ts
+// package.json before:
+// {
+//   "name": "app",
+//   "version": "1.0.0"
+// }
+await json.find("package.json").addKey(["private"], true, { after: "name" });
+// -> {
+// ->   "name": "app",
+// ->   "private": true,
+// ->   "version": "1.0.0"
+// -> }
+```
+
+### `removeKey(path)`
+
+Removes the member and its separator comma. An absent key is a no-op.
+
+```ts
+// config.json before: { "a": 1, "b": 2 }
+await json.find("config.json").removeKey(["b"]);
+// -> { "a": 1 }
+```
+
+### `renameKey(path, newKey)`
+
+Renames a key in place, keeping its value, position, and comments. When the old key is absent and
+`newKey` already exists, the key was already renamed and the op is a no-op. When both keys exist,
+or neither does, the op rejects.
+
+```ts
+// config.json before: { "a": 1, "b": 2, "c": 3 }
+await json.find("config.json").renameKey(["b"], "beta");
+// -> { "a": 1, "beta": 2, "c": 3 }
+```
+
+## Arrays
+
+Every array op rejects when the value at `path` exists and is not an array.
+
+### `insertItem(path, index, value)`
+
+Inserts `value` before the item at `index`. `index` equal to the array length appends. An index
+outside `0..length` rejects.
+
+```ts
+// config.json before: { "x": [1, 3] }
+await json.find("config.json").insertItem(["x"], 1, 2);
+// -> { "x": [1, 2, 3] }
+```
+
+### `appendItem(path, value, options?)`
+
+Appends `value` at the end, creating the array when it is absent. With `{ unique: true }`, the op
+skips the append when a deep-equal item already exists, which makes it safe to re-run.
+
+```ts
+// config.json before: { "plugins": ["a"] }
+await json.find("config.json").appendItem(["plugins"], "b", { unique: true });
+// -> { "plugins": ["a", "b"] }
+```
+
+### `removeItem(path, index)`
+
+Removes the item at `index` and its separator. An out-of-range index rejects.
+
+```ts
+// config.json before: { "x": [1, 2] }
+await json.find("config.json").removeItem(["x"], 0);
+// -> { "x": [2] }
+```
+
+### `removeValue(path, value)`
+
+Removes every item deep-equal to `value`. No match, or no array at `path`, is a no-op.
+
+```ts
+// config.json before: { "x": ["a", "b", "a"] }
+await json.find("config.json").removeValue(["x"], "a");
+// -> { "x": ["b"] }
+```
+
+### `replaceItem(path, index, value)`
+
+Replaces the item at `index` in place. An out-of-range index rejects. A deep-equal value is a
+no-op.
+
+```ts
+// config.json before: { "x": [1, 2] }
+await json.find("config.json").replaceItem(["x"], 1, 9);
+// -> { "x": [1, 9] }
+```
+
+### `moveItem(path, from, to)`
+
+Moves the item at index `from` so it sits at index `to`. The other items keep their relative
+order. Out-of-range indices reject.
+
+```ts
+// config.json before: { "x": [1, 2, 3] }
+await json.find("config.json").moveItem(["x"], 0, 2);
+// -> { "x": [2, 3, 1] }
+```
+
+## Values
+
+### `merge(path, value)`
+
+Deep-merges a plain object into the object at `path`, creating it when absent. Two plain objects
+merge recursively. Any other pair, arrays included, is replaced by the incoming value. Keys that
+exist only in the document are kept, and members the merge does not change keep their bytes.
+Merging the same value again is a no-op. A target or `value` that is not a plain object rejects.
+
+```ts
+// config.json before: { "a": { "x": 1, "y": [1] }, "b": true }
+await json.find("config.json").merge([], { a: { y: [2], z: 3 } });
+// -> { "a": { "x": 1, "y": [2], "z": 3 }, "b": true }
+```
+
+### `updateValue(path, fn)`
+
+Calls `fn` with the current value, or `undefined` when it is absent, and sets what `fn` returns.
+The returned value is validated like any other value.
+
+```ts
+// package.json before: { "version": 1 }
+await json
+  .find("package.json")
+  .updateValue(["version"], (v) => (typeof v === "number" ? v + 1 : 1));
+// -> { "version": 2 }
+```
+
+### `moveValue(from, to)`
+
+Moves a value, like the RFC 6902 `move` operation: removes it at `from` and writes it at `to`,
+replacing any value already there. A `number` last segment in `to` inserts into that array at that
+index; in `from`, it removes that item.
+
+When `from` is absent and `to` exists, the value was already moved and the op is a no-op. The op
+rejects when both are absent, when `to` lies inside `from`, or when `from` is the document root.
+
+```ts
+// config.json before:
+// {
+//   "a": {
+//     "x": 1
+//   },
+//   "b": {
+//     "y": 2
+//   }
+// }
+await json.find("config.json").moveValue(["a", "x"], ["b", "x"]);
+// -> {
+// ->   "a": {},
+// ->   "b": {
+// ->     "y": 2,
+// ->     "x": 1
+// ->   }
+// -> }
+```
+
+### `copyValue(from, to)`
+
+Copies a value with `setValue`'s rules, like the RFC 6902 `copy` operation. A deep-equal value
+already at `to` is a no-op. An absent `from` rejects.
+
+```ts
+// config.json before: { "a": [1] }
+await json.find("config.json").copyValue(["a"], ["b"]);
+// -> { "a": [1], "b": [1] }
+```
+
+### `sortKeys(path, options?)`
+
+Orders the object's members by key, in code-point order. Each member keeps the comments and
+indentation that precede it. `{ recursive: true }` also sorts every nested object, including
+objects inside arrays. An already sorted object is a no-op. A value that is not an object, or no
+value at all, rejects.
+
+```ts
+// config.json before: { "b": 1, "a": 2 }
+await json.find("config.json").sortKeys([]);
+// -> { "a": 2, "b": 1 }
+```
+
+## Comments and formatting
+
+JSONC comments (`//` and `/* */`) are preserved. In an object or array where each member ends its
+own line, a member owns the comment lines above it and the trailing comment on its last line.
+Removing the member drops them, sorting moves them with it, and inserting next to it never
+separates them from it:
+
+```ts
+// tsconfig.json before:
+// {
+//   // second
+//   "b": 1, // trailing b
+//   "a": 2
+// }
+await json.find("tsconfig.json").sortKeys([]);
+// -> {
+// ->   "a": 2,
+// ->   // second
+// ->   "b": 1 // trailing b
+// -> }
+```
+
+There is no op to add, change, or remove a comment. Comment edits go through
+[`.modify()`](#custom-edits-with-modify).
+
+New content uses the indentation detected from the document (tabs, or the width of the first
+indented line, falling back to two spaces) and the document's own line ending. Inside a one-line
+container, edits stay on that line: `{ "a": 1 }` gains `, "b": 2` instead of being reformatted.
+
+## Custom edits with `.modify()`
+
+For comments, or any edit the named ops do not cover, `.modify(fn)` hands `fn` the live
+`JsonDocument`. It has one property, `text`: the current source, without the BOM, which is added
+back when the file is printed. `jsonc-parser` edits text rather than a mutable tree, so you
+compute edits with it and assign the result back to `doc.text`. Named ops chained after `.modify()`
+see the new text.
+
+The dialect exports the complete `jsonc-parser` module as `astLibrary`, from the same entry point
+as `find`. You do not need to add `jsonc-parser` to your own dependencies.
+
+### Example: enable a compiler option with a comment
+
+This factory sets `compilerOptions.strict` with `modify` and `applyEdits`, then adds a comment
+above it. A re-run finds the comment and writes nothing new:
+
+```json title="tsconfig.json (before)"
+{
+  // Shared compiler settings.
+  "compilerOptions": {
+    "target": "es2022"
+  }
+}
+```
+
+```ts title="factory.ts"
+import { find, astLibrary } from "@pbuilder/sdk/json";
+
+const COMMENT = "// Required by the build pipeline.";
+
+export default async () => {
+  await find("tsconfig.json").modify((doc) => {
+    const path = ["compilerOptions", "strict"];
+    const edits = astLibrary.modify(doc.text, path, true, {
+      formattingOptions: { insertSpaces: true, tabSize: 2 },
+    });
+    doc.text = astLibrary.applyEdits(doc.text, edits);
+
+    if (doc.text.includes(COMMENT)) return;
+    const property = astLibrary.findNodeAtLocation(astLibrary.parseTree(doc.text)!, path)!.parent!;
+    const lineStart = doc.text.lastIndexOf("\n", property.offset) + 1;
+    const indent = doc.text.slice(lineStart, property.offset);
+    doc.text = astLibrary.applyEdits(doc.text, [
+      { offset: lineStart, length: 0, content: `${indent}${COMMENT}\n` },
+    ]);
+  });
+};
+```
+
+```json title="tsconfig.json (after)"
+{
+  // Shared compiler settings.
+  "compilerOptions": {
+    "target": "es2022",
+    // Required by the build pipeline.
+    "strict": true
+  }
+}
+```
+
+<Aside type="note" title="You own the edits">
+Edits made in `.modify()` skip the named ops' checks. `jsonc-parser` does not validate values or
+detect the document's indentation for you: pass `formattingOptions` that match the file, and
+keep the text valid JSON. The [rules for custom edits](/guides/modify/#rules-for-custom-edits)
+apply here too.
+</Aside>

@@ -11,9 +11,11 @@ Cuando la mutación a nivel de string no alcanza — "agrega un import a este m�
 prop a este elemento JSX" — los **dialectos** proveen operaciones estructuradas y conscientes
 del AST para un tipo de archivo. Un dialecto nunca edita texto con buscar-y-reemplazar: parsea
 el archivo a un **AST**, muta el árbol e imprime el resultado de vuelta. Cada tipo de archivo
-recibe la librería de AST que mejor le calza — los dos dialectos que se distribuyen hoy,
-`@pbuilder/sdk/typescript` y `@pbuilder/sdk/react`, están ambos construidos sobre el AST propio
-de TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática.
+recibe la librería de AST que mejor le calza — los dialectos `@pbuilder/sdk/typescript` y
+`@pbuilder/sdk/react` que cubre esta página están ambos construidos sobre el AST propio de
+TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática. Los archivos
+JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-dialect/) y
+[Dialecto YAML](/es/guides/yaml-dialect/).
 
 ## Cómo funciona un handle de dialecto
 
@@ -159,9 +161,10 @@ edición, no por costumbre:
 |---|---|
 | Agregar o quitar un import, agregar una declaración de nivel superior, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
 | Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
-| Editar un tipo de archivo que ningún dialecto cubre — JSON, YAML, Markdown, CSS… | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
+| Editar un archivo JSON o YAML | El dialecto [JSON](/es/guides/json-dialect/) o [YAML](/es/guides/yaml-dialect/) |
+| Editar un tipo de archivo que ningún dialecto cubre — Markdown, CSS… | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
 
-El callback recibe **solo el AST** — un `SourceFile` de ts-morph en los dos dialectos actuales,
+El callback recibe **solo el AST** — un `SourceFile` de ts-morph en los dos dialectos de esta página,
 la misma instancia viva que mutan las ops nombradas. No hay un segundo argumento. Las ops
 nombradas y las llamadas a `.modify()` encadenadas en un mismo handle siguen generando **una
 sola** escritura, en el orden de la cadena.
@@ -326,8 +329,8 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Archivos sin dialecto
 
-Hoy existen dialectos para `.ts` y `.tsx`. Cualquier otro archivo — `package.json`, una
-configuración YAML, un índice en Markdown, una hoja de estilos — se puede editar igual con `find`
+Hoy existen dialectos para `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml` y `.yml`. Cualquier otro
+archivo — un índice en Markdown, una hoja de estilos, un archivo `.env` — se puede editar igual con `find`
 de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `read()` y los verbos
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
 transfórmalo con el parser que corresponda al formato y escribe el resultado.
@@ -375,6 +378,8 @@ Dos diferencias con una edición de dialecto:
 
 ## Para ir más lejos
 
+- [Dialecto JSON](/es/guides/json-dialect/) y [Dialecto YAML](/es/guides/yaml-dialect/) — ops
+  nombradas para archivos JSON, JSONC y YAML que conservan comentarios y formato.
 - [Librerías AST](/es/reference/ast-libraries/) — qué librería y versión respaldan a cada
   dialecto, y cómo las expone `astLibrary`.
 - **Construir un dialecto propio** es una superficie para contribuidores. Todo dialecto debe
