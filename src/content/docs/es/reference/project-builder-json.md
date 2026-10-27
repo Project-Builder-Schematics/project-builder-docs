@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-`project-builder.json` vive en la raíz del proyecto y ancla el workspace: `builder execute` y `builder new schematic` lo leen, y `builder init` lo escribe. Esta página lista cada clave que contiene.
+`project-builder.json` vive en la raíz del proyecto y ancla el workspace. `builder init` lo escribe; `builder execute` y `builder new schematic` lo leen.
 
 ## Validación en el editor
 
@@ -61,7 +61,7 @@ Las claves que la CLI no conoce se conservan tal cual, también con `init --forc
 
 Cada entrada de `collections` adopta una de dos formas.
 
-**Modo colección** apunta a un `collection.json`:
+En modo colección, la entrada apunta a un `collection.json`:
 
 ```json
 {
@@ -73,7 +73,7 @@ Cada entrada de `collections` adopta una de dos formas.
 
 Una entrada con un string `path` siempre se lee como modo colección.
 
-**Contenedor de schematics** asocia nombres de schematic a sus directorios. Es la forma que `builder new schematic` escribe en `default`:
+Un contenedor de schematics asocia nombres de schematic a sus directorios. `builder new schematic` escribe esta forma en `default`:
 
 ```json
 {

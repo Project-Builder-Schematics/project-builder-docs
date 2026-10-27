@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-`project-builder.json` sits at the project root and anchors the workspace: `builder execute` and `builder new schematic` read it, and `builder init` writes it. This page lists every key it holds.
+`project-builder.json` sits at the project root and anchors the workspace. `builder init` writes it; `builder execute` and `builder new schematic` read it.
 
 ## Editor validation
 
@@ -61,7 +61,7 @@ Keys the CLI does not know are kept as they are, including on `init --force`, so
 
 Each entry under `collections` takes one of two shapes.
 
-**Collection mode** points at a `collection.json`:
+In collection mode, the entry points at a `collection.json`:
 
 ```json
 {
@@ -73,7 +73,7 @@ Each entry under `collections` takes one of two shapes.
 
 An entry with a `path` string is always read as collection mode.
 
-**Schematic container** maps schematic names to their directories. This is the shape `builder new schematic` writes into `default`:
+A schematic container maps schematic names to their directories. `builder new schematic` writes this shape into `default`:
 
 ```json
 {
