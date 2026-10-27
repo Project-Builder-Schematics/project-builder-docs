@@ -14,7 +14,7 @@ usa vocabulario de autor, sin terminología interna del engine.
 ## Fail-closed por diseño
 
 Un run fallido no escribe **nada**. Los verbos solo agendan directivas contra el árbol de
-staging del engine; las escrituras a disco ocurren en la fase de apply, después de que tu
+staging del engine; las escrituras a disco ocurren en el Commit, después de que tu
 factory retorna. Por eso, un `AuthoringError` lanzado (o cualquier error) antes del retorno deja
 el proyecto de destino exactamente como estaba. No hay estado de escritura parcial que limpiar,
 y por eso los verbos mismos son estrictos: `create` rechaza una ruta existente,
@@ -116,7 +116,7 @@ un error de compilación si falta un valor:
 | `path-not-found` | La ruta de destino no existe. |
 | `unrepresentable-content` | El contenido no pudo representarse en el formato del engine. |
 | `changes-too-large` | El tamaño total de cambios del run excede el tope del engine. |
-| `outside-run` | Se llamó a un verbo de autoría fuera de un run activo. |
+| `outside-session` | Se llamó a un verbo de autoría fuera de una sesión activa. |
 | `unknown` | El rechazo no pudo clasificarse. |
 | `invalid-input` | El SDK rechazó los argumentos de una llamada antes de cualquier ida y vuelta al engine. |
 | `reserved-name` | La llamada usó un nombre reservado por el SDK o el engine. |
@@ -143,7 +143,7 @@ switch (err.reason) {
   case "path-not-found":
   case "unrepresentable-content":
   case "changes-too-large":
-  case "outside-run":
+  case "outside-session":
   case "unknown":
   case "invalid-input":
   case "reserved-name":
@@ -183,5 +183,5 @@ y diseñado:
 
 - [Verbos de mutación](/es/guides/mutation-verbs/): los siete verbos de autoría y la regla de
   la tricotomía de lectura.
-- [Dry-run](/es/guides/dry-run/): previsualiza los cambios planificados de un factory antes de
+- [Directivas pendientes](/es/guides/pending-directives/): previsualiza los cambios planificados de un factory antes de
   que algo se confirme.

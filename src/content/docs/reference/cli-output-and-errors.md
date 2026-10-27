@@ -18,7 +18,7 @@ The CLI has two output formats, selected by the global `--output` flag:
 
 When `--output` is unset, the format is auto-detected from the terminal: an interactive TTY gets `pretty`, a piped or redirected stdout gets `json`. This makes `builder ... | jq` and CI invocations machine-readable without any extra flags.
 
-`builder init` additionally accepts a local `--json` boolean flag selecting the same NDJSON output, and combines with `--dry-run` for a full structured plan of every operation without writing anything (see the [dry-run guide](/guides/dry-run/)).
+`builder init` additionally accepts a local `--json` boolean flag selecting the same NDJSON output, and combines with `--dry-run` for a full structured plan of every operation without writing anything.
 
 ### Flag placement with `builder execute`
 

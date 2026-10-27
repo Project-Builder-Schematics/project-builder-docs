@@ -12,7 +12,7 @@ conversación.
 
 ## La conversación SDK–engine
 
-![Diagrama de secuencia de la conversación SDK–engine: el engine lanza el runner del SDK con el factory y la entrada del usuario y envía un único mensaje ready; el factory encadena mutaciones que se acumulan en el buffer como directivas; ante una lectura, el buffer hace flush hacia el engine como un lote ir.emit que se aplica de inmediato al árbol de staging, seguido de tree.read y su respuesta; cuando el factory retorna, un flush final e ir.commit cierran la ejecución y la fase de aplicación del engine escribe el resultado preparado en disco.](../../../../assets/sdk-engine-flow.svg)
+![Diagrama de secuencia de la conversación SDK–engine: el engine lanza el runner del SDK con el factory y la entrada del usuario y envía un único mensaje ready; el factory encadena mutaciones que se acumulan en el buffer como directivas; ante una lectura, el buffer hace flush hacia el engine como un lote ir.emit que se aplica de inmediato al árbol de staging, seguido de tree.read y su respuesta; cuando el factory retorna, un flush final e ir.commit cierran la ejecución y el Commit del engine escribe el resultado preparado en disco.](../../../../assets/sdk-engine-flow.svg)
 
 ### SDK — registros de instrucciones y experiencia de desarrollo
 

@@ -10,7 +10,7 @@ import { Aside } from '@astrojs/starlight/components';
 Todos los verbos de autoría viven en `@pbuilder/sdk/commons`, el mismo punto de entrada desde
 el que importa cada schematic. Cada verbo **agenda** una directiva; nada toca el disco hasta que
 el run hace flush (en el siguiente `read()`, o al final del run). Las escrituras a disco ocurren
-solo en la fase de apply del engine, después de que tu factory retorna. Un error lanzado antes
+solo en el Commit del engine, después de que tu factory retorna. Un error lanzado antes
 del retorno significa que no se escribe absolutamente nada.
 
 Los siete verbos comparten una única unión cerrada de etiquetas `AuthoringVerb`: `create`,
@@ -345,7 +345,7 @@ idempotencia con árboles sembrados.
 
 - [Plantillas](/es/guides/templates/): el mini-lenguaje `{= =}` con el que `create` renderiza.
 - [Scaffolding](/es/guides/scaffolding/): replica una carpeta entera de plantillas con `scaffold`.
-- [Dry-run](/es/guides/dry-run/): previsualiza los cambios planificados de un factory antes de
+- [Directivas pendientes](/es/guides/pending-directives/): previsualiza los cambios planificados de un factory antes de
   que algo se confirme.
 - [Manejo de errores](/es/guides/error-handling/): cómo luce `AuthoringError` y cómo escribir
   aserciones contra él.

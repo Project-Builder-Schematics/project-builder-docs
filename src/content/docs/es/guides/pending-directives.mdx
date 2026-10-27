@@ -1,0 +1,71 @@
+---
+title: Directivas pendientes
+description: Previsualiza las directivas que la sesión de un factory todavía va a enviar, verbo por verbo y ruta por ruta, antes de que alguna se prepare en staging.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`pendingDirectives()` lista las directivas que la sesión de un factory todavía va a enviar,
+antes de que el engine prepare ninguna en staging. Es una función plana de
+`@pbuilder/sdk/commons` y se importa igual que cualquier otro verbo de autoría. No tiene un
+subpath propio.
+
+```ts
+import { pendingDirectives } from "@pbuilder/sdk/commons";
+```
+
+## Qué retorna
+
+`pendingDirectives()` retorna `PendingDirective[]`: las directivas aún pendientes en el buffer
+de la sesión activa, expresadas en vocabulario de autor. Cada entrada lleva un `verb` y un
+`path`, más un `kind` opcional (`"rendered" | "copied"`). Ese campo aparece solo en los verbos
+de lectura local del paquete cuyo transporte se clasifica: `create` (`kind: "rendered"`) y
+`copyIn` (`kind: "copied"`).
+
+```ts
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { create, find, pendingDirectives } from "@pbuilder/sdk/commons";
+
+const run = () => {
+  create("src/index.ts", { template: "export const version = '1.0.0';", options: {} });
+  find("src/legacy.ts").remove();
+
+  for (const entry of pendingDirectives()) {
+    console.log(entry.verb, entry.path); // "create src/index.ts", luego "remove src/legacy.ts"
+  }
+};
+
+await runFactoryForTest(run, undefined, { seed: { "src/legacy.ts": "" } });
+```
+
+<Aside type="note">
+`verb` reutiliza la etiqueta de mutación de wire `"modify"` tanto para las llamadas a
+`.replaceContent()` como para las `.modify(fn)` de un dialecto. Las dos llamadas se traducen a
+la misma directiva, así que `pendingDirectives()` no puede (ni necesita) distinguirlas.
+Compartir la etiqueta es deliberado, y la misma etiqueta aparece en
+[`AuthoringError`](/es/guides/error-handling/).
+</Aside>
+
+## Llámalo antes de cualquier lectura
+
+El resultado contiene solo lo que sigue **pendiente**: lo que la sesión todavía va a enviar,
+sin lo que ya envió. Un `read()` (o cualquier flush) vacía el buffer de pendientes, así que las
+directivas ya enviadas desaparecen del resultado de `pendingDirectives()`.
+
+<Aside type="caution">
+Llama a `pendingDirectives()` antes de que se abra cualquier `read()` o `find()` de dialecto,
+si quieres que vea todo lo que la sesión ha agendado hasta el momento.
+</Aside>
+
+`pendingDirectives()` solo puede llamarse dentro de una sesión activa (un factory en
+ejecución). Llamarlo fuera de una lanza el mismo error "authoring verbs can only be used while
+a schematic is running" que lanza cualquier otro verbo de `@pbuilder/sdk/commons`.
+
+## Próximos pasos
+
+- [Verbos de mutación](/es/guides/mutation-verbs/): los siete verbos de autoría y la regla de
+  la tricotomía de lectura.
+- [Manejo de errores](/es/guides/error-handling/): cómo luce `AuthoringError` y cómo escribir
+  aserciones contra él.

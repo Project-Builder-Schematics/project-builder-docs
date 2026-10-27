@@ -14,7 +14,7 @@ vocabulary, with no engine-internal terminology.
 ## Fail-closed by design
 
 A failed run writes **nothing**. Verbs only schedule directives against the engine's staging
-tree; disk writes happen in the apply phase, after your factory returns. A thrown
+tree; disk writes happen at Commit, after your factory returns. A thrown
 `AuthoringError` (or any error) before return therefore leaves the target project exactly as it was.
 There is no partial-write state to clean up, which is why the verbs themselves are strict:
 `create` rejects an existing path, `replaceContent` rejects a missing one, and overwrites
@@ -114,7 +114,7 @@ error if a value is missed:
 | `path-not-found` | The target path does not exist. |
 | `unrepresentable-content` | The content could not be represented in the engine's format. |
 | `changes-too-large` | The run's total change size exceeds the engine's cap. |
-| `outside-run` | An authoring verb was called outside an active run. |
+| `outside-session` | An authoring verb was called outside an active session. |
 | `unknown` | The rejection could not be classified. |
 | `invalid-input` | The SDK rejected a call's arguments before any engine round-trip. |
 | `reserved-name` | The call used a name reserved by the SDK or engine. |
@@ -141,7 +141,7 @@ switch (err.reason) {
   case "path-not-found":
   case "unrepresentable-content":
   case "changes-too-large":
-  case "outside-run":
+  case "outside-session":
   case "unknown":
   case "invalid-input":
   case "reserved-name":
@@ -181,4 +181,4 @@ designed outcome:
 
 - [Mutation verbs](/guides/mutation-verbs/): the seven authoring verbs and the
   read-trichotomy rule.
-- [Dry-run](/guides/dry-run/): preview a factory's planned changes before anything commits.
+- [Pending directives](/guides/pending-directives/): preview a factory's planned changes before anything commits.

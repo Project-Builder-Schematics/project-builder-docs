@@ -18,7 +18,7 @@ La CLI tiene dos formatos de salida, seleccionados por el flag global `--output`
 
 Cuando `--output` no se establece, el formato se autodetecta desde la terminal: una TTY interactiva recibe `pretty`, un stdout redirigido o en pipe recibe `json`. Esto hace que `builder ... | jq` y las invocaciones en CI sean legibles por máquinas sin ningún flag adicional.
 
-`builder init` acepta adicionalmente un flag booleano local `--json` que selecciona la misma salida NDJSON, y se combina con `--dry-run` para obtener un plan estructurado completo de cada operación sin escribir nada (ver la [guía de dry-run](/es/guides/dry-run/)).
+`builder init` acepta adicionalmente un flag booleano local `--json` que selecciona la misma salida NDJSON, y se combina con `--dry-run` para obtener un plan estructurado completo de cada operación sin escribir nada.
 
 ### Ubicación de flags con `builder execute`
 
