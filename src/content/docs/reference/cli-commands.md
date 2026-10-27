@@ -97,7 +97,7 @@ These guarantees cover the CLI's own edit. The install step that follows, and an
 | Flag | Effect |
 |---|---|
 | `--force` | Re-run on an existing project: `project-builder.json` is read-merged (`collections`, `dependencies`, `settings`, and unknown keys preserved), while the skill artefact set and marker block are regenerated. |
-| `--dry-run` | Preview every planned operation without writing any files. See the [dry-run guide](/guides/dry-run/). |
+| `--dry-run` | Preview every planned operation without writing any files. |
 | `--json` | Emit machine-readable JSON output (NDJSON). Combines with `--dry-run` for a full structured plan. |
 | `--non-interactive` | Disable all prompts (suitable for CI and AI agents). With `--mcp` unset, defaults to `--mcp=no`. |
 | `--package-manager=<npm\|pnpm\|yarn\|bun>` | Override package-manager detection. Default: lockfile sniff (pnpm > yarn > bun > npm) with `npm` as fallback. |

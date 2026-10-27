@@ -97,7 +97,7 @@ Estas garantías cubren la edición de la propia CLI. El paso de instalación po
 | Flag | Efecto |
 |---|---|
 | `--force` | Re-ejecutar sobre un proyecto existente: `project-builder.json` se lee y fusiona (`collections`, `dependencies`, `settings` y las claves desconocidas se preservan), mientras que el conjunto de artefactos de skill y el bloque marcador se regeneran. |
-| `--dry-run` | Previsualizar cada operación planificada sin escribir ningún archivo. Ver la [guía de dry-run](/es/guides/dry-run/). |
+| `--dry-run` | Previsualizar cada operación planificada sin escribir ningún archivo. |
 | `--json` | Emitir salida JSON legible por máquinas (NDJSON). Se combina con `--dry-run` para obtener un plan estructurado completo. |
 | `--non-interactive` | Deshabilitar todos los prompts (apto para CI y agentes de IA). Con `--mcp` sin establecer, el valor por defecto es `--mcp=no`. |
 | `--package-manager=<npm\|pnpm\|yarn\|bun>` | Sobrescribir la detección del gestor de paquetes. Por defecto: detección por lockfile (pnpm > yarn > bun > npm) con `npm` como fallback. |

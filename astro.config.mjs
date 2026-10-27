@@ -7,6 +7,10 @@ import favicons from 'astro-favicons';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://schematics.pbuilder.dev',
+	redirects: {
+		'/guides/dry-run': '/guides/pending-directives/',
+		'/es/guides/dry-run': '/es/guides/pending-directives/',
+	},
 	integrations: [
 		starlight({
 			title: 'Project Builder',

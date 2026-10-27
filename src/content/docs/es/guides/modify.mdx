@@ -1,6 +1,6 @@
 ---
 title: Modify
-description: Haz ediciones conscientes del AST sobre archivos TypeScript y TSX con los dialectos incorporados, incluidos los imports idempotentes, las ops estructuradas y el escape .modify().
+description: Haz ediciones conscientes del AST sobre archivos TypeScript y TSX con los dialectos incorporados, incluidos los imports idempotentes, las ops con nombre y el escape .modify().
 sidebar:
   order: 4
 ---
@@ -99,7 +99,7 @@ sanitizarla.
 
 `@pbuilder/sdk/react` muta archivos `.tsx`, y `find()` requiere la extensión `.tsx` explícita
 (las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El paquete de ops de la
-v1 es deliberadamente mínimo: dos ops estructuradas, con `.modify(fn)` como escape para todo lo
+v1 es deliberadamente mínimo: dos ops con nombre, con `.modify(fn)` como escape para todo lo
 demás:
 
 ```ts

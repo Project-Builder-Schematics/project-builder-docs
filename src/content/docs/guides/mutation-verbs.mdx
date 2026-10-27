@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 Every author verb lives on `@pbuilder/sdk/commons`, the same entry every schematic imports
 from. Each verb **schedules** a directive; nothing touches disk until the run flushes (on the
-next `read()`, or at run end). Disk writes happen only in the engine's apply phase, after
+next `read()`, or at run end). Disk writes happen only at the engine's Commit, after
 your factory returns. A thrown error before return means nothing is written at all.
 
 The seven verbs share one closed `AuthoringVerb` label union: `create`, `replaceContent`,
@@ -338,6 +338,6 @@ idempotence with seeded trees.
 
 - [Templates](/guides/templates/): the `{= =}` mini-language `create` renders with.
 - [Scaffolding](/guides/scaffolding/): mirror a whole folder of templates with `scaffold`.
-- [Dry-run](/guides/dry-run/): preview a factory's planned changes before anything commits.
+- [Pending directives](/guides/pending-directives/): preview a factory's planned changes before anything commits.
 - [Error handling](/guides/error-handling/): what `AuthoringError` looks like and how to
   assert against it.

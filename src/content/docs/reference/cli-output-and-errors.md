@@ -18,7 +18,7 @@ The CLI has two output formats, selected by the global `--output` flag:
 
 When `--output` is unset, the format is auto-detected from the terminal: an interactive TTY gets `pretty`, a piped or redirected stdout gets `json`. This makes `builder ... | jq` and CI invocations machine-readable without any extra flags.
 
-`builder init` additionally accepts a local `--json` boolean flag selecting the same NDJSON output, and combines with `--dry-run` for a full structured plan of every operation without writing anything (see the [dry-run guide](/guides/dry-run/)).
+`builder init` additionally accepts a local `--json` boolean flag selecting the same NDJSON output, and combines with `--dry-run` for a full structured plan of every operation without writing anything.
 
 ### Flag placement with `builder execute`
 
@@ -103,8 +103,8 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `cli_unknown_flag` | 2 | unrecognised command-line flag | Fix: run `--help` to see the accepted flags |
 | `invalid_input` | 2 | input value invalid | Note: check the input value against its expected format |
 | `not_implemented` | 1 | command not yet implemented | Note: this command is not implemented yet |
-| `collection_manifest_invalid` | 3 | collection manifest not found | Fix: check that `collection.json` exists at the registered path |
-| `collection_manifest_invalid` | 3 | collection manifest unparseable | Note: edit `collection.json` to fix the JSON syntax error |
+| `collection_definition_invalid` | 3 | collection definition not found | Fix: check that `collection.json` exists at the registered path |
+| `collection_definition_invalid` | 3 | collection definition unparseable | Note: edit `collection.json` to fix the JSON syntax error |
 
 ### `builder init`
 
@@ -157,7 +157,7 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edit `schema.json` to fix the JSON syntax error |
-| `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
+| `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection definition for the registered schematic name |
 | `execute_sdk_link_failed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
 | `execute_sdk_link_path_conflict` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
 | `execute_sdk_not_installed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
@@ -265,12 +265,12 @@ A run that fails with `engine_native_developer_fault` and a note about a *split 
 | `info_collection_not_found` | 2 | collection not found in project-builder.json | Note: check `project-builder.json` for the registered collection name |
 | `info_invalid_factory_pointer` | 3 | schematic's factory pointer is empty or missing | Note: edit `collection.json`'s factory to `<module>#<export>` |
 | `info_invalid_factory_pointer` (`path_escapes_manifest_root`) | 3 | schematic's registered path, factory module, or schema.json resolves outside the named manifest root | Note: keep every registered path inside the manifest root |
-| `info_manifest_invalid` | 3 | collection manifest not found | Fix: check that `collection.json` exists at the registered path |
-| `info_manifest_invalid` | 3 | collection manifest could not be parsed | Note: edit `collection.json` to fix the JSON syntax error |
+| `info_collection_definition_invalid` | 3 | collection definition not found | Fix: check that `collection.json` exists at the registered path |
+| `info_collection_definition_invalid` | 3 | collection definition could not be parsed | Note: edit `collection.json` to fix the JSON syntax error |
 | `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `info_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
 | `info_schema_invalid` | 3 | schema.json is missing or could not be parsed | Note: ensure `schema.json` exists at the schematic root and is valid JSON |
-| `info_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection's manifest for the registered schematic name |
+| `info_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection definition for the registered schematic name |
 
 ### Engine
 

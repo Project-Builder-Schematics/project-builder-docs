@@ -11,7 +11,7 @@ responsibilities, two of which hold a conversation.
 
 ## The SDK–engine conversation
 
-![Sequence diagram of the SDK–engine conversation: the engine spawns the SDK runner with the factory and the user's input and sends a single ready message; the factory chains mutations that buffer as directives; on a read the buffer flushes to the engine as an ir.emit batch applied eagerly to the staging tree, followed by tree.read and its response; when the factory returns, a final flush and ir.commit close the run and the engine's apply phase writes the staged result to disk.](../../../assets/sdk-engine-flow.svg)
+![Sequence diagram of the SDK–engine conversation: the engine spawns the SDK runner with the factory and the user's input and sends a single ready message; the factory chains mutations that buffer as directives; on a read the buffer flushes to the engine as an ir.emit batch applied eagerly to the staging tree, followed by tree.read and its response; when the factory returns, a final flush and ir.commit close the run and the engine's Commit writes the staged result to disk.](../../../assets/sdk-engine-flow.svg)
 
 ### SDK — instruction records and developer experience
 

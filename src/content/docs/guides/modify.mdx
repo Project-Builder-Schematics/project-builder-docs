@@ -1,6 +1,6 @@
 ---
 title: Modify
-description: Make AST-aware edits to TypeScript and TSX files with the built-in dialects, including idempotent imports, structured ops, and the .modify() escape hatch.
+description: Make AST-aware edits to TypeScript and TSX files with the built-in dialects, including idempotent imports, named ops, and the .modify() escape hatch.
 sidebar:
   order: 4
 ---
@@ -95,7 +95,7 @@ answers, network data) is the author's responsibility to sanitize.
 
 `@pbuilder/sdk/react` mutates `.tsx` files, and `find()` requires the explicit `.tsx` extension
 (extensionless and `.jsx` paths are rejected, never normalized). The v1 op-pack is deliberately
-minimal: two structured ops, with `.modify(fn)` as the escape hatch for everything else:
+minimal: two named ops, with `.modify(fn)` as the escape hatch for everything else:
 
 ```ts
 import * as react from "@pbuilder/sdk/react";

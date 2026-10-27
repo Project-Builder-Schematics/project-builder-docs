@@ -1,0 +1,69 @@
+---
+title: Pending directives
+description: Preview the directives a factory's session will still send, verb by verb and path by path, before any of them is staged.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`pendingDirectives()` lists the directives a factory's session will still send, before the
+engine stages any of them. It is a plain function on `@pbuilder/sdk/commons`, and you import
+it the same way as every other author verb. It has no subpath of its own.
+
+```ts
+import { pendingDirectives } from "@pbuilder/sdk/commons";
+```
+
+## What it returns
+
+`pendingDirectives()` returns `PendingDirective[]`: the directives still pending in the active
+session's buffer, rendered in author vocabulary. Each entry carries a `verb` and a `path`, plus
+an optional `kind` (`"rendered" | "copied"`). That field is present only on the
+package-local-read verbs whose transport is classified: `create` (`kind: "rendered"`) and
+`copyIn` (`kind: "copied"`).
+
+```ts
+import { runFactoryForTest } from "@pbuilder/sdk/testing";
+import { create, find, pendingDirectives } from "@pbuilder/sdk/commons";
+
+const run = () => {
+  create("src/index.ts", { template: "export const version = '1.0.0';", options: {} });
+  find("src/legacy.ts").remove();
+
+  for (const entry of pendingDirectives()) {
+    console.log(entry.verb, entry.path); // "create src/index.ts", then "remove src/legacy.ts"
+  }
+};
+
+await runFactoryForTest(run, undefined, { seed: { "src/legacy.ts": "" } });
+```
+
+<Aside type="note">
+`verb` reuses the wire mutation label `"modify"` for both `.replaceContent()` and a
+dialect's `.modify(fn)` calls. The two calls lower to the same directive, so
+`pendingDirectives()` cannot (and does not need to) distinguish them. The shared label is
+deliberate, and the same label appears on [`AuthoringError`](/guides/error-handling/).
+</Aside>
+
+## Call it before any read
+
+The result holds only what is still **pending**: what the session will still send, without
+what it has already sent. A `read()` (or any flush) empties the pending buffer, so directives
+already sent drop out of `pendingDirectives()`'s result.
+
+<Aside type="caution">
+Call `pendingDirectives()` before any `read()` or dialect `find()` opens, if you want it to
+see everything the session has scheduled so far.
+</Aside>
+
+`pendingDirectives()` can only be called inside an active session (a running factory).
+Calling it outside one throws the same "authoring verbs can only be used while a schematic is
+running" error every other `@pbuilder/sdk/commons` verb throws.
+
+## Next steps
+
+- [Mutation verbs](/guides/mutation-verbs/): the seven authoring verbs and the
+  read-trichotomy rule.
+- [Error handling](/guides/error-handling/): what `AuthoringError` looks like and how to
+  assert against it.
