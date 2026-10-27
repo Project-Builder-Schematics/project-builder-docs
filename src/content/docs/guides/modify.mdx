@@ -323,6 +323,9 @@ returns a handle for **any** path, with `read()` plus the text-level verbs
 (`replaceContent`, `rename`, `move`, `copy`, `remove`). There is no AST: read the content,
 transform it with whatever parser fits the format, and write the result back.
 
+The example below uses a JSON file because the round trip is short. In a real factory, edit JSON
+with the [JSON dialect](/guides/json-dialect/), which keeps the file's formatting and comments.
+
 ```json title="config/features.json (before)"
 {
   "enabled": ["search"]

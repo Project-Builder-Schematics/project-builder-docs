@@ -335,6 +335,9 @@ de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `rea
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
 transfórmalo con el parser que corresponda al formato y escribe el resultado.
 
+El ejemplo usa un archivo JSON porque la ida y vuelta es corta. En una factory real, edita JSON
+con el [dialecto JSON](/es/guides/json-dialect/), que conserva el formato y los comentarios del archivo.
+
 ```json title="config/features.json (antes)"
 {
   "enabled": ["search"]
