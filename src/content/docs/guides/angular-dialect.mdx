@@ -1,0 +1,436 @@
+---
+title: Angular dialect
+description: Add component imports, root providers, routes, NgModule entries, signals and injections in an Angular project with @pbuilder/sdk/angular, on top of every TypeScript dialect op.
+sidebar:
+  order: 13
+---
+
+`@pbuilder/sdk/angular` edits the `.ts` files of an Angular project. Its handle has every op of
+`@pbuilder/sdk/typescript` plus ops for standalone components, the application's root
+providers, routes, `@NgModule` metadata, and class members such as signals and injected
+dependencies. All ops chain on one handle and the file is written once; see
+[Modify](/guides/modify/#how-a-dialect-handle-works) for how a handle works.
+
+Each op finds its target from the code in the file, whatever the file is named, so the ops
+work with both the `app.ts` and the `app.component.ts` naming styles.
+
+```ts
+import * as angular from "@pbuilder/sdk/angular";
+
+export const run = async () => {
+  await angular
+    .find("src/app/app.config.ts")
+    .addRootProvider({ expression: "provideHttpClient(withFetch())" }, [
+      { name: "provideHttpClient", from: "@angular/common/http" },
+      { name: "withFetch", from: "@angular/common/http" },
+    ]);
+};
+```
+
+```ts
+// before
+import { ApplicationConfig } from "@angular/core";
+import { provideRouter } from "@angular/router";
+import { routes } from "./app.routes";
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideRouter(routes)],
+};
+
+// after
+import { ApplicationConfig } from "@angular/core";
+import { provideRouter } from "@angular/router";
+import { routes } from "./app.routes";
+import { provideHttpClient, withFetch } from "@angular/common/http";
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideRouter(routes), provideHttpClient(withFetch())],
+};
+```
+
+## Inherited TypeScript ops
+
+The handle carries every [TypeScript dialect](/guides/modify/) op: `addImport`,
+`addDefaultImport`, `addNamespaceImport`, `addTypeImport`, `addSideEffectImport`,
+`addReExport`, `addExportAll`, `addFunction`, `addVariable`, `addClass`, `removeImport`,
+`removeExport`, `removeExportAll`, `addArrayElement` and `addClassProperty`. An op the
+TypeScript dialect gains later is available here too.
+
+## Code and its imports
+
+The component, root-provider and NgModule ops take `(element, imports?)`.
+
+- `element` is an identifier such as `"RouterOutlet"`, or `{ expression }` for code such as
+  `{ expression: "provideHttpClient(withFetch())" }`. An expression must parse as exactly one
+  expression. Beyond that, the op writes it as given.
+- `imports` lists the `{ name, from }` named imports the element needs. Each one is added with
+  the same rules as the TypeScript `addImport`: an existing import of `name` from `from` is
+  reused, and a `name` already bound some other way in the file rejects.
+
+If the list already has the element, the op leaves it as it is. Elements are compared token
+by token, so spacing and comments do not count.
+
+## Component ops
+
+| Op | Appends to |
+|---|---|
+| `addComponentImport(element, imports?)` | `imports` of the file's only `@Component` |
+| `addComponentProvider(element, imports?)` | `providers` of the file's only `@Component` |
+
+Both ops create the metadata object or the array when it is missing.
+
+```ts
+await angular
+  .find("src/app/app.ts")
+  .addComponentImport("RouterOutlet", [{ name: "RouterOutlet", from: "@angular/router" }]);
+```
+
+```ts
+// before
+import { Component } from "@angular/core";
+
+@Component({
+  selector: "app-root",
+  imports: [],
+  templateUrl: "./app.html",
+})
+export class App {}
+
+// after
+import { Component } from "@angular/core";
+import { RouterOutlet } from "@angular/router";
+
+@Component({
+  selector: "app-root",
+  imports: [RouterOutlet],
+  templateUrl: "./app.html",
+})
+export class App {}
+```
+
+## Root providers
+
+`addRootProvider(element, imports?)` appends to the application's root `providers`. It looks
+for them in this order:
+
+1. The `providers` of the file's only top-level variable typed `ApplicationConfig`, by
+   annotation (`const appConfig: ApplicationConfig = …`) or `satisfies`, whatever its name.
+2. The `providers` of the config object passed to the file's only `bootstrapApplication(...)`
+   call. When the call has no config yet, the op creates one.
+
+```ts
+// src/main.ts before
+import { bootstrapApplication } from "@angular/platform-browser";
+import { App } from "./app/app";
+
+bootstrapApplication(App);
+
+// after addRootProvider({ expression: "provideHttpClient()" }, [...])
+import { bootstrapApplication } from "@angular/platform-browser";
+import { App } from "./app/app";
+import { provideHttpClient } from "@angular/common/http";
+
+bootstrapApplication(App, { providers: [provideHttpClient()] });
+```
+
+When `bootstrapApplication` receives a config by name, such as an `appConfig` imported from
+`./app/app.config`, the op rejects and its message names that module. Run the op on that file
+instead.
+
+## Routes
+
+| Op | Adds |
+|---|---|
+| `addRoute({ path, component, from })` | An eager route. It imports `component` from `from`. |
+| `addLazyRoute({ path, loadComponent \| loadChildren, export? })` | A lazy route that loads the module named by `loadComponent` or `loadChildren` (exactly one of them). With `export`, the route reads that named export; without it, the module's default export. No import is added. |
+
+Both ops add to the file's only top-level variable typed `Routes` or `Route[]`, by annotation
+or `satisfies`. Angular uses the first route that matches, so a new route goes before a
+top-level `{ path: "**" }` route when there is one, and at the end otherwise.
+
+```ts
+await angular
+  .find("src/app/app.routes.ts")
+  .addRoute({ path: "about", component: "About", from: "./about/about" })
+  .addLazyRoute({ path: "settings", loadComponent: "./settings/settings", export: "Settings" })
+  .addLazyRoute({ path: "admin", loadChildren: "./admin/admin.routes" });
+```
+
+```ts
+// before
+import { Routes } from "@angular/router";
+import { Home } from "./home/home";
+
+export const routes: Routes = [
+  { path: "", component: Home },
+  { path: "**", redirectTo: "" },
+];
+
+// after
+import { Routes } from "@angular/router";
+import { Home } from "./home/home";
+import { About } from "./about/about";
+
+export const routes: Routes = [
+  { path: "", component: Home },
+  { path: "about", component: About },
+  { path: "settings", loadComponent: () => import("./settings/settings").then((m) => m.Settings) },
+  { path: "admin", loadChildren: () => import("./admin/admin.routes") },
+  { path: "**", redirectTo: "" },
+];
+```
+
+An equal route is left as it is. A different route with the same `path` rejects, so a
+schematic run twice with other inputs never adds a second one.
+
+### Routes in an NgModule app
+
+In an NgModule routing file with no `Routes` variable, the ops add to the routes of the only
+`RouterModule.forRoot(...)` or `RouterModule.forChild(...)` call: its inline array, or a
+variable in the same file that it names.
+
+```ts
+await angular
+  .find("src/app/app-routing.module.ts")
+  .addRoute({ path: "about", component: "About", from: "./about/about" });
+```
+
+```ts
+// before
+import { NgModule } from "@angular/core";
+import { RouterModule, Routes } from "@angular/router";
+import { Home } from "./home/home";
+
+const routes = [
+  { path: "", component: Home },
+  { path: "**", redirectTo: "" },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+
+// after
+import { NgModule } from "@angular/core";
+import { RouterModule, Routes } from "@angular/router";
+import { Home } from "./home/home";
+import { About } from "./about/about";
+
+const routes = [
+  { path: "", component: Home },
+  { path: "about", component: About },
+  { path: "**", redirectTo: "" },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+```
+
+The ops match `RouterModule` by that name. An aliased import (`RouterModule as RM`) is not
+found, and the op rejects.
+
+### Known limitation: route comparison
+
+Routes are compared token by token, and the ops write double quotes. A route written as
+`{ path: 'about', component: About }` is a different route from the one `addRoute` writes, so
+adding that route again rejects because the `path` is taken.
+
+## NgModule
+
+Angular recommends standalone components for new code. These ops maintain applications still
+built with `@NgModule`. Each takes `(element, imports?)`, like the component ops, and appends
+to one array of the file's only `@NgModule`, creating the metadata object or the array when
+missing.
+
+| Op | Appends to |
+|---|---|
+| `addNgModuleImport(element, imports?)` | `imports`, such as other NgModules or `StoreModule.forRoot({})` |
+| `addDeclaration(element, imports?)` | `declarations`. Angular requires those components, directives and pipes to be `standalone: false`. |
+| `addNgModuleProvider(element, imports?)` | `providers` |
+| `addNgModuleExport(element, imports?)` | `exports` |
+| `addBootstrap(element, imports?)` | `bootstrap` |
+
+The names avoid `addImport`, `addProvider` and `addExport` because `addImport` is already the
+inherited TypeScript op that adds an `import` statement.
+
+```ts
+await angular
+  .find("src/app/app.module.ts")
+  .addDeclaration("UserCard", [{ name: "UserCard", from: "./user-card" }]);
+```
+
+```ts
+// before
+import { NgModule } from "@angular/core";
+import { BrowserModule } from "@angular/platform-browser";
+import { App } from "./app";
+
+@NgModule({ declarations: [App], imports: [BrowserModule], bootstrap: [App] })
+export class AppModule {}
+
+// after
+import { NgModule } from "@angular/core";
+import { BrowserModule } from "@angular/platform-browser";
+import { App } from "./app";
+import { UserCard } from "./user-card";
+
+@NgModule({ declarations: [App, UserCard], imports: [BrowserModule], bootstrap: [App] })
+export class AppModule {}
+```
+
+## Signals and injection
+
+These ops add a class property through the TypeScript `addClassProperty` and import the
+Angular function it calls from `@angular/core`. The property goes after the class's last
+property, which keeps inputs, outputs and injected dependencies above the constructor and the
+methods, as the Angular style guide asks. The ops find the class by its decorator, so they take
+no class name. If the class already has the same property, the op does nothing. Another member
+with the same name rejects.
+
+| Op | Adds | Class |
+|---|---|---|
+| `addInjection(name, token, options?)` | `private readonly name = inject(token);` | `@Component`, `@Directive`, `@Pipe`, `@Injectable` or `@Service` |
+| `addInput(name, options?)` | `readonly name = input<type>(initial);`, or `input.required<type>()` with `required: true` | `@Component` or `@Directive` |
+| `addModel(name, options?)` | `readonly name = model<type>(initial);`, for a two-way binding | `@Component` or `@Directive` |
+| `addOutput(name, options?)` | `readonly name = output<type>();` | `@Component` or `@Directive` |
+| `addSignal(name, initial, options?)` | `protected readonly name = signal<type>(initial);` | `@Component` or `@Directive` |
+| `addComputed(name, expression, options?)` | `protected readonly name = computed<type>(() => expression);` | `@Component` or `@Directive` |
+
+The modifiers follow the Angular style guide: `input`, `model` and `output` properties are
+`readonly`, and `signal` and `computed` properties are `protected readonly` because the
+template reads them. The file must have exactly one class the op can target.
+
+The options:
+
+- `type` is the generic argument and must parse as exactly one type.
+- `initial` is the value and must parse as exactly one expression. `addInput` and `addModel`
+  reject `required: true` together with `initial`.
+- `scope` replaces `private` in `addInjection` and `protected` in `addSignal` and
+  `addComputed`.
+- `imports` lists the `{ name, from }` imports those need, as in
+  [Code and its imports](#code-and-its-imports).
+- In `addInjection`, `token` is an identifier or `{ expression }`.
+- In `addComputed`, an object literal expression is wrapped in parentheses so the arrow
+  function returns it.
+
+```ts
+await angular
+  .find("src/app/user-card.ts")
+  .addInput("user", { type: "User", required: true, imports: [{ name: "User", from: "./user" }] })
+  .addInput("size", { type: '"sm" | "lg"', initial: '"sm"' })
+  .addModel("expanded", { type: "boolean", initial: "false" })
+  .addOutput("selected", { type: "User" });
+```
+
+```ts
+// before
+import { Component } from "@angular/core";
+
+@Component({ selector: "app-user-card", template: "" })
+export class UserCard {}
+
+// after
+import { Component, input, model, output } from "@angular/core";
+import { User } from "./user";
+
+@Component({ selector: "app-user-card", template: "" })
+export class UserCard {
+  readonly user = input.required<User>();
+  readonly size = input<"sm" | "lg">("sm");
+  readonly expanded = model<boolean>(false);
+  readonly selected = output<User>();
+}
+```
+
+```ts
+await angular
+  .find("src/app/counter.ts")
+  .addSignal("count", "0")
+  .addComputed("double", "this.count() * 2");
+// -> protected readonly count = signal(0);
+// -> protected readonly double = computed(() => this.count() * 2);
+```
+
+```ts
+await angular
+  .find("src/app/users.ts")
+  .addInjection("http", "HttpClient", { imports: [{ name: "HttpClient", from: "@angular/common/http" }] });
+```
+
+```ts
+// before
+import { Injectable } from "@angular/core";
+
+@Injectable({ providedIn: "root" })
+export class Users {
+  constructor() {}
+}
+
+// after
+import { Injectable, inject } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+
+@Injectable({ providedIn: "root" })
+export class Users {
+  private readonly http = inject(HttpClient);
+  constructor() {}
+}
+```
+
+## Format preservation
+
+A new entry follows the layout of the list it joins. A one-line list stays on one line, a
+multi-line list gets a new line at the indentation of its last entry, and a trailing comma
+stays trailing. Everything outside the inserted text is byte-identical.
+
+## Rejections
+
+An op rejects, and the file is left unchanged, when:
+
+- the file has no `@Component`, `@NgModule`, decorated class, `ApplicationConfig` variable,
+  `bootstrapApplication` call, or routes for the op, or more than one;
+- the class already has a different member with the property's name;
+- the metadata, config, or route list is not a literal (for example `providers: PROVIDERS`);
+- `bootstrapApplication` receives its config by name;
+- a route `path` starts with `/`, or a different route already uses the `path`;
+- an `element`, an import `name`, a `component`, an `export`, a `type`, or an `initial` is
+  not valid, or `required` comes with `initial`.
+
+Like the TypeScript dialect, `find(path)` accepts any `.ts` path. A file without the target
+fails only when one of these ops runs.
+
+## Custom edits with `.modify()`
+
+Use `.modify(fn)` for edits these ops do not cover, such as a child route or `viewProviders`,
+and for files the ops reject. The callback receives the live ts-morph `SourceFile`, and the
+module's `astLibrary` export is ts-morph itself:
+
+```ts
+import * as angular from "@pbuilder/sdk/angular";
+
+await angular
+  .find("src/app/user-card.ts")
+  .addImport("CardState", "./card-state")
+  .modify((ast) => {
+    const viewProviders = ast
+      .getClassOrThrow("UserCard")
+      .getDecoratorOrThrow("Component")
+      .getArguments()[0]!
+      .asKindOrThrow(angular.astLibrary.SyntaxKind.ObjectLiteralExpression)
+      .getPropertyOrThrow("viewProviders")
+      .asKindOrThrow(angular.astLibrary.SyntaxKind.PropertyAssignment)
+      .getInitializerIfKindOrThrow(angular.astLibrary.SyntaxKind.ArrayLiteralExpression);
+    viewProviders.addElement("CardState");
+  });
+```
+
+## Next steps
+
+- [Modify](/guides/modify/): the TypeScript and React dialects and how a handle works.
+- [NestJS dialect](/guides/nestjs-dialect/): the same approach for a NestJS `@Module`.
+- [AST libraries](/reference/ast-libraries/): which library and version back each dialect.

@@ -1,0 +1,446 @@
+---
+title: Dialecto Angular
+description: Agrega imports de componentes, providers raíz, rutas, entradas de NgModule, signals e inyecciones en un proyecto Angular con @pbuilder/sdk/angular, sumado a todas las ops del dialecto TypeScript.
+sidebar:
+  order: 13
+---
+
+`@pbuilder/sdk/angular` edita los archivos `.ts` de un proyecto Angular. Su handle tiene todas
+las ops de `@pbuilder/sdk/typescript` más ops para componentes standalone, los providers raíz
+de la aplicación, rutas, la metadata de `@NgModule` y miembros de clase como signals y
+dependencias inyectadas. Todas las ops se encadenan sobre un handle y el archivo se escribe una
+sola vez; ver [Modify](/es/guides/modify/#cómo-funciona-un-handle-de-dialecto) para cómo
+funciona un handle.
+
+Cada op encuentra su destino a partir del código del archivo, sin importar cómo se llame el
+archivo, así que las ops funcionan con los dos estilos de nombres: `app.ts` y
+`app.component.ts`.
+
+```ts
+import * as angular from "@pbuilder/sdk/angular";
+
+export const run = async () => {
+  await angular
+    .find("src/app/app.config.ts")
+    .addRootProvider({ expression: "provideHttpClient(withFetch())" }, [
+      { name: "provideHttpClient", from: "@angular/common/http" },
+      { name: "withFetch", from: "@angular/common/http" },
+    ]);
+};
+```
+
+```ts
+// antes
+import { ApplicationConfig } from "@angular/core";
+import { provideRouter } from "@angular/router";
+import { routes } from "./app.routes";
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideRouter(routes)],
+};
+
+// después
+import { ApplicationConfig } from "@angular/core";
+import { provideRouter } from "@angular/router";
+import { routes } from "./app.routes";
+import { provideHttpClient, withFetch } from "@angular/common/http";
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideRouter(routes), provideHttpClient(withFetch())],
+};
+```
+
+## Ops heredadas de TypeScript
+
+El handle tiene todas las ops del [dialecto TypeScript](/es/guides/modify/): `addImport`,
+`addDefaultImport`, `addNamespaceImport`, `addTypeImport`, `addSideEffectImport`,
+`addReExport`, `addExportAll`, `addFunction`, `addVariable`, `addClass`, `removeImport`,
+`removeExport`, `removeExportAll`, `addArrayElement` y `addClassProperty`. Una op que el
+dialecto TypeScript sume más adelante también queda disponible aquí.
+
+## El código y sus imports
+
+Las ops de componente, de providers raíz y de NgModule reciben `(element, imports?)`.
+
+- `element` es un identificador como `"RouterOutlet"`, o `{ expression }` para código como
+  `{ expression: "provideHttpClient(withFetch())" }`. Una expresión debe parsearse como
+  exactamente una expresión. Fuera de eso, la op la escribe tal como se pasa.
+- `imports` lista los imports con nombre `{ name, from }` que el elemento necesita. Cada uno
+  se agrega con las mismas reglas que el `addImport` de TypeScript: un import existente de
+  `name` desde `from` se reutiliza, y un `name` que ya está ligado de otra forma en el archivo
+  se rechaza.
+
+Si la lista ya tiene el elemento, la op lo deja como está. Los elementos se comparan token por
+token, así que los espacios y los comentarios no cuentan.
+
+## Ops de componente
+
+| Op | Agrega a |
+|---|---|
+| `addComponentImport(element, imports?)` | `imports` del único `@Component` del archivo |
+| `addComponentProvider(element, imports?)` | `providers` del único `@Component` del archivo |
+
+Las dos ops crean el objeto de metadata o el array cuando falta.
+
+```ts
+await angular
+  .find("src/app/app.ts")
+  .addComponentImport("RouterOutlet", [{ name: "RouterOutlet", from: "@angular/router" }]);
+```
+
+```ts
+// antes
+import { Component } from "@angular/core";
+
+@Component({
+  selector: "app-root",
+  imports: [],
+  templateUrl: "./app.html",
+})
+export class App {}
+
+// después
+import { Component } from "@angular/core";
+import { RouterOutlet } from "@angular/router";
+
+@Component({
+  selector: "app-root",
+  imports: [RouterOutlet],
+  templateUrl: "./app.html",
+})
+export class App {}
+```
+
+## Providers raíz
+
+`addRootProvider(element, imports?)` agrega al final de los `providers` raíz de la
+aplicación. Los busca en este orden:
+
+1. Los `providers` de la única variable de nivel superior del archivo con tipo
+   `ApplicationConfig`, por anotación (`const appConfig: ApplicationConfig = …`) o
+   `satisfies`, sin importar su nombre.
+2. Los `providers` del objeto de configuración que recibe la única llamada a
+   `bootstrapApplication(...)` del archivo. Si la llamada todavía no tiene configuración, la op
+   la crea.
+
+```ts
+// src/main.ts antes
+import { bootstrapApplication } from "@angular/platform-browser";
+import { App } from "./app/app";
+
+bootstrapApplication(App);
+
+// después de addRootProvider({ expression: "provideHttpClient()" }, [...])
+import { bootstrapApplication } from "@angular/platform-browser";
+import { App } from "./app/app";
+import { provideHttpClient } from "@angular/common/http";
+
+bootstrapApplication(App, { providers: [provideHttpClient()] });
+```
+
+Cuando `bootstrapApplication` recibe la configuración por nombre, como un `appConfig`
+importado desde `./app/app.config`, la op se rechaza y su mensaje nombra ese módulo. Corre la
+op sobre ese archivo.
+
+## Rutas
+
+| Op | Agrega |
+|---|---|
+| `addRoute({ path, component, from })` | Una ruta eager. Importa `component` desde `from`. |
+| `addLazyRoute({ path, loadComponent \| loadChildren, export? })` | Una ruta lazy que carga el módulo indicado por `loadComponent` o `loadChildren` (exactamente uno de los dos). Con `export`, la ruta lee ese export con nombre; sin él, el export default del módulo. No agrega ningún import. |
+
+Las dos ops agregan a la única variable de nivel superior del archivo con tipo `Routes` o
+`Route[]`, por anotación o `satisfies`. Angular usa la primera ruta que coincide, así que una
+ruta nueva va antes de una ruta `{ path: "**" }` de nivel superior cuando existe, y al final
+en caso contrario.
+
+```ts
+await angular
+  .find("src/app/app.routes.ts")
+  .addRoute({ path: "about", component: "About", from: "./about/about" })
+  .addLazyRoute({ path: "settings", loadComponent: "./settings/settings", export: "Settings" })
+  .addLazyRoute({ path: "admin", loadChildren: "./admin/admin.routes" });
+```
+
+```ts
+// antes
+import { Routes } from "@angular/router";
+import { Home } from "./home/home";
+
+export const routes: Routes = [
+  { path: "", component: Home },
+  { path: "**", redirectTo: "" },
+];
+
+// después
+import { Routes } from "@angular/router";
+import { Home } from "./home/home";
+import { About } from "./about/about";
+
+export const routes: Routes = [
+  { path: "", component: Home },
+  { path: "about", component: About },
+  { path: "settings", loadComponent: () => import("./settings/settings").then((m) => m.Settings) },
+  { path: "admin", loadChildren: () => import("./admin/admin.routes") },
+  { path: "**", redirectTo: "" },
+];
+```
+
+Una ruta igual se deja como está. Una ruta distinta con el mismo `path` se rechaza, así que un
+schematic que corre dos veces con otras entradas nunca agrega una segunda.
+
+### Rutas en una app con NgModule
+
+En un archivo de routing de NgModule sin variable `Routes`, las ops agregan a las rutas de la
+única llamada a `RouterModule.forRoot(...)` o `RouterModule.forChild(...)`: su array inline, o
+una variable del mismo archivo que la llamada nombra.
+
+```ts
+await angular
+  .find("src/app/app-routing.module.ts")
+  .addRoute({ path: "about", component: "About", from: "./about/about" });
+```
+
+```ts
+// antes
+import { NgModule } from "@angular/core";
+import { RouterModule, Routes } from "@angular/router";
+import { Home } from "./home/home";
+
+const routes = [
+  { path: "", component: Home },
+  { path: "**", redirectTo: "" },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+
+// después
+import { NgModule } from "@angular/core";
+import { RouterModule, Routes } from "@angular/router";
+import { Home } from "./home/home";
+import { About } from "./about/about";
+
+const routes = [
+  { path: "", component: Home },
+  { path: "about", component: About },
+  { path: "**", redirectTo: "" },
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule],
+})
+export class AppRoutingModule {}
+```
+
+Las ops reconocen `RouterModule` por ese nombre. Un import con alias (`RouterModule as RM`) no
+se encuentra, y la op se rechaza.
+
+### Limitación conocida: comparación de rutas
+
+Las rutas se comparan token por token, y las ops escriben comillas dobles. Una ruta escrita
+como `{ path: 'about', component: About }` es una ruta distinta de la que escribe `addRoute`,
+así que volver a agregarla se rechaza porque el `path` ya está ocupado.
+
+## NgModule
+
+Angular recomienda componentes standalone para el código nuevo. Estas ops mantienen
+aplicaciones que todavía usan `@NgModule`. Cada una recibe `(element, imports?)`, igual que las
+ops de componente, y agrega al final de un array del único `@NgModule` del archivo, creando el
+objeto de metadata o el array cuando falta.
+
+| Op | Agrega a |
+|---|---|
+| `addNgModuleImport(element, imports?)` | `imports`, como otros NgModules o `StoreModule.forRoot({})` |
+| `addDeclaration(element, imports?)` | `declarations`. Angular exige que esos componentes, directivas y pipes sean `standalone: false`. |
+| `addNgModuleProvider(element, imports?)` | `providers` |
+| `addNgModuleExport(element, imports?)` | `exports` |
+| `addBootstrap(element, imports?)` | `bootstrap` |
+
+Los nombres evitan `addImport`, `addProvider` y `addExport` porque `addImport` ya es la op
+heredada de TypeScript que agrega una sentencia `import`.
+
+```ts
+await angular
+  .find("src/app/app.module.ts")
+  .addDeclaration("UserCard", [{ name: "UserCard", from: "./user-card" }]);
+```
+
+```ts
+// antes
+import { NgModule } from "@angular/core";
+import { BrowserModule } from "@angular/platform-browser";
+import { App } from "./app";
+
+@NgModule({ declarations: [App], imports: [BrowserModule], bootstrap: [App] })
+export class AppModule {}
+
+// después
+import { NgModule } from "@angular/core";
+import { BrowserModule } from "@angular/platform-browser";
+import { App } from "./app";
+import { UserCard } from "./user-card";
+
+@NgModule({ declarations: [App, UserCard], imports: [BrowserModule], bootstrap: [App] })
+export class AppModule {}
+```
+
+## Signals e inyección
+
+Estas ops agregan una propiedad de clase mediante el `addClassProperty` de TypeScript e
+importan desde `@angular/core` la función de Angular que esa propiedad llama. La propiedad va
+después de la última propiedad de la clase, lo que mantiene inputs, outputs y dependencias
+inyectadas por encima del constructor y de los métodos, como pide la guía de estilo de
+Angular. Las ops encuentran la clase por su decorador, así que no reciben un nombre de clase.
+Si la clase ya tiene la misma propiedad, la op no hace nada. Otro miembro con el mismo nombre
+se rechaza.
+
+| Op | Agrega | Clase |
+|---|---|---|
+| `addInjection(name, token, options?)` | `private readonly name = inject(token);` | `@Component`, `@Directive`, `@Pipe`, `@Injectable` o `@Service` |
+| `addInput(name, options?)` | `readonly name = input<type>(initial);`, o `input.required<type>()` con `required: true` | `@Component` o `@Directive` |
+| `addModel(name, options?)` | `readonly name = model<type>(initial);`, para un binding bidireccional | `@Component` o `@Directive` |
+| `addOutput(name, options?)` | `readonly name = output<type>();` | `@Component` o `@Directive` |
+| `addSignal(name, initial, options?)` | `protected readonly name = signal<type>(initial);` | `@Component` o `@Directive` |
+| `addComputed(name, expression, options?)` | `protected readonly name = computed<type>(() => expression);` | `@Component` o `@Directive` |
+
+Los modificadores siguen la guía de estilo de Angular: las propiedades `input`, `model` y
+`output` son `readonly`, y las propiedades `signal` y `computed` son `protected readonly`
+porque las lee el template. El archivo debe tener exactamente una clase a la que apunte la op.
+
+Las opciones:
+
+- `type` es el argumento genérico y debe parsearse como exactamente un tipo.
+- `initial` es el valor y debe parsearse como exactamente una expresión. `addInput` y
+  `addModel` rechazan `required: true` junto con `initial`.
+- `scope` reemplaza a `private` en `addInjection` y a `protected` en `addSignal` y
+  `addComputed`.
+- `imports` lista los imports `{ name, from }` que esos valores necesitan, como en
+  [El código y sus imports](#el-código-y-sus-imports).
+- En `addInjection`, `token` es un identificador o `{ expression }`.
+- En `addComputed`, una expresión que es un object literal se envuelve entre paréntesis para
+  que la arrow function la devuelva.
+
+```ts
+await angular
+  .find("src/app/user-card.ts")
+  .addInput("user", { type: "User", required: true, imports: [{ name: "User", from: "./user" }] })
+  .addInput("size", { type: '"sm" | "lg"', initial: '"sm"' })
+  .addModel("expanded", { type: "boolean", initial: "false" })
+  .addOutput("selected", { type: "User" });
+```
+
+```ts
+// antes
+import { Component } from "@angular/core";
+
+@Component({ selector: "app-user-card", template: "" })
+export class UserCard {}
+
+// después
+import { Component, input, model, output } from "@angular/core";
+import { User } from "./user";
+
+@Component({ selector: "app-user-card", template: "" })
+export class UserCard {
+  readonly user = input.required<User>();
+  readonly size = input<"sm" | "lg">("sm");
+  readonly expanded = model<boolean>(false);
+  readonly selected = output<User>();
+}
+```
+
+```ts
+await angular
+  .find("src/app/counter.ts")
+  .addSignal("count", "0")
+  .addComputed("double", "this.count() * 2");
+// -> protected readonly count = signal(0);
+// -> protected readonly double = computed(() => this.count() * 2);
+```
+
+```ts
+await angular
+  .find("src/app/users.ts")
+  .addInjection("http", "HttpClient", { imports: [{ name: "HttpClient", from: "@angular/common/http" }] });
+```
+
+```ts
+// antes
+import { Injectable } from "@angular/core";
+
+@Injectable({ providedIn: "root" })
+export class Users {
+  constructor() {}
+}
+
+// después
+import { Injectable, inject } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+
+@Injectable({ providedIn: "root" })
+export class Users {
+  private readonly http = inject(HttpClient);
+  constructor() {}
+}
+```
+
+## Preservación del formato
+
+Una entrada nueva sigue el formato de la lista a la que se suma. Una lista de una línea queda
+en una línea, una lista multilínea recibe una línea nueva con la indentación de su última
+entrada, y una coma final se mantiene. Todo lo que está fuera del texto insertado queda
+idéntico byte a byte.
+
+## Rechazos
+
+Una op se rechaza, y el archivo queda sin cambios, cuando:
+
+- el archivo no tiene ningún `@Component`, `@NgModule`, clase decorada, variable
+  `ApplicationConfig`, llamada a `bootstrapApplication` o rutas para la op, o tiene más de uno;
+- la clase ya tiene un miembro distinto con el nombre de la propiedad;
+- la metadata, la configuración o la lista de rutas no es un literal (por ejemplo
+  `providers: PROVIDERS`);
+- `bootstrapApplication` recibe su configuración por nombre;
+- el `path` de una ruta empieza con `/`, o una ruta distinta ya usa ese `path`;
+- un `element`, un `name` de import, un `component`, un `export`, un `type` o un `initial` no
+  es válido, o `required` viene junto con `initial`.
+
+Igual que el dialecto TypeScript, `find(path)` acepta cualquier ruta `.ts`. Un archivo sin el
+destino solo falla cuando corre una de estas ops.
+
+## Ediciones a medida con `.modify()`
+
+Usa `.modify(fn)` para las ediciones que estas ops no cubren, como una ruta hija o
+`viewProviders`, y para los archivos que las ops rechazan. El callback recibe el `SourceFile`
+vivo de ts-morph, y el export `astLibrary` del módulo es ts-morph:
+
+```ts
+import * as angular from "@pbuilder/sdk/angular";
+
+await angular
+  .find("src/app/user-card.ts")
+  .addImport("CardState", "./card-state")
+  .modify((ast) => {
+    const viewProviders = ast
+      .getClassOrThrow("UserCard")
+      .getDecoratorOrThrow("Component")
+      .getArguments()[0]!
+      .asKindOrThrow(angular.astLibrary.SyntaxKind.ObjectLiteralExpression)
+      .getPropertyOrThrow("viewProviders")
+      .asKindOrThrow(angular.astLibrary.SyntaxKind.PropertyAssignment)
+      .getInitializerIfKindOrThrow(angular.astLibrary.SyntaxKind.ArrayLiteralExpression);
+    viewProviders.addElement("CardState");
+  });
+```
+
+## Próximos pasos
+
+- [Modify](/es/guides/modify/): los dialectos TypeScript y React y cómo funciona un handle.
+- [Dialecto NestJS](/es/guides/nestjs-dialect/): el mismo enfoque para un `@Module` de NestJS.
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y qué versión respalda cada
+  dialecto.
