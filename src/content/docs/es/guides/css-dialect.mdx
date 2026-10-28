@@ -1,0 +1,256 @@
+---
+title: Dialecto CSS
+description: Asigna y elimina declaraciones en archivos .css con @pbuilder/sdk/css, por ejemplo para sincronizar tokens de diseño en un archivo de Tailwind 4, más getDeclaration y el escape .modify().
+sidebar:
+  order: 14
+---
+
+`@pbuilder/sdk/css` asigna y elimina declaraciones en archivos `.css`. Está pensado para archivos
+que mezclan valores generados con CSS escrito a mano, como un archivo de tokens de diseño
+sincronizado desde una exportación JSON (por ejemplo, variables de Figma). Cada op edita solo la
+declaración que indica, y el resto de los bytes del archivo queda como estaba. El handle funciona
+como el de cualquier otro dialecto: las ops encadenadas sobre él se combinan en una sola
+escritura, y `await` sigue las reglas de
+[Cómo funciona un handle de dialecto](/es/guides/modify/#cómo-funciona-un-handle-de-dialecto).
+
+## Sincronizar tokens en un archivo de Tailwind 4
+
+```css title="tokens.css (antes)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #0b254d;
+  --radius: 4px;
+}
+```
+
+```ts title="factory.ts"
+import * as css from "@pbuilder/sdk/css";
+
+export default async () => {
+  await css
+    .find("tokens.css")
+    .setDeclaration({ atRule: "theme" }, "--color-primary", "#1974f9")
+    .setDeclaration({ selector: "html[data-theme='nylon']" }, "--color-primary", "#0b254d");
+};
+```
+
+```css title="tokens.css (después)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #1974f9;
+  --radius: 4px;
+}
+
+html[data-theme='nylon'] {
+  --color-primary: #0b254d;
+}
+```
+
+El valor de `@theme` se actualiza en su lugar. El bloque del modo `nylon` no existía, así que la
+op lo creó al final del archivo. El dialecto recibe strings ya resueltos: convertir el JSON de
+tokens en nombres de propiedad y valores (alias, modos) es tarea de tu schematic.
+
+`find(path)` acepta solo archivos `.css`; `.scss` no está soportado. Cualquier otra extensión
+lanza un error de forma síncrona. Los fragmentos del resto de esta página omiten el envoltorio de
+la factory.
+
+## Targets
+
+Un target indica un bloque de nivel superior:
+
+| Target | Bloque |
+|---|---|
+| `{ selector: ":root" }` | la regla de nivel superior `:root { }` |
+| `{ atRule: "theme" }` | el cuerpo de `@theme { }` |
+| `{ atRule: "theme", params: "inline" }` | el cuerpo de `@theme inline { }` |
+| `{ atRule: "media", params: "(prefers-color-scheme: dark)", selector: ":root" }` | la regla `:root` dentro de ese `@media` |
+
+- El selector y los params coinciden tal como están escritos, después de recortar los espacios.
+  `html[data-theme='nylon']` y `html[data-theme="nylon"]` son targets distintos, y asignar un
+  valor en el segundo crea un bloque nuevo junto al primero.
+- El nombre de la at-rule se escribe sin `@` y coincide sin distinguir mayúsculas.
+- Omitir `params` coincide solo con una at-rule sin params. `{ atRule: "theme" }` no coincide con
+  `@theme inline { }`: en un archivo que solo tiene `@theme inline`, crea un bloque `@theme { }`
+  nuevo al final del archivo. Usa `{ atRule: "theme", params: "inline" }`.
+- Una sentencia at-rule sin cuerpo, como `@layer base;` o `@import`, nunca es un target.
+- Un target que coincide con más de un bloque se rechaza.
+
+## Ubicación
+
+- Un bloque que falta se crea al final del archivo. Siempre queda después de `@import`, que debe
+  ir antes que cualquier otra regla, y después de cualquier encabezado escrito a mano. Una regla
+  dentro de una at-rule, como `:root` dentro de `@media`, se crea al final de esa at-rule.
+- Un bloque nuevo usa el fin de línea del archivo (`\n` o `\r\n`) y la indentación de su primera
+  declaración de nivel superior. Si no hay ninguna declaración que copiar, indenta con dos
+  espacios.
+- Una declaración nueva va al final de su bloque, o junto a una existente con `{ before }` o
+  `{ after }`.
+- Una declaración existente se actualiza en su lugar y el ancla se ignora, así que una segunda
+  ejecución nunca reordena el bloque.
+
+```ts
+css.find("tokens.css").setDeclaration({ atRule: "theme" }, "--color-accent", "#ff0", { after: "--color-primary" });
+// -> @theme {
+// ->   --color-primary: #0b254d;
+// ->   --color-accent: #ff0;
+// ->   --radius: 4px;
+// -> }
+```
+
+Un target con at-rule y selector crea los dos cuando faltan:
+
+```ts
+css.find("tokens.css").setDeclaration(
+  { atRule: "media", params: "(prefers-color-scheme: dark)", selector: ":root" },
+  "--color-primary",
+  "#9ec5ff",
+);
+// se agrega al final del archivo:
+// -> @media (prefers-color-scheme: dark) {
+// ->   :root {
+// ->     --color-primary: #9ec5ff;
+// ->   }
+// -> }
+```
+
+## Nombres de propiedad y valores
+
+- Los nombres de propiedad normales se comparan sin distinguir mayúsculas, así que `COLOR`
+  actualiza `color`. Las propiedades personalizadas sí distinguen mayúsculas, como en CSS:
+  `--Brand` y `--brand` son dos declaraciones.
+- Un valor es CSS crudo, como `#1974f9`, `var(--blue-500)` o `calc(1rem + 2px)`, y debe ser
+  exactamente un valor de declaración. `;` y `}` se permiten dentro de strings, como en
+  `content: ";"`.
+- `!important` va en la opción `important`, nunca en el valor. `{ important: true }` lo escribe,
+  y omitir la opción lo quita de una declaración existente.
+- El dialecto no razona sobre shorthands. Asignar `margin-top` en un bloque que tiene
+  `margin: 8px` agrega `margin-top` y deja `margin` como está.
+
+## Ops
+
+### `setDeclaration(target, property, value, options?)`
+
+Asigna `value` a `property` en el bloque del target. Una declaración existente se actualiza en su
+lugar. Una nueva va al final del bloque, o junto a `options.before` u `options.after`. Un bloque
+que falta se crea al final del archivo. `options.important: true` escribe `!important`. Asignar
+el valor que la declaración ya tiene no escribe nada.
+
+```ts
+// :root antes: color-scheme: light !important;
+css.find("tokens.css").setDeclaration({ selector: ":root" }, "color-scheme", "light");
+// -> :root {
+// ->   color-scheme: light;
+// -> }
+```
+
+### `removeDeclaration(target, property)`
+
+Elimina `property` del bloque del target. Un bloque o una declaración que falta no hace nada, así
+que una sincronización puede eliminar tokens que quizá ya no estén. El bloque se mantiene, aunque
+quede vacío.
+
+```ts
+css
+  .find("tokens.css")
+  .removeDeclaration({ atRule: "theme" }, "--radius")
+  .removeDeclaration({ selector: ".missing" }, "--x");
+// -> @theme {
+// ->   --color-primary: #0b254d;
+// -> }
+```
+
+## Rechazos
+
+Cada rechazo lanza un error antes de que el archivo cambie. El mensaje empieza con
+`dialect operation failed: ` e indica la op y el target:
+
+```text
+dialect operation failed: setDeclaration(@theme) — `red; color: blue` is not a single declaration value.
+```
+
+Una op rechazada deja el archivo sin cambios, y lo mismo pasa con las ops encadenadas antes que
+ella en el mismo handle. Las ops rechazan:
+
+- un nombre de propiedad que no es un identificador CSS ni una propiedad personalizada `--`;
+- un valor que cerraría la declaración o agregaría otra (`red; color: blue`, `red}`), un valor
+  con `!important`, un valor vacío y un valor con un comentario;
+- un target que no es `{ selector }`, `{ atRule, params? }` ni ambos, un nombre de at-rule escrito
+  con `@`, y un selector o unos params que agregarían otro bloque;
+- un target que coincide con más de un bloque;
+- una propiedad declarada más de una vez en el bloque, como el fallback
+  `display: -webkit-box; display: flex;` (edítalo con [`.modify()`](#ediciones-personalizadas-con-modify));
+- un ancla que no está declarada en el bloque, y pasar `before` y `after` a la vez.
+
+## Ediciones personalizadas con `.modify()`
+
+`.modify(fn)` le pasa a `fn` el `Root` vivo de PostCSS. El módulo exporta el paquete `postcss`
+como `astLibrary`, así que no necesitas agregar `postcss` a tus propias dependencias. PostCSS
+conserva cada byte de espacios, comentarios y BOM, así que un archivo que ninguna op tocó se
+imprime idéntico byte a byte.
+
+```ts
+await css.find("app.css").modify((root) => {
+  root.walkRules(".legacy", (rule) => rule.remove());
+});
+```
+
+### Leer un valor con `getDeclaration(root, target, property)`
+
+Las ops no devuelven valores, así que el módulo exporta una función normal para leer. Recibe un
+`Root` ya parseado y devuelve `{ value, important }`, o `undefined` cuando falta el bloque o la
+declaración. Sigue las mismas reglas de target, nombre, ambigüedad y duplicados que las ops, y
+lanza los mismos errores. Llámala dentro de `.modify(fn)` para decidir qué cambiar. Esta factory
+actualiza `--color-primary` en `@theme` solo cuando todavía tiene el valor viejo:
+
+```ts title="factory.ts"
+import * as css from "@pbuilder/sdk/css";
+
+export default async () => {
+  await css.find("tokens.css").modify((root) => {
+    if (css.getDeclaration(root, { atRule: "theme" }, "--color-primary")?.value === "#0b254d") {
+      // A bare root.walkDecls would also rewrite the html[data-theme='nylon'] block.
+      root.walkAtRules("theme", (theme) =>
+        theme.walkDecls("--color-primary", (decl) => {
+          decl.value = "#1974f9";
+        }),
+      );
+    }
+  });
+};
+```
+
+```css title="tokens.css (después)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #1974f9;
+  --radius: 4px;
+}
+
+html[data-theme='nylon'] {
+  --color-primary: #0b254d;
+}
+```
+
+`getDeclaration` también funciona sobre un `Root` que parseas tú con `astLibrary.parse`:
+
+```ts
+const root = css.astLibrary.parse((await css.find("tokens.css").read()) ?? "");
+css.getDeclaration(root, { selector: ":root" }, "--radius"); // { value: "4px", important: false }
+```
+
+Las ediciones hechas en `.modify()` saltan las validaciones de las ops. Las
+[reglas para las ediciones personalizadas](/es/guides/modify/#reglas-para-las-ediciones-personalizadas)
+también aplican aquí.
+
+## Para ir más lejos
+
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y qué versión respaldan cada
+  dialecto.
+- La [guía del dialecto CSS](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/css-dialect.md)
+  del SDK (en inglés).

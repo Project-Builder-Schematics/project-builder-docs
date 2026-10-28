@@ -1,0 +1,246 @@
+---
+title: CSS dialect
+description: Set and remove declarations in .css files with @pbuilder/sdk/css, for example to sync design tokens into a Tailwind 4 file, plus getDeclaration and the .modify() escape hatch.
+sidebar:
+  order: 14
+---
+
+`@pbuilder/sdk/css` sets and removes declarations in `.css` files. It is meant for files that
+mix generated values with hand-written CSS, such as a design-token file synced from a JSON export
+(Figma variables, for example). Each op edits only the declaration it addresses, and every other
+byte of the file stays as it was. The handle works like every other dialect handle: ops chained
+on it coalesce into one write, and `await` follows the rules in
+[How a dialect handle works](/guides/modify/#how-a-dialect-handle-works).
+
+## Syncing tokens into a Tailwind 4 file
+
+```css title="tokens.css (before)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #0b254d;
+  --radius: 4px;
+}
+```
+
+```ts title="factory.ts"
+import * as css from "@pbuilder/sdk/css";
+
+export default async () => {
+  await css
+    .find("tokens.css")
+    .setDeclaration({ atRule: "theme" }, "--color-primary", "#1974f9")
+    .setDeclaration({ selector: "html[data-theme='nylon']" }, "--color-primary", "#0b254d");
+};
+```
+
+```css title="tokens.css (after)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #1974f9;
+  --radius: 4px;
+}
+
+html[data-theme='nylon'] {
+  --color-primary: #0b254d;
+}
+```
+
+The `@theme` value is updated where it is. The `nylon` mode block did not exist, so the op
+created it at the end of the file. The dialect takes resolved strings: turning token JSON into
+property names and values (aliases, modes) is your schematic's job.
+
+`find(path)` accepts only `.css` files; `.scss` is not supported. Any other extension throws
+synchronously. The snippets in the rest of this page leave out the factory wrapper.
+
+## Targets
+
+A target names one top-level block:
+
+| Target | Block |
+|---|---|
+| `{ selector: ":root" }` | the top-level rule `:root { }` |
+| `{ atRule: "theme" }` | the body of `@theme { }` |
+| `{ atRule: "theme", params: "inline" }` | the body of `@theme inline { }` |
+| `{ atRule: "media", params: "(prefers-color-scheme: dark)", selector: ":root" }` | the `:root` rule inside that `@media` |
+
+- The selector and params match as written, after trimming whitespace.
+  `html[data-theme='nylon']` and `html[data-theme="nylon"]` are different targets, and setting
+  a value on the second one creates a new block next to the first.
+- The at-rule name is written without `@` and matches case-insensitively.
+- Leaving out `params` matches only an at-rule with no params. `{ atRule: "theme" }` does not
+  match `@theme inline { }`: on a file that has only `@theme inline`, it creates a new
+  `@theme { }` block at the end of the file. Use `{ atRule: "theme", params: "inline" }`.
+- An at-rule statement with no body, such as `@layer base;` or `@import`, is never a target.
+- A target that matches more than one block rejects.
+
+## Placement
+
+- A missing block is created at the end of the file. It always lands after `@import`, which
+  must come before every other rule, and after any hand-written header. A rule inside an
+  at-rule, such as `:root` inside `@media`, is created at the end of that at-rule.
+- A new block uses the file's line ending (`\n` or `\r\n`) and the indentation of its first
+  top-level declaration. With no declaration to copy, it indents with two spaces.
+- A new declaration goes last in its block, or next to an existing one with `{ before }` or
+  `{ after }`.
+- An existing declaration is updated in place and the anchor is ignored, so a second run never
+  reorders the block.
+
+```ts
+css.find("tokens.css").setDeclaration({ atRule: "theme" }, "--color-accent", "#ff0", { after: "--color-primary" });
+// -> @theme {
+// ->   --color-primary: #0b254d;
+// ->   --color-accent: #ff0;
+// ->   --radius: 4px;
+// -> }
+```
+
+A target with an at-rule and a selector creates both when they are missing:
+
+```ts
+css.find("tokens.css").setDeclaration(
+  { atRule: "media", params: "(prefers-color-scheme: dark)", selector: ":root" },
+  "--color-primary",
+  "#9ec5ff",
+);
+// appended to the file:
+// -> @media (prefers-color-scheme: dark) {
+// ->   :root {
+// ->     --color-primary: #9ec5ff;
+// ->   }
+// -> }
+```
+
+## Property names and values
+
+- Regular property names compare case-insensitively, so `COLOR` updates `color`. Custom
+  properties compare case-sensitively, as in CSS: `--Brand` and `--brand` are two declarations.
+- A value is raw CSS, such as `#1974f9`, `var(--blue-500)`, or `calc(1rem + 2px)`, and must be
+  exactly one declaration value. `;` and `}` are allowed inside strings, as in `content: ";"`.
+- `!important` goes in the `important` option, never in the value. `{ important: true }` writes
+  it, and leaving the option out removes it from an existing declaration.
+- The dialect does not reason about shorthands. Setting `margin-top` on a block that has
+  `margin: 8px` adds `margin-top` and leaves `margin` alone.
+
+## Ops
+
+### `setDeclaration(target, property, value, options?)`
+
+Sets `property` to `value` in the target block. An existing declaration is updated in place. A
+new one goes last in the block, or next to `options.before` or `options.after`. A missing block
+is created at the end of the file. `options.important: true` writes `!important`. Setting the
+value a declaration already has writes nothing.
+
+```ts
+// :root before: color-scheme: light !important;
+css.find("tokens.css").setDeclaration({ selector: ":root" }, "color-scheme", "light");
+// -> :root {
+// ->   color-scheme: light;
+// -> }
+```
+
+### `removeDeclaration(target, property)`
+
+Removes `property` from the target block. A missing block or declaration is a no-op, so a sync
+can remove tokens that may already be gone. The block stays, even when it ends up empty.
+
+```ts
+css
+  .find("tokens.css")
+  .removeDeclaration({ atRule: "theme" }, "--radius")
+  .removeDeclaration({ selector: ".missing" }, "--x");
+// -> @theme {
+// ->   --color-primary: #0b254d;
+// -> }
+```
+
+## Rejections
+
+Every rejection throws before the file changes. The message starts with
+`dialect operation failed: ` and names the op and the target:
+
+```text
+dialect operation failed: setDeclaration(@theme) — `red; color: blue` is not a single declaration value.
+```
+
+A rejected op leaves the file unchanged, and so do the ops chained before it on the same handle.
+The ops reject:
+
+- a property name that is not a CSS identifier or a `--` custom property;
+- a value that would close the declaration or add another one (`red; color: blue`, `red}`), a
+  value that carries `!important`, an empty value, and a value that carries a comment;
+- a target that is not `{ selector }`, `{ atRule, params? }`, or both, an at-rule name written
+  with `@`, and a selector or params that would add another block;
+- a target that matches more than one block;
+- a property declared more than once in the block, such as the fallback
+  `display: -webkit-box; display: flex;` (edit those with [`.modify()`](#custom-edits-with-modify));
+- an anchor that is not declared in the block, and passing both `before` and `after`.
+
+## Custom edits with `.modify()`
+
+`.modify(fn)` hands `fn` the live PostCSS `Root`. The module exports the `postcss` package as
+`astLibrary`, so you do not need to add `postcss` to your own dependencies. PostCSS keeps every
+whitespace, comment, and BOM byte, so a file no op touched prints byte-identical.
+
+```ts
+await css.find("app.css").modify((root) => {
+  root.walkRules(".legacy", (rule) => rule.remove());
+});
+```
+
+### Reading a value with `getDeclaration(root, target, property)`
+
+Ops do not return values, so the module exports a plain function for reading. It takes a parsed
+`Root` and returns `{ value, important }`, or `undefined` when the block or declaration is
+missing. It follows the same target, name, ambiguity, and duplicate rules as the ops, and throws
+the same errors. Call it inside `.modify(fn)` to decide what to change. This factory updates
+`--color-primary` in `@theme` only when it still has the old value:
+
+```ts title="factory.ts"
+import * as css from "@pbuilder/sdk/css";
+
+export default async () => {
+  await css.find("tokens.css").modify((root) => {
+    if (css.getDeclaration(root, { atRule: "theme" }, "--color-primary")?.value === "#0b254d") {
+      // A bare root.walkDecls would also rewrite the html[data-theme='nylon'] block.
+      root.walkAtRules("theme", (theme) =>
+        theme.walkDecls("--color-primary", (decl) => {
+          decl.value = "#1974f9";
+        }),
+      );
+    }
+  });
+};
+```
+
+```css title="tokens.css (after)"
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #1974f9;
+  --radius: 4px;
+}
+
+html[data-theme='nylon'] {
+  --color-primary: #0b254d;
+}
+```
+
+`getDeclaration` also works on a `Root` you parse yourself with `astLibrary.parse`:
+
+```ts
+const root = css.astLibrary.parse((await css.find("tokens.css").read()) ?? "");
+css.getDeclaration(root, { selector: ":root" }, "--radius"); // { value: "4px", important: false }
+```
+
+Edits made in `.modify()` skip the ops' checks. The general
+[rules for custom edits](/guides/modify/#rules-for-custom-edits) apply here too.
+
+## Going further
+
+- [AST libraries](/reference/ast-libraries/): which library and version back each dialect.
+- The SDK's [CSS dialect guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/css-dialect.md).
