@@ -123,7 +123,7 @@ error if a value is missed:
 | `source-unreadable` | A package-local source exists but could not be read. |
 
 <Aside type="caution">
-`source-outside-package` was removed in `@pbuilder/sdk` `0.2.0`. The SDK no longer
+`source-outside-package` was removed from `@pbuilder/sdk`. The SDK no longer
 re-derives a containment ceiling for package-local sources. Migration: drop the
 `case "source-outside-package":` arm from any exhaustive `switch (err.reason)`. TypeScript
 will point at it.
