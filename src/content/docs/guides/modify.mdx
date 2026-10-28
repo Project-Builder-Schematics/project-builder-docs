@@ -14,8 +14,9 @@ prints the result back. Each file type gets the AST library that fits it best. T
 `@pbuilder/sdk/typescript` and `@pbuilder/sdk/react` dialects covered on this page are both built
 on TypeScript's own AST (surfaced through ts-morph), because TS and TSX share a grammar. JSON and
 YAML files have dialects of their own: see [JSON dialect](/guides/json-dialect/) and
-[YAML dialect](/guides/yaml-dialect/). For NestJS modules, the
-[NestJS dialect](/guides/nestjs-dialect/) adds `@Module` ops on top of the TypeScript ones.
+[YAML dialect](/guides/yaml-dialect/), and CSS files use the [CSS dialect](/guides/css-dialect/).
+The [NestJS dialect](/guides/nestjs-dialect/) and the [Angular dialect](/guides/angular-dialect/)
+add framework ops on top of the TypeScript ones.
 
 ## How a dialect handle works
 
@@ -42,6 +43,14 @@ still surfaces its error contained at the run boundary instead of as an unhandle
 `await` the chain yourself when you need to sequence a read after your own write, or to observe
 a failure locally in your own `try`/`catch`.
 
+### Queries
+
+Most ops write and return the handle, so they chain. A dialect can also declare queries, which
+read a value. A query ends the chain: `await` it and it resolves to the value. It sees every op
+chained before it on the same handle, writes nothing, and the ops before it still commit. A
+query that would change the file rejects and fails the run. The
+[CSS dialect](/guides/css-dialect/)'s `getDeclaration` is a query.
+
 ## The TypeScript dialect
 
 ```ts
@@ -55,10 +64,20 @@ await ts.find("src/index.ts")
 | Op | What it does |
 |---|---|
 | `addImport(name, from)` | Adds `import { name } from "from"`, merging into an existing clause from the same module. Idempotent: calling it twice never duplicates the import. |
+| `addDefaultImport(name, from)` | Adds `import name from "from"`, merging into a declaration of that module with no default yet. Rejects a second default under another name. |
+| `addNamespaceImport(name, from)` | Adds `import * as name from "from"`, merging into a default-only declaration. Beside named imports it opens its own declaration. |
+| `addTypeImport(name, from)` | Adds `import type { name } from "from"` as its own statement, never merged into a value import. A no-op when the module already imports `name`, by value or as a type. |
+| `addSideEffectImport(from)` | Adds `import "from"`. A no-op when that bare import already exists. |
+| `addReExport(name, from)` | Adds `export { name } from "from"`, merging into an existing re-export of that module. Rejects a name the file already exports. |
+| `addExportAll(from, { as? })` | Adds `export * from "from"`, or `export * as ns from "from"` with `{ as: "ns" }`. |
 | `removeImport(name, from)` | Removes the named binding; deletes the whole statement when it was the last one. Idempotent on an absent binding. |
+| `removeExport(name, from)` | Removes a named re-export; deletes the statement when it was the last one. Idempotent on an absent one. |
+| `removeExportAll(from, { as? })` | Removes `export * from "from"` (or the `as` form). Idempotent on an absent one. |
 | `addFunction(name, source, opts?)` | Appends a top-level function. `source` **includes** the braces (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Appends a top-level variable (`kind` defaults to `const`). |
 | `addClass(name, source, opts?)` | Appends a top-level class. `source` **excludes** the braces, and the op adds them. |
+| `addArrayElement(locator, element)` | Appends `element` to the array literal that `locator` points at, keeping the list's layout. A no-op when the element is already there. See [Nested arrays](#nested-arrays-addarrayelement). |
+| `addClassProperty(className, name, initializer, opts?)` | Adds `name = initializer;` after the last property of the only class named `className`. A no-op when the same property exists. |
 | `.modify(fn)` | The universal escape hatch: direct [ts-morph](https://ts-morph.com) access to the file's AST for anything the named ops don't cover. |
 
 Note the deliberate contrast between the two `source` conventions:
@@ -74,23 +93,184 @@ await ts.find("src/index.ts").addClass("Point", "  x = 0;");
 ```
 
 `addVariable` emits `{export }{kind} {name} = {initializer};`. `kind` accepts `"const"`
-(default), `"let"`, or `"var"`:
+(default), `"let"`, or `"var"`, and rejects any other value:
 
 ```ts
 await ts.find("src/index.ts").addVariable("counter", "0", { export: true, kind: "let" });
 // -> export let counter = 0;
 ```
 
+### Import forms and barrel files
+
+Each import form has its own op. Running one twice changes the file once:
+
+```ts
+await ts
+  .find("src/main.ts")
+  .addDefaultImport("express", "express")
+  .addTypeImport("Request", "express")
+  .addSideEffectImport("reflect-metadata");
+// -> import express from "express";
+// -> import type { Request } from "express";
+// -> import "reflect-metadata";
+```
+
+The re-export ops build barrel files. Generate a file, then export it from `index.ts`:
+
+```ts
+import { create } from "@pbuilder/sdk/commons";
+import * as ts from "@pbuilder/sdk/typescript";
+
+create("src/user.service.ts", { template: "export class UserService {}", options: {} });
+await ts
+  .find("src/index.ts")
+  .addReExport("UserService", "./user.service")
+  .addExportAll("./dto");
+// -> export { UserService } from "./user.service";
+// -> export * from "./dto";
+```
+
+`addReExport` and `addExportAll` reject a name the file already exports by any route (another
+re-export, an `export * as`, or an exported declaration), because two exports sharing a name
+are invalid TypeScript. `addReExport` and `removeExport` match by source name, so
+`export { name as Y }` already counts. `removeExport` never touches a local `export { x }` or
+an `export *`, and each `export *` form only removes itself.
+
+**Name validation.** Every op checks `name` before it touches the file. It must be a plain
+ASCII JavaScript identifier (`^[A-Za-z_$][A-Za-z0-9_$]*$`), not a reserved or
+strict-mode-restricted word (`class`, `await`, `eval`, `arguments`, …), and not `__proto__`,
+`constructor`, or `prototype`. A rejected name leaves the file unchanged, and `removeImport`
+rejects it even when there was nothing to remove.
+
 **Collision rules.** The `add*` ops fail loud on a name collision with an existing value
-declaration or import binding, because two value declarations sharing a name is invalid TypeScript. A
-`type`/`interface` sharing the name does **not** collide (TypeScript legally permits a value and
-a type to share an identifier).
+declaration or import binding, because two value declarations sharing a name is invalid
+TypeScript. An import binding is any import form: named, default (`import X from "m"`) and
+namespace (`import * as X from "m"`), type-only ones included. A `type`/`interface` sharing the
+name does **not** collide (TypeScript legally permits a value and a type to share an
+identifier).
 
 <Aside type="caution" title="Verbatim source strings">
 `source`/`initializer` strings are inserted **verbatim**, never validated or sanitized, so the
 author owns their syntax, and anything derived from untrusted input (schema options, CLI
 answers, network data) is the author's responsibility to sanitize.
 </Aside>
+
+### Nested arrays: `addArrayElement`
+
+Most generators create a file and then register it somewhere: a provider in `appConfig`, a
+guard on a route, a module in `@NgModule`. `addArrayElement(locator, element)` makes that edit.
+The `locator` names a root and then a `path` from that root to the array:
+
+| Root | Starts at |
+|---|---|
+| `{ variable: "appConfig", path }` | The initializer of that top-level variable |
+| `{ call: "bootstrapApplication", argument: 1, path }` | That argument of the only call to `bootstrapApplication` |
+| `{ decorator: "NgModule", path }` | The argument of the only `@NgModule(...)` |
+
+Each `path` segment is an object key (`"providers"`) or a match such as `{ path: "admin" }`,
+which selects the only array element whose `path` property is `"admin"`. There are no numeric
+indices, because an index points at the wrong element once someone reorders the array. At each
+step the op looks through `as`, `satisfies`, `<T>` assertions, `!` and parentheses.
+
+```ts
+await ts
+  .find("src/app/app.config.ts")
+  .addImport("provideHttpClient", "@angular/common/http")
+  .addArrayElement({ variable: "appConfig", path: ["providers"] }, { expression: "provideHttpClient()" });
+// before: providers: [provideRouter(routes)],
+// after:  providers: [provideRouter(routes), provideHttpClient()],
+```
+
+A match walks into one entry of a list. Here the `admin` route has no `providers` key yet, so
+the op creates it:
+
+```ts
+await ts
+  .find("src/app/app.routes.ts")
+  .addImport("AdminGuard", "./admin/admin.guard")
+  .addArrayElement({ variable: "routes", path: [{ path: "admin" }, "providers"] }, "AdminGuard");
+```
+
+```ts
+// before
+export const routes: Routes = [
+  { path: "", component: HomeComponent },
+  {
+    path: "admin",
+    component: AdminComponent,
+  },
+];
+
+// after
+export const routes: Routes = [
+  { path: "", component: HomeComponent },
+  {
+    path: "admin",
+    component: AdminComponent,
+    providers: [AdminGuard],
+  },
+];
+```
+
+The op creates a missing key (`{}` becomes `{ providers: [X] }`) and the next missing argument
+of a call or decorator (`bootstrapApplication(App)` becomes
+`bootstrapApplication(App, { providers: [X] })`). It rejects, and leaves the file unchanged,
+when:
+
+- the root does not exist, or a match selects nothing;
+- the root or a match selects more than one node;
+- the argument is past the next one, such as `argument: 2` on `bootstrapApplication(App)`;
+- the missing key could already come from a spread (`{ ...base }`), a computed key, or a getter
+  or setter, since a new key might shadow it.
+
+`element` is an identifier, or `{ expression: "..." }` for code. The expression must parse as
+exactly one expression, so it cannot close the array or add a statement. The op inserts it
+verbatim otherwise, so never build it from consumer input. An element that is already in the
+array is a no-op: elements are compared token by token, and spacing, comments and trailing
+commas don't count. The new element follows the list's layout. A one-line list stays on one
+line, a multi-line list gets a new line at the last entry's indentation, and a trailing comma
+stays. The op adds no import, so pair it with `addImport`.
+
+### Class properties: `addClassProperty`
+
+`addClassProperty(className, name, initializer, options?)` writes
+`{scope }{readonly }name = initializer;` into an existing class. `options` is
+`{ scope?: "public" | "protected" | "private"; readonly?: boolean }`, and an omitted option
+writes nothing.
+
+```ts
+await ts
+  .find("src/app/user.service.ts")
+  .addImport("inject", "@angular/core")
+  .addClassProperty("UserService", "http", "inject(HttpClient)", { scope: "private", readonly: true });
+```
+
+```ts
+// before
+export class UserService {
+  private readonly cache = new Map<string, User>();
+
+  load(id: string) {
+    return this.cache.get(id);
+  }
+}
+
+// after
+export class UserService {
+  private readonly cache = new Map<string, User>();
+  private readonly http = inject(HttpClient);
+
+  load(id: string) {
+    return this.cache.get(id);
+  }
+}
+```
+
+The property goes after the class's last property, which keeps properties above the
+constructor and methods. A class without properties gets it as its first member. The file must
+have exactly one class named `className`. A property with the same declaration is a no-op, and
+any other member named `name`, a method included, rejects. `initializer` must parse as one
+expression and is inserted verbatim, like `{ expression }`. The op adds no import.
 
 ## The React dialect
 
@@ -152,11 +332,12 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 
 | You need to… | Use |
 |---|---|
-| Add or remove an import, add a top-level declaration, set one JSX prop | The dialect's [named ops](#the-typescript-dialect) |
+| Add or remove an import, add a top-level declaration, append to an array, add a class property, set one JSX prop | The dialect's [named ops](#the-typescript-dialect) |
 | Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
 | Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
-| Edit a JSON or YAML file | The [JSON](/guides/json-dialect/) or [YAML](/guides/yaml-dialect/) dialect |
-| Edit a file type no dialect covers, such as Markdown or CSS | [`find` from `@pbuilder/sdk/commons`](#files-without-a-dialect) |
+| Register a component, provider or route, or add a signal or `inject()` member in Angular | The [Angular dialect](/guides/angular-dialect/) |
+| Edit a JSON, YAML or CSS file | The [JSON](/guides/json-dialect/), [YAML](/guides/yaml-dialect/) or [CSS](/guides/css-dialect/) dialect |
+| Edit a file type no dialect covers, such as Markdown | [`find` from `@pbuilder/sdk/commons`](#files-without-a-dialect) |
 
 The callback receives **only the AST**: a ts-morph `SourceFile` for both dialects on this page,
 the same live instance the named ops mutate. There is no second argument. Named ops and
@@ -184,8 +365,10 @@ backs each dialect is listed in [AST libraries](/reference/ast-libraries/).
 
 ### Example: register a route (TypeScript)
 
-The TypeScript dialect has no op to append to an array literal. This factory adds a path to
-an exported `routes` array, and does nothing when it is already there:
+[`addArrayElement`](#nested-arrays-addarrayelement) takes only code you wrote yourself. When the
+element comes from consumer input, build it in `.modify()` so you control the quoting. This
+factory adds a path from its input to an exported `routes` array, and does nothing when the path
+is already there:
 
 ```ts title="src/routes.ts (before)"
 export const routes = [
@@ -319,8 +502,8 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Files without a dialect
 
-Dialects exist for `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml` and `.yml` today. Any other file
-(a Markdown index, a stylesheet, an `.env` file) is still editable with `find` from `@pbuilder/sdk/commons`: it
+Dialects exist for `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml`, `.yml` and `.css` today. Any other
+file (a Markdown index, an `.scss` stylesheet, an `.env` file) is still editable with `find` from `@pbuilder/sdk/commons`: it
 returns a handle for **any** path, with `read()` plus the text-level verbs
 (`replaceContent`, `rename`, `move`, `copy`, `remove`). There is no AST: read the content,
 transform it with whatever parser fits the format, and write the result back.
@@ -372,8 +555,11 @@ Two differences from a dialect edit:
 
 - [JSON dialect](/guides/json-dialect/) and [YAML dialect](/guides/yaml-dialect/): named ops
   for JSON, JSONC and YAML files that keep comments and formatting.
+- [CSS dialect](/guides/css-dialect/): set and remove declarations in a `.css` file, such as
+  design tokens in a Tailwind `@theme` block.
 - [NestJS dialect](/guides/nestjs-dialect/): register classes in a NestJS `@Module`.
-- [NestJS dialect](/guides/nestjs-dialect/): register classes in a NestJS `@Module`.
+- [Angular dialect](/guides/angular-dialect/): register components, providers and routes, and
+  add signal and `inject()` members.
 - [AST libraries](/reference/ast-libraries/): which library and version back each dialect,
   and how `astLibrary` exposes them.
 - **Building a dialect of your own** is a contributor-level surface. Every dialect must export
@@ -381,7 +567,6 @@ Two differences from a dialect edit:
   and a library exercise. See the SDK's
   [dialect authoring guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration).
 
-Support for more file types such as HTML and CSS
-(each backed by its own parser/AST library), and framework-aware dialects for Angular, Vue,
-and Svelte, are planned. Until then, edit those files with `find` from
+Support for more file types such as HTML (each backed by its own parser/AST library), and
+framework-aware dialects for Vue and Svelte, are planned. Until then, edit those files with `find` from
 `@pbuilder/sdk/commons`.

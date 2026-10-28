@@ -38,7 +38,9 @@ export class AppModule {}
 ## Ops heredadas de TypeScript
 
 El handle tiene todas las ops del [dialecto TypeScript](/es/guides/modify/): `addImport`,
-`addFunction`, `addVariable`, `addClass` y `removeImport`. Una op que el dialecto TypeScript
+`addDefaultImport`, `addNamespaceImport`, `addTypeImport`, `addSideEffectImport`,
+`addReExport`, `addExportAll`, `addFunction`, `addVariable`, `addClass`, `addArrayElement`,
+`addClassProperty`, `removeImport`, `removeExport` y `removeExportAll`. Una op que el dialecto TypeScript
 sume más adelante también queda disponible acá.
 
 ## Ops de `@Module`
@@ -66,8 +68,9 @@ agrega una sentencia `import`.
 
 Una entrada nueva sigue el formato de la lista a la que se suma. Una lista de una línea queda
 en una línea, una lista multilínea recibe una línea nueva con la indentación de su última
-entrada, y una coma final se mantiene. Todo lo que está fuera del texto insertado queda
-idéntico byte a byte.
+entrada, y una coma final se mantiene. Una coma dentro de un comentario después de la última
+entrada (`[A /* x, y */]`) no se toma como coma final. Todo lo que está fuera del texto
+insertado queda idéntico byte a byte.
 
 ## Rechazos
 
@@ -81,12 +84,27 @@ Una op se rechaza, y el archivo queda sin cambios, cuando:
 Igual que el dialecto TypeScript, `find(path)` acepta cualquier ruta `.ts`. Un archivo sin
 `@Module` solo falla cuando corre una de estas ops.
 
+## Entradas que no son un nombre de clase
+
+Las ops de `@Module` reciben un nombre de clase. Para una entrada como `ConfigModule.forRoot()`
+o `{ provide: TOKEN, useValue: 1 }`, usa la op heredada
+[`addArrayElement`](/es/guides/modify/#arrays-anidados-addarrayelement) con una raíz
+`decorator`, y agrega el import tú mismo:
+
+```ts
+await nestjs
+  .find("src/app.module.ts")
+  .addImport("ConfigModule", "@nestjs/config")
+  .addArrayElement({ decorator: "Module", path: ["imports"] }, { expression: "ConfigModule.forRoot()" });
+// antes:   @Module({ imports: [] })
+// después: @Module({ imports: [ConfigModule.forRoot()] })
+```
+
 ## Ediciones a medida con `.modify()`
 
-Usa `.modify(fn)` para entradas que no son un nombre de clase simple, como
-`ConfigModule.forRoot()` o `{ provide: TOKEN, useValue: 1 }`, y para los archivos que las ops
-rechazan. El callback recibe el `SourceFile` vivo de ts-morph, y el export `astLibrary` del
-módulo es ts-morph:
+Usa `.modify(fn)` para los archivos que las ops rechazan y para ediciones que ninguna op cubre.
+El callback recibe el `SourceFile` vivo de ts-morph, y el export `astLibrary` del módulo es
+ts-morph. Este ejemplo hace a mano la misma edición que la llamada a `addArrayElement` de arriba:
 
 ```ts
 import * as nestjs from "@pbuilder/sdk/nestjs";
