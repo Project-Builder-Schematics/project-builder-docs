@@ -1,6 +1,6 @@
 ---
 title: CSS dialect
-description: Set and remove declarations in .css files with @pbuilder/sdk/css, for example to sync design tokens into a Tailwind 4 file, plus getDeclaration and the .modify() escape hatch.
+description: Set and remove declarations in .css files with @pbuilder/sdk/css, for example to sync design tokens into a Tailwind 4 file, plus the getDeclaration query and the .modify() escape hatch.
 sidebar:
   order: 14
 ---
@@ -191,10 +191,22 @@ await css.find("app.css").modify((root) => {
 });
 ```
 
-### Reading a value with `getDeclaration(root, target, property)`
+### Reading a value with `getDeclaration`
 
-Ops do not return values, so the module exports a plain function for reading. It takes a parsed
-`Root` and returns `{ value, important }`, or `undefined` when the block or declaration is
+On the handle, `getDeclaration(target, property)` is a [query](/guides/modify/#queries). It ends
+the chain and resolves to `{ value, important }`, or `undefined` when the block or declaration
+is missing. It sees every op chained before it, and those ops still commit:
+
+```ts
+const primary = await css
+  .find("tokens.css")
+  .setDeclaration({ atRule: "theme" }, "--color-primary", "#1974f9")
+  .getDeclaration({ atRule: "theme" }, "--color-primary");
+// primary: { value: "#1974f9", important: false }
+```
+
+The module also exports `getDeclaration(root, target, property)` as a plain function. It takes a
+parsed `Root` and returns `{ value, important }`, or `undefined` when the block or declaration is
 missing. It follows the same target, name, ambiguity, and duplicate rules as the ops, and throws
 the same errors. Call it inside `.modify(fn)` to decide what to change. This factory updates
 `--color-primary` in `@theme` only when it still has the old value:

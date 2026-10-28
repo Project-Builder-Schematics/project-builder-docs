@@ -46,6 +46,14 @@ contenido en el límite del run en lugar de como un unhandled rejection. Haz `aw
 mismo cuando necesites secuenciar una lectura después de tu propia escritura, o para observar un
 fallo localmente en tu propio `try`/`catch`.
 
+### Queries
+
+La mayoría de las ops escriben y devuelven el handle, así que se encadenan. Un dialecto también
+puede declarar queries, que leen un valor. Una query termina la cadena: haz `await` y resuelve
+al valor. Ve todas las ops encadenadas antes que ella en el mismo handle, no escribe nada, y las
+ops anteriores se confirman igual. Una query que cambiaría el archivo rechaza y hace fallar el
+run. `getDeclaration` del [dialecto CSS](/es/guides/css-dialect/) es una query.
+
 ## El dialecto de TypeScript
 
 ```ts

@@ -1,6 +1,6 @@
 ---
 title: Dialecto CSS
-description: Asigna y elimina declaraciones en archivos .css con @pbuilder/sdk/css, por ejemplo para sincronizar tokens de diseño en un archivo de Tailwind 4, más getDeclaration y el escape .modify().
+description: Asigna y elimina declaraciones en archivos .css con @pbuilder/sdk/css, por ejemplo para sincronizar tokens de diseño en un archivo de Tailwind 4, más la query getDeclaration y el escape .modify().
 sidebar:
   order: 14
 ---
@@ -198,10 +198,22 @@ await css.find("app.css").modify((root) => {
 });
 ```
 
-### Leer un valor con `getDeclaration(root, target, property)`
+### Leer un valor con `getDeclaration`
 
-Las ops no devuelven valores, así que el módulo exporta una función normal para leer. Recibe un
-`Root` ya parseado y devuelve `{ value, important }`, o `undefined` cuando falta el bloque o la
+Sobre el handle, `getDeclaration(target, property)` es una [query](/es/guides/modify/#queries).
+Termina la cadena y resuelve a `{ value, important }`, o a `undefined` cuando falta el bloque o
+la declaración. Ve todas las ops encadenadas antes que ella, y esas ops se confirman igual:
+
+```ts
+const primary = await css
+  .find("tokens.css")
+  .setDeclaration({ atRule: "theme" }, "--color-primary", "#1974f9")
+  .getDeclaration({ atRule: "theme" }, "--color-primary");
+// primary: { value: "#1974f9", important: false }
+```
+
+El módulo también exporta `getDeclaration(root, target, property)` como función normal. Recibe
+un `Root` ya parseado y devuelve `{ value, important }`, o `undefined` cuando falta el bloque o la
 declaración. Sigue las mismas reglas de target, nombre, ambigüedad y duplicados que las ops, y
 lanza los mismos errores. Llámala dentro de `.modify(fn)` para decidir qué cambiar. Esta factory
 actualiza `--color-primary` en `@theme` solo cuando todavía tiene el valor viejo:

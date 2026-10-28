@@ -43,6 +43,14 @@ still surfaces its error contained at the run boundary instead of as an unhandle
 `await` the chain yourself when you need to sequence a read after your own write, or to observe
 a failure locally in your own `try`/`catch`.
 
+### Queries
+
+Most ops write and return the handle, so they chain. A dialect can also declare queries, which
+read a value. A query ends the chain: `await` it and it resolves to the value. It sees every op
+chained before it on the same handle, writes nothing, and the ops before it still commit. A
+query that would change the file rejects and fails the run. The
+[CSS dialect](/guides/css-dialect/)'s `getDeclaration` is a query.
+
 ## The TypeScript dialect
 
 ```ts
