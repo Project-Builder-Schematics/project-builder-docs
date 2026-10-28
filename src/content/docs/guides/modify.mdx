@@ -15,8 +15,8 @@ prints the result back. Each file type gets the AST library that fits it best. T
 on TypeScript's own AST (surfaced through ts-morph), because TS and TSX share a grammar. JSON and
 YAML files have dialects of their own: see [JSON dialect](/guides/json-dialect/) and
 [YAML dialect](/guides/yaml-dialect/), and CSS files use the [CSS dialect](/guides/css-dialect/).
-The [NestJS dialect](/guides/nestjs-dialect/) and the [Angular dialect](/guides/angular-dialect/)
-add framework ops on top of the TypeScript ones.
+The React dialect, the [NestJS dialect](/guides/nestjs-dialect/) and the
+[Angular dialect](/guides/angular-dialect/) add framework ops on top of the TypeScript ones.
 
 ## How a dialect handle works
 
@@ -63,7 +63,7 @@ await ts.find("src/index.ts")
 
 | Op | What it does |
 |---|---|
-| `addImport(name, from)` | Adds `import { name } from "from"`, merging into an existing clause from the same module. Idempotent: calling it twice never duplicates the import. |
+| `addImport(name, from, opts?)` | Adds `import { name } from "from"`, merging into an existing clause from the same module. Idempotent: calling it twice never duplicates the import. With `{ position: "sorted" }` it places the import in order instead of appending it. See [Sorted imports](#sorted-imports). |
 | `addDefaultImport(name, from)` | Adds `import name from "from"`, merging into a declaration of that module with no default yet. Rejects a second default under another name. |
 | `addNamespaceImport(name, from)` | Adds `import * as name from "from"`, merging into a default-only declaration. Beside named imports it opens its own declaration. |
 | `addTypeImport(name, from)` | Adds `import type { name } from "from"` as its own statement, never merged into a value import. A no-op when the module already imports `name`, by value or as a type. |
@@ -73,6 +73,7 @@ await ts.find("src/index.ts")
 | `removeImport(name, from)` | Removes the named binding; deletes the whole statement when it was the last one. Idempotent on an absent binding. |
 | `removeExport(name, from)` | Removes a named re-export; deletes the statement when it was the last one. Idempotent on an absent one. |
 | `removeExportAll(from, { as? })` | Removes `export * from "from"` (or the `as` form). Idempotent on an absent one. |
+| `sortImports()` | Sorts the file's import declarations by module, and the names inside each one's braces. Only reorders. A no-op on a sorted file. See [Sorted imports](#sorted-imports). |
 | `addFunction(name, source, opts?)` | Appends a top-level function. `source` **includes** the braces (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Appends a top-level variable (`kind` defaults to `const`). |
 | `addClass(name, source, opts?)` | Appends a top-level class. `source` **excludes** the braces, and the op adds them. |
@@ -154,6 +155,47 @@ identifier).
 author owns their syntax, and anything derived from untrusted input (schema options, CLI
 answers, network data) is the author's responsibility to sanitize.
 </Aside>
+
+### Sorted imports
+
+`addImport` appends by default. Pass `{ position: "sorted" }` to keep a file's imports in order:
+the name goes into its alphabetical place inside the braces, and a new declaration goes next to
+its folder siblings, before the first of them that sorts after it.
+
+```ts
+// import { BookOpen, Users } from "lucide-react";
+// import { authorHandlers } from "./domains/authors.mock";
+// import { config } from "./config";
+await ts.find("src/mocks/handlers.ts")
+  .addImport("LayoutDashboard", "lucide-react", { position: "sorted" })
+  .addImport("bookHandlers", "./domains/books.mock", { position: "sorted" });
+// import { BookOpen, LayoutDashboard, Users } from "lucide-react";
+// import { authorHandlers } from "./domains/authors.mock";
+// import { bookHandlers } from "./domains/books.mock";
+// import { config } from "./config";
+```
+
+`sortImports()` sorts the whole file instead: its import declarations by module, and the names
+inside each declaration's braces, in the same order. A multi-line brace layout is kept.
+
+Both follow the same rules:
+
+- Sorting is case-insensitive, and package specifiers (`react`, `node:fs`, `@/lib`) sort ahead
+  of relative ones.
+- A module's folder siblings are the existing imports that share the most leading path segments
+  with `from`. In a file with no imports, the declaration goes where the unsorted form puts it.
+- Sorted `addImport` never moves existing imports, so a file that was out of order stays out of
+  order around the new line. A new declaration goes above a comment attached to the import it
+  precedes.
+- Without the option, `addImport` behaves as before. Any other `position` value rejects and
+  leaves the file unchanged.
+- Inserted imports match the file's quotes and semicolons, like every insertion.
+- `sortImports` only reorders. It never combines two declarations of one module, removes an
+  unused import, or reformats one, and on a sorted file it writes nothing.
+- Declarations move only within a run of consecutive imports. A blank line, a comment, a
+  side-effect import (`import "./polyfills";`, whose position changes behaviour), or a
+  declaration with a comment attached ends the run, and nothing crosses it. Braces that contain
+  a comment keep their order.
 
 ### Nested arrays: `addArrayElement`
 
@@ -275,8 +317,10 @@ expression and is inserted verbatim, like `{ expression }`. The op adds no impor
 ## The React dialect
 
 `@pbuilder/sdk/react` mutates `.tsx` files, and `find()` requires the explicit `.tsx` extension
-(extensionless and `.jsx` paths are rejected, never normalized). The v1 op-pack is deliberately
-minimal: two named ops, with `.modify(fn)` as the escape hatch for everything else:
+(extensionless and `.jsx` paths are rejected, never normalized). The handle carries every
+[TypeScript dialect](#the-typescript-dialect) op (`addImport`, `addDefaultImport`,
+`sortImports` and the rest) plus four JSX ops, with `.modify(fn)` as the escape hatch for
+everything else:
 
 ```ts
 import * as react from "@pbuilder/sdk/react";
@@ -292,12 +336,66 @@ await react
 
 | Op | What it does |
 |---|---|
-| `addImport(name, from)` | Same contract as the TypeScript dialect's: idempotent, named-binding-only (no default/namespace imports in v1). |
-| `setJsxProp(element, prop, value?)` | Sets a prop on **the one** element with that tag name. Zero or multiple matches reject loudly. `value` takes three forms: `'"hi"'` (string), `'{count}'` (expression), or omitted (boolean shorthand). |
+| `setJsxProp(target, prop, value?)` | Sets a prop on **the one** element `target` names. `value` takes three forms: `'"hi"'` (string), `'{count}'` (expression), or omitted (boolean shorthand). |
+| `removeJsxProp(target, prop)` | Removes a prop from **the one** element `target` names. An absent prop is a no-op, and a `{...spread}` is never touched, even when it may carry the prop. |
+| `addJsxChild(target, jsx)` | Appends `jsx`, one JSX element or fragment, as the last child of **the one** element `target` names. A child with the same text already there is a no-op. |
+| `wrapJsxElement(target, wrapper)` | Wraps **the one** element `target` names in `wrapper`, a self-closing JSX element whose props are kept. A no-op when the target is already directly inside that tag. |
 
-Because `addImport` is named-binding-only, `addImport("React", "react")` always prints
-`import { React } from "react"`, never `import React from "react"`. Default and namespace
-imports are deliberately left for follow-up scope.
+The import ops are the TypeScript dialect's own, with the same rules, so
+`addImport("React", "react")` prints `import { React } from "react"`. For
+`import React from "react"`, use `addDefaultImport("React", "react")`.
+
+### Picking the element
+
+Every JSX op edits exactly one element, and rejects when zero or several elements match.
+`target` is a tag name (`"Button"`), or an object that adds props
+to narrow the match. A string prop value must equal the attribute's initializer text as written
+in the source, quotes included; `true` matches the prop with any value, shorthand included:
+
+```ts
+// src/App.tsx before:
+// <Routes>
+//   <Route path="/" element={<Home />} />
+//   <Route path="/users" element={<Users />} />
+// </Routes>
+await react
+  .find("src/App.tsx")
+  .setJsxProp({ tag: "Route", props: { path: '"/users"' } }, "caseSensitive");
+// -> <Route path="/users" element={<Users />} caseSensitive />
+```
+
+A reject message names the tag and the prop names, never the prop values.
+
+### Children and wrappers
+
+`addJsxChild` puts the child on its own line at the siblings' indentation, or inline when the
+element's content is inline. A self-closing target becomes an open/close pair. `jsx` must be
+exactly one JSX element or fragment; anything else rejects without echoing it.
+
+```ts
+// src/App.tsx before:
+// <Routes>
+//   <Route path="/" element={<Home />} />
+// </Routes>
+await react
+  .find("src/App.tsx")
+  .addImport("Users", "./pages/Users")
+  .addJsxChild("Routes", '<Route path="/users" element={<Users />} />');
+// -> <Routes>
+// ->   <Route path="/" element={<Home />} />
+// ->   <Route path="/users" element={<Users />} />
+// -> </Routes>
+```
+
+`wrapJsxElement` takes a self-closing wrapper and puts the target inside it:
+
+```ts
+// src/main.tsx before: root.render(<App />);
+await react.find("src/main.tsx").wrapJsxElement("App", "<QueryProvider client={queryClient} />");
+// -> root.render(<QueryProvider client={queryClient}><App /></QueryProvider>);
+```
+
+Neither op adds an import, so pair them with `addImport`.
 
 Two React-specific subtleties:
 
@@ -305,16 +403,16 @@ Two React-specific subtleties:
   at runtime under React's later-position precedence: `<Button {...rest} />` plus
   `setJsxProp("Button", "onClick", "{safe}")` prints `<Button {...rest} onClick={safe} />`, and
   `safe` wins even if `rest` also supplies an `onClick`.
-- **Collision rejects.** `addImport` rejects when `name` is already bound elsewhere in the file
-  under a different binding: a different module, a same-module alias or type-only specifier, or
-  a top-level value declaration (`function`/`const`/`class`/…) sharing the name. There is no
-  alias argument to route around it; renaming the existing binding or choosing a different
-  `name` is on you.
+- **Collision rejects.** `addImport` follows the TypeScript [collision rules](#import-forms-and-barrel-files):
+  a `name` already bound some other way in the file rejects with
+  `a value or import binding named "X" already exists`. There is no alias argument to route
+  around it; renaming the existing binding or choosing a different `name` is on you.
 
-<Aside type="caution" title="The value trust boundary">
-`setJsxProp`'s `value` is emitted verbatim into executable code, with the same trust boundary as the
-TypeScript `source` strings. The SDK performs no validation, escaping, or sanitisation on it.
-By contrast, `element` and `prop` are validated name arguments and are not a trusted-code
+<Aside type="caution" title="The trust boundary">
+`setJsxProp`'s `value`, `addJsxChild`'s `jsx` and `wrapJsxElement`'s `wrapper` are emitted
+verbatim into executable code, with the same trust boundary as the TypeScript `source` strings.
+The SDK checks that `jsx` and `wrapper` are one JSX node, and does no escaping or sanitisation.
+By contrast, tag and prop names are validated name arguments and are not a trusted-code
 channel.
 </Aside>
 
@@ -332,7 +430,7 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 
 | You need to… | Use |
 |---|---|
-| Add or remove an import, add a top-level declaration, append to an array, add a class property, set one JSX prop | The dialect's [named ops](#the-typescript-dialect) |
+| Add, remove or sort imports, add a top-level declaration, append to an array, add a class property, edit one JSX element's props, children or wrapper | The dialect's [named ops](#the-typescript-dialect) |
 | Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
 | Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
 | Register a component, provider or route, or add a signal or `inject()` member in Angular | The [Angular dialect](/guides/angular-dialect/) |
@@ -411,8 +509,9 @@ Running it again with the same input leaves the file unchanged.
 
 ### Example: add a `<Route>` (React)
 
-`setJsxProp` edits props, not children. This factory combines a named op with `.modify()` to
-import a page and add a `<Route>` inside `<Routes>`, with one write for both:
+`addJsxChild` skips a child only when the same text is already there. This factory uses
+`.modify()` to skip the `<Route>` when any route already has that `path`, whatever its
+`element`, and imports the page in the same write:
 
 ```tsx title="src/App.tsx (before)"
 import { Routes, Route } from "react-router-dom";

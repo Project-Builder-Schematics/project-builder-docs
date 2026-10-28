@@ -16,7 +16,8 @@ recibe la librería de AST que mejor le calza. Los dialectos `@pbuilder/sdk/type
 TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática. Los archivos
 JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-dialect/) y
 [Dialecto YAML](/es/guides/yaml-dialect/), y los archivos CSS usan el
-[Dialecto CSS](/es/guides/css-dialect/). El [Dialecto NestJS](/es/guides/nestjs-dialect/) y el
+[Dialecto CSS](/es/guides/css-dialect/). El dialecto de React, el
+[Dialecto NestJS](/es/guides/nestjs-dialect/) y el
 [Dialecto Angular](/es/guides/angular-dialect/) suman ops de framework a las de TypeScript.
 
 ## Cómo funciona un handle de dialecto
@@ -66,7 +67,7 @@ await ts.find("src/index.ts")
 
 | Op | Qué hace |
 |---|---|
-| `addImport(name, from)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente: llamarla dos veces nunca duplica el import. |
+| `addImport(name, from, opts?)` | Agrega `import { name } from "from"`, fusionándose con una cláusula existente del mismo módulo. Idempotente: llamarla dos veces nunca duplica el import. Con `{ position: "sorted" }` ubica el import en orden en lugar de agregarlo al final. Ver [Imports ordenados](#imports-ordenados). |
 | `addDefaultImport(name, from)` | Agrega `import name from "from"`, fusionándose con una declaración de ese módulo que todavía no tiene default. Rechaza un segundo default con otro nombre. |
 | `addNamespaceImport(name, from)` | Agrega `import * as name from "from"`, fusionándose con una declaración que solo tiene default. Junto a imports nombrados abre su propia declaración. |
 | `addTypeImport(name, from)` | Agrega `import type { name } from "from"` como sentencia propia, nunca fusionada con un import de valor. No hace nada si el módulo ya importa `name`, como valor o como tipo. |
@@ -76,6 +77,7 @@ await ts.find("src/index.ts")
 | `removeImport(name, from)` | Elimina el binding nombrado; borra la sentencia completa cuando era el último. Idempotente sobre un binding ausente. |
 | `removeExport(name, from)` | Elimina un re-export nombrado; borra la sentencia cuando era el último. Idempotente si no existe. |
 | `removeExportAll(from, { as? })` | Elimina `export * from "from"` (o la forma con `as`). Idempotente si no existe. |
+| `sortImports()` | Ordena las declaraciones de import del archivo por módulo, y los nombres dentro de las llaves de cada una. Solo reordena. Es un no-op en un archivo ya ordenado. Ver [Imports ordenados](#imports-ordenados). |
 | `addFunction(name, source, opts?)` | Agrega una función de nivel superior al final. `source` **incluye** las llaves (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Agrega una variable de nivel superior al final (`kind` por defecto es `const`). |
 | `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves, y la op las agrega. |
@@ -159,6 +161,51 @@ sanitizarse, así que el autor es dueño de su sintaxis, y cualquier cosa deriva
 confiable (opciones de schema, respuestas del CLI, datos de red) es responsabilidad del autor
 sanitizarla.
 </Aside>
+
+### Imports ordenados
+
+Por defecto, `addImport` agrega al final. Pasa `{ position: "sorted" }` para mantener los
+imports de un archivo en orden: el nombre va a su lugar alfabético dentro de las llaves, y una
+declaración nueva va junto a sus hermanas de carpeta, antes de la primera que ordena después de
+ella.
+
+```ts
+// import { BookOpen, Users } from "lucide-react";
+// import { authorHandlers } from "./domains/authors.mock";
+// import { config } from "./config";
+await ts.find("src/mocks/handlers.ts")
+  .addImport("LayoutDashboard", "lucide-react", { position: "sorted" })
+  .addImport("bookHandlers", "./domains/books.mock", { position: "sorted" });
+// import { BookOpen, LayoutDashboard, Users } from "lucide-react";
+// import { authorHandlers } from "./domains/authors.mock";
+// import { bookHandlers } from "./domains/books.mock";
+// import { config } from "./config";
+```
+
+`sortImports()` ordena el archivo completo: sus declaraciones de import por módulo, y los nombres
+dentro de las llaves de cada declaración, con el mismo orden. Un formato de llaves en varias
+líneas se conserva.
+
+Ambas siguen las mismas reglas:
+
+- El orden no distingue mayúsculas, y los specifiers de paquete (`react`, `node:fs`, `@/lib`)
+  van antes que los relativos.
+- Las hermanas de carpeta de un módulo son los imports existentes que comparten más segmentos
+  iniciales de ruta con `from`. En un archivo sin imports, la declaración va donde la pondría la
+  forma sin ordenar.
+- El `addImport` ordenado nunca mueve imports existentes, así que un archivo que estaba
+  desordenado sigue desordenado alrededor de la línea nueva. Una declaración nueva va encima de
+  un comentario pegado al import que la sigue.
+- Sin la opción, `addImport` se comporta como antes. Cualquier otro valor de `position` rechaza y
+  deja el archivo sin cambios.
+- Los imports insertados respetan las comillas y los punto y coma del archivo, como toda
+  inserción.
+- `sortImports` solo reordena. Nunca combina dos declaraciones del mismo módulo, ni quita un
+  import sin uso, ni reformatea uno, y en un archivo ya ordenado no escribe nada.
+- Las declaraciones se mueven solo dentro de una racha de imports consecutivos. Una línea en
+  blanco, un comentario, un import de efecto secundario (`import "./polyfills";`, cuya posición
+  cambia el comportamiento) o una declaración con un comentario pegado cortan la racha, y nada la
+  cruza. Las llaves que contienen un comentario conservan su orden.
 
 ### Arrays anidados: `addArrayElement`
 
@@ -282,9 +329,10 @@ declaración no cambia nada, y cualquier otro miembro llamado `name`, incluido u
 ## El dialecto de React
 
 `@pbuilder/sdk/react` muta archivos `.tsx`, y `find()` requiere la extensión `.tsx` explícita
-(las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El paquete de ops de la
-v1 es deliberadamente mínimo: dos ops con nombre, con `.modify(fn)` como escape para todo lo
-demás:
+(las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El handle tiene todas
+las ops del [dialecto de TypeScript](#el-dialecto-de-typescript) (`addImport`,
+`addDefaultImport`, `sortImports` y el resto) más cuatro ops de JSX, con `.modify(fn)` como
+escape para todo lo demás:
 
 ```ts
 import * as react from "@pbuilder/sdk/react";
@@ -300,12 +348,68 @@ await react
 
 | Op | Qué hace |
 |---|---|
-| `addImport(name, from)` | El mismo contrato que la del dialecto de TypeScript: idempotente, solo bindings nombrados (sin imports default ni de namespace en la v1). |
-| `setJsxProp(element, prop, value?)` | Asigna una prop en **el único** elemento con ese nombre de tag. Cero o múltiples coincidencias rechazan ruidosamente. `value` toma tres formas: `'"hi"'` (string), `'{count}'` (expresión), u omitido (shorthand booleano). |
+| `setJsxProp(target, prop, value?)` | Asigna una prop en **el único** elemento que nombra `target`. `value` toma tres formas: `'"hi"'` (string), `'{count}'` (expresión), u omitido (shorthand booleano). |
+| `removeJsxProp(target, prop)` | Quita una prop del **único** elemento que nombra `target`. Una prop ausente es un no-op, y un `{...spread}` nunca se toca, aunque pueda traer la prop. |
+| `addJsxChild(target, jsx)` | Agrega `jsx`, un único elemento o fragmento JSX, como último hijo del **único** elemento que nombra `target`. Un hijo con el mismo texto ya presente es un no-op. |
+| `wrapJsxElement(target, wrapper)` | Envuelve el **único** elemento que nombra `target` en `wrapper`, un elemento JSX autocerrado cuyas props se conservan. Es un no-op cuando el target ya está directamente dentro de ese tag. |
 
-Como `addImport` es solo de bindings nombrados, `addImport("React", "react")` siempre imprime
-`import { React } from "react"`, nunca `import React from "react"`. Los imports default y de
-namespace se dejaron a propósito para un alcance futuro.
+Las ops de import son las del dialecto de TypeScript, con las mismas reglas, así que
+`addImport("React", "react")` imprime `import { React } from "react"`. Para
+`import React from "react"`, usa `addDefaultImport("React", "react")`.
+
+### Elegir el elemento
+
+Cada op de JSX edita exactamente un elemento, y rechaza cuando coinciden cero o varios.
+`target` es un nombre de tag (`"Button"`), o un objeto que suma props para acotar la
+coincidencia. El valor string de una prop debe ser igual al texto del inicializador del atributo
+tal como está escrito en el código, comillas incluidas; `true` coincide con la prop con cualquier
+valor, shorthand incluido:
+
+```ts
+// src/App.tsx antes:
+// <Routes>
+//   <Route path="/" element={<Home />} />
+//   <Route path="/users" element={<Users />} />
+// </Routes>
+await react
+  .find("src/App.tsx")
+  .setJsxProp({ tag: "Route", props: { path: '"/users"' } }, "caseSensitive");
+// -> <Route path="/users" element={<Users />} caseSensitive />
+```
+
+Un mensaje de rechazo nombra el tag y los nombres de las props, nunca sus valores.
+
+### Hijos y envoltorios
+
+`addJsxChild` pone el hijo en su propia línea con la indentación de sus hermanos, o en línea
+cuando el contenido del elemento está en línea. Un target autocerrado pasa a tener apertura y
+cierre. `jsx` debe ser exactamente un elemento o fragmento JSX; cualquier otra cosa se rechaza
+sin repetirla en el mensaje.
+
+```ts
+// src/App.tsx antes:
+// <Routes>
+//   <Route path="/" element={<Home />} />
+// </Routes>
+await react
+  .find("src/App.tsx")
+  .addImport("Users", "./pages/Users")
+  .addJsxChild("Routes", '<Route path="/users" element={<Users />} />');
+// -> <Routes>
+// ->   <Route path="/" element={<Home />} />
+// ->   <Route path="/users" element={<Users />} />
+// -> </Routes>
+```
+
+`wrapJsxElement` recibe un wrapper autocerrado y pone el target dentro:
+
+```ts
+// src/main.tsx antes: root.render(<App />);
+await react.find("src/main.tsx").wrapJsxElement("App", "<QueryProvider client={queryClient} />");
+// -> root.render(<QueryProvider client={queryClient}><App /></QueryProvider>);
+```
+
+Ninguna de las dos agrega imports, así que combínalas con `addImport`.
 
 Dos sutilezas específicas de React:
 
@@ -314,17 +418,18 @@ Dos sutilezas específicas de React:
   `<Button {...rest} />` más `setJsxProp("Button", "onClick", "{safe}")` imprime
   `<Button {...rest} onClick={safe} />`, y `safe` gana incluso si `rest` también provee un
   `onClick`.
-- **Rechazo por colisión.** `addImport` rechaza cuando `name` ya está ligado en otra parte del
-  archivo bajo un binding distinto: otro módulo, un alias del mismo módulo o un specifier
-  type-only, o una declaración de valor de nivel superior (`function`/`const`/`class`/…) que
-  comparte el nombre. No hay argumento de alias para esquivarlo; renombrar el binding existente
-  o elegir otro `name` corre por tu cuenta.
+- **Rechazo por colisión.** `addImport` sigue las
+  [reglas de colisión](#formas-de-import-y-archivos-barrel) de TypeScript: un `name` que ya está
+  ligado de otra forma en el archivo rechaza con
+  `a value or import binding named "X" already exists`. No hay argumento de alias para
+  esquivarlo; renombrar el binding existente o elegir otro `name` corre por tu cuenta.
 
-<Aside type="caution" title="El límite de confianza de value">
-El `value` de `setJsxProp` se emite tal cual dentro de código ejecutable, con el mismo límite de
-confianza que los strings `source` de TypeScript. El SDK no realiza validación, escapado ni
-sanitización sobre él. En contraste, `element` y `prop` son argumentos de nombre validados y no
-son un canal de código confiable.
+<Aside type="caution" title="El límite de confianza">
+El `value` de `setJsxProp`, el `jsx` de `addJsxChild` y el `wrapper` de `wrapJsxElement` se
+emiten tal cual dentro de código ejecutable, con el mismo límite de confianza que los strings
+`source` de TypeScript. El SDK verifica que `jsx` y `wrapper` sean un único nodo JSX, y no hace
+escapado ni sanitización. En contraste, los nombres de tag y de prop son argumentos de nombre
+validados y no son un canal de código confiable.
 </Aside>
 
 ## Idempotencia: seguro de re-ejecutar
@@ -343,7 +448,7 @@ edición:
 
 | Necesitas… | Usa |
 |---|---|
-| Agregar o quitar un import, agregar una declaración de nivel superior, agregar a un array, agregar una propiedad de clase, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
+| Agregar, quitar u ordenar imports, agregar una declaración de nivel superior, agregar a un array, agregar una propiedad de clase, editar las props, los hijos o el envoltorio de un elemento JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
 | Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
 | Registrar un provider, controller, import de módulo o export en un `@Module` de NestJS | El [dialecto NestJS](/es/guides/nestjs-dialect/) |
 | Registrar un componente, provider o ruta, o agregar un miembro signal o `inject()` en Angular | El [dialecto Angular](/es/guides/angular-dialect/) |
@@ -423,9 +528,9 @@ Ejecutarla otra vez con la misma entrada deja el archivo sin cambios.
 
 ### Ejemplo: agregar un `<Route>` (React)
 
-`setJsxProp` edita props, no hijos. Esta factory combina una op nombrada con `.modify()` para
-importar una página y agregar un `<Route>` dentro de `<Routes>`, con una sola escritura para ambas
-cosas:
+`addJsxChild` omite un hijo solo cuando ya está el mismo texto. Esta factory usa `.modify()`
+para omitir el `<Route>` cuando alguna ruta ya tiene ese `path`, sea cual sea su `element`, e
+importa la página en la misma escritura:
 
 ```tsx title="src/App.tsx (antes)"
 import { Routes, Route } from "react-router-dom";
