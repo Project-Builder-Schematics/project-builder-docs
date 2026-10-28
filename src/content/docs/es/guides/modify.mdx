@@ -15,8 +15,9 @@ recibe la librería de AST que mejor le calza. Los dialectos `@pbuilder/sdk/type
 `@pbuilder/sdk/react` que cubre esta página están ambos construidos sobre el AST propio de
 TypeScript (expuesto a través de ts-morph), porque TS y TSX comparten gramática. Los archivos
 JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-dialect/) y
-[Dialecto YAML](/es/guides/yaml-dialect/). Para módulos de NestJS, el
-[Dialecto NestJS](/es/guides/nestjs-dialect/) suma ops de `@Module` a las de TypeScript.
+[Dialecto YAML](/es/guides/yaml-dialect/), y los archivos CSS usan el
+[Dialecto CSS](/es/guides/css-dialect/). El [Dialecto NestJS](/es/guides/nestjs-dialect/) y el
+[Dialecto Angular](/es/guides/angular-dialect/) suman ops de framework a las de TypeScript.
 
 ## Cómo funciona un handle de dialecto
 
@@ -70,6 +71,8 @@ await ts.find("src/index.ts")
 | `addFunction(name, source, opts?)` | Agrega una función de nivel superior al final. `source` **incluye** las llaves (`"(): void {}"`). |
 | `addVariable(name, initializer, opts?)` | Agrega una variable de nivel superior al final (`kind` por defecto es `const`). |
 | `addClass(name, source, opts?)` | Agrega una clase de nivel superior al final. `source` **excluye** las llaves, y la op las agrega. |
+| `addArrayElement(locator, element)` | Agrega `element` al array literal al que apunta `locator`, manteniendo el formato de la lista. No hace nada si el elemento ya está. Ver [Arrays anidados](#arrays-anidados-addarrayelement). |
+| `addClassProperty(className, name, initializer, opts?)` | Agrega `name = initializer;` después de la última propiedad de la única clase llamada `className`. No hace nada si la misma propiedad ya existe. |
 | `.modify(fn)` | El escape universal: acceso directo a [ts-morph](https://ts-morph.com) sobre el AST del archivo para todo lo que las ops nombradas no cubren. |
 
 Nota el contraste deliberado entre las dos convenciones de `source`:
@@ -149,6 +152,125 @@ confiable (opciones de schema, respuestas del CLI, datos de red) es responsabili
 sanitizarla.
 </Aside>
 
+### Arrays anidados: `addArrayElement`
+
+La mayoría de los generadores crean un archivo y después lo registran en algún lado: un provider
+en `appConfig`, un guard en una ruta, un módulo en `@NgModule`. `addArrayElement(locator, element)`
+hace esa edición. El `locator` nombra una raíz y después un `path` desde esa raíz hasta el array:
+
+| Raíz | Empieza en |
+|---|---|
+| `{ variable: "appConfig", path }` | El inicializador de esa variable de nivel superior |
+| `{ call: "bootstrapApplication", argument: 1, path }` | Ese argumento de la única llamada a `bootstrapApplication` |
+| `{ decorator: "NgModule", path }` | El argumento del único `@NgModule(...)` |
+
+Cada segmento del `path` es una clave de objeto (`"providers"`) o una coincidencia como
+`{ path: "admin" }`, que selecciona el único elemento del array cuya propiedad `path` vale
+`"admin"`. No hay índices numéricos, porque un índice apunta al elemento equivocado en cuanto
+alguien reordena el array. En cada paso la op mira a través de `as`, `satisfies`, aserciones
+`<T>`, `!` y paréntesis.
+
+```ts
+await ts
+  .find("src/app/app.config.ts")
+  .addImport("provideHttpClient", "@angular/common/http")
+  .addArrayElement({ variable: "appConfig", path: ["providers"] }, { expression: "provideHttpClient()" });
+// antes:   providers: [provideRouter(routes)],
+// después: providers: [provideRouter(routes), provideHttpClient()],
+```
+
+Una coincidencia entra en una entrada de una lista. Acá la ruta `admin` todavía no tiene la clave
+`providers`, así que la op la crea:
+
+```ts
+await ts
+  .find("src/app/app.routes.ts")
+  .addImport("AdminGuard", "./admin/admin.guard")
+  .addArrayElement({ variable: "routes", path: [{ path: "admin" }, "providers"] }, "AdminGuard");
+```
+
+```ts
+// antes
+export const routes: Routes = [
+  { path: "", component: HomeComponent },
+  {
+    path: "admin",
+    component: AdminComponent,
+  },
+];
+
+// después
+export const routes: Routes = [
+  { path: "", component: HomeComponent },
+  {
+    path: "admin",
+    component: AdminComponent,
+    providers: [AdminGuard],
+  },
+];
+```
+
+La op crea una clave que falta (`{}` pasa a ser `{ providers: [X] }`) y el siguiente argumento
+que falta de una llamada o un decorador (`bootstrapApplication(App)` pasa a ser
+`bootstrapApplication(App, { providers: [X] })`). Rechaza, y deja el archivo sin cambios, cuando:
+
+- la raíz no existe, o una coincidencia no selecciona nada;
+- la raíz o una coincidencia seleccionan más de un nodo;
+- el argumento está más allá del siguiente, como `argument: 2` sobre `bootstrapApplication(App)`;
+- la clave que falta podría venir ya de un spread (`{ ...base }`), de una clave computada o de un
+  getter o setter, porque una clave nueva podría ocultarla.
+
+`element` es un identificador, o `{ expression: "..." }` para código. La expresión tiene que
+parsear como exactamente una expresión, así que no puede cerrar el array ni agregar una
+sentencia. Fuera de eso la op la inserta tal cual, así que nunca la armes con entrada del
+consumidor. Un elemento que ya está en el array no cambia nada: los elementos se comparan token
+por token, y los espacios, los comentarios y las comas finales no cuentan. El elemento nuevo
+sigue el formato de la lista. Una lista de una línea queda en una línea, una lista multilínea
+recibe una línea nueva con la indentación de la última entrada, y una coma final se mantiene.
+La op no agrega imports, así que combínala con `addImport`.
+
+### Propiedades de clase: `addClassProperty`
+
+`addClassProperty(className, name, initializer, options?)` escribe
+`{scope }{readonly }name = initializer;` en una clase existente. `options` es
+`{ scope?: "public" | "protected" | "private"; readonly?: boolean }`, y una opción omitida no
+escribe nada.
+
+```ts
+await ts
+  .find("src/app/user.service.ts")
+  .addImport("inject", "@angular/core")
+  .addClassProperty("UserService", "http", "inject(HttpClient)", { scope: "private", readonly: true });
+```
+
+```ts
+// antes
+export class UserService {
+  private readonly cache = new Map<string, User>();
+
+  load(id: string) {
+    return this.cache.get(id);
+  }
+}
+
+// después
+export class UserService {
+  private readonly cache = new Map<string, User>();
+  private readonly http = inject(HttpClient);
+
+  load(id: string) {
+    return this.cache.get(id);
+  }
+}
+```
+
+La propiedad va después de la última propiedad de la clase, lo que deja las propiedades por
+encima del constructor y los métodos. Una clase sin propiedades la recibe como primer miembro.
+El archivo tiene que tener exactamente una clase llamada `className`. Una propiedad con la misma
+declaración no cambia nada, y cualquier otro miembro llamado `name`, incluido un método, rechaza.
+`initializer` tiene que parsear como una expresión y se inserta tal cual, igual que
+`{ expression }`. La op no agrega imports.
+
 ## El dialecto de React
 
 `@pbuilder/sdk/react` muta archivos `.tsx`, y `find()` requiere la extensión `.tsx` explícita
@@ -213,11 +335,12 @@ edición:
 
 | Necesitas… | Usa |
 |---|---|
-| Agregar o quitar un import, agregar una declaración de nivel superior, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
+| Agregar o quitar un import, agregar una declaración de nivel superior, agregar a un array, agregar una propiedad de clase, definir una prop JSX | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
 | Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
 | Registrar un provider, controller, import de módulo o export en un `@Module` de NestJS | El [dialecto NestJS](/es/guides/nestjs-dialect/) |
-| Editar un archivo JSON o YAML | El dialecto [JSON](/es/guides/json-dialect/) o [YAML](/es/guides/yaml-dialect/) |
-| Editar un tipo de archivo que ningún dialecto cubre, como Markdown o CSS | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
+| Registrar un componente, provider o ruta, o agregar un miembro signal o `inject()` en Angular | El [dialecto Angular](/es/guides/angular-dialect/) |
+| Editar un archivo JSON, YAML o CSS | El dialecto [JSON](/es/guides/json-dialect/), [YAML](/es/guides/yaml-dialect/) o [CSS](/es/guides/css-dialect/) |
+| Editar un tipo de archivo que ningún dialecto cubre, como Markdown | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
 
 El callback recibe **solo el AST**: un `SourceFile` de ts-morph en los dos dialectos de esta página,
 la misma instancia viva que mutan las ops nombradas. No hay un segundo argumento. Las ops
@@ -246,8 +369,10 @@ librería respalda a cada dialecto está en [Librerías AST](/es/reference/ast-l
 
 ### Ejemplo: registrar una ruta (TypeScript)
 
-El dialecto de TypeScript no tiene una op para agregar elementos a un array literal. Esta factory
-agrega una ruta a un array `routes` exportado, y no hace nada si ya está:
+[`addArrayElement`](#arrays-anidados-addarrayelement) solo acepta código que escribiste tú. Cuando
+el elemento viene de la entrada del consumidor, ármalo en `.modify()` para controlar las comillas.
+Esta factory agrega una ruta que recibe como entrada a un array `routes` exportado, y no hace nada
+si la ruta ya está:
 
 ```ts title="src/routes.ts (antes)"
 export const routes = [
@@ -384,8 +509,8 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Archivos sin dialecto
 
-Hoy existen dialectos para `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml` y `.yml`. Cualquier otro
-archivo (un índice en Markdown, una hoja de estilos, un archivo `.env`) se puede editar igual con `find`
+Hoy existen dialectos para `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml`, `.yml` y `.css`. Cualquier
+otro archivo (un índice en Markdown, una hoja de estilos `.scss`, un archivo `.env`) se puede editar igual con `find`
 de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `read()` y los verbos
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
 transfórmalo con el parser que corresponda al formato y escribe el resultado.
@@ -438,8 +563,11 @@ Dos diferencias con una edición de dialecto:
 
 - [Dialecto JSON](/es/guides/json-dialect/) y [Dialecto YAML](/es/guides/yaml-dialect/): ops
   nombradas para archivos JSON, JSONC y YAML que conservan comentarios y formato.
+- [Dialecto CSS](/es/guides/css-dialect/): define y elimina declaraciones en un archivo `.css`,
+  como los design tokens de un bloque `@theme` de Tailwind.
 - [Dialecto NestJS](/es/guides/nestjs-dialect/): registra clases en un `@Module` de NestJS.
-- [Dialecto NestJS](/es/guides/nestjs-dialect/): registra clases en un `@Module` de NestJS.
+- [Dialecto Angular](/es/guides/angular-dialect/): registra componentes, providers y rutas, y
+  agrega miembros signal e `inject()`.
 - [Librerías AST](/es/reference/ast-libraries/): qué librería y versión respaldan a cada
   dialecto, y cómo las expone `astLibrary`.
 - **Construir un dialecto propio** es una superficie para contribuidores. Todo dialecto debe
@@ -448,7 +576,6 @@ Dos diferencias con una edición de dialecto:
   [guía de autoría de dialectos](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration)
   del SDK.
 
-El soporte para más tipos de archivo como HTML y CSS (cada uno respaldado por su propia
-librería de parser/AST), y dialectos para frameworks como Angular, Vue y Svelte, están
-planificados. Mientras tanto, edita esos
+El soporte para más tipos de archivo como HTML (cada uno respaldado por su propia librería de
+parser/AST), y dialectos para frameworks como Vue y Svelte, están planificados. Mientras tanto, edita esos
 archivos con `find` de `@pbuilder/sdk/commons`.

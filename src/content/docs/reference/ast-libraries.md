@@ -14,12 +14,14 @@ Each [dialect](/guides/modify/) parses its file type with an AST library of its 
 | TypeScript | `@pbuilder/sdk/typescript` | ts-morph | `28.0.0`, exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
 | React / TSX | `@pbuilder/sdk/react` | ts-morph | `28.0.0`, exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
 | NestJS | `@pbuilder/sdk/nestjs` | ts-morph | `28.0.0`, exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
+| Angular | `@pbuilder/sdk/angular` | ts-morph | `28.0.0`, exact pin in the SDK's `dependencies` | [ts-morph.com](https://ts-morph.com/) | `.modify()` receives a ts-morph `SourceFile`; the full library is exported as `astLibrary` |
 | JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1`, exact pin in the SDK's `dependencies` | [jsonc-parser on GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` receives a `JsonDocument` (`{ text }`); the full library is exported as `astLibrary` |
 | YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1`, exact pin in the SDK's `dependencies` | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` receives a `YamlStream` (`{ documents }`) of `Document` instances; the full library is exported as `astLibrary` |
+| CSS | `@pbuilder/sdk/css` | postcss | `8.5.30`, exact pin in the SDK's `dependencies` | [postcss.org](https://postcss.org/) | `.modify()` receives a postcss `Root`; the full library is exported as `astLibrary` |
 
 The version column is the dependency the SDK's `package.json` declares, not a runtime check of what your package manager installed. It is also unrelated to the TypeScript compiler the SDK uses for its own development.
 
-HTML, CSS and framework-specific dialects are planned; until they ship, edit those files with [`find` from `@pbuilder/sdk/commons`](/guides/modify/#files-without-a-dialect).
+HTML and dialects for Vue and Svelte are planned; until they ship, edit those files with [`find` from `@pbuilder/sdk/commons`](/guides/modify/#files-without-a-dialect).
 
 ## `astLibrary`
 

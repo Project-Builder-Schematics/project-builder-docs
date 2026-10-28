@@ -14,12 +14,14 @@ Cada [dialecto](/es/guides/modify/) parsea su tipo de archivo con una librería 
 | TypeScript | `@pbuilder/sdk/typescript` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
 | React / TSX | `@pbuilder/sdk/react` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
 | NestJS | `@pbuilder/sdk/nestjs` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
+| Angular | `@pbuilder/sdk/angular` | ts-morph | `28.0.0`, versión exacta en las `dependencies` del SDK | [ts-morph.com](https://ts-morph.com/) | `.modify()` recibe un `SourceFile` de ts-morph; la librería completa se exporta como `astLibrary` |
 | JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1`, versión exacta en las `dependencies` del SDK | [jsonc-parser en GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` recibe un `JsonDocument` (`{ text }`); la librería completa se exporta como `astLibrary` |
 | YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1`, versión exacta en las `dependencies` del SDK | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` recibe un `YamlStream` (`{ documents }`) de instancias `Document`; la librería completa se exporta como `astLibrary` |
+| CSS | `@pbuilder/sdk/css` | postcss | `8.5.30`, versión exacta en las `dependencies` del SDK | [postcss.org](https://postcss.org/) | `.modify()` recibe un `Root` de postcss; la librería completa se exporta como `astLibrary` |
 
 La columna de versión es la dependencia que declara el `package.json` del SDK, no una comprobación en tiempo de ejecución de lo que instaló tu gestor de paquetes. Tampoco tiene relación con el compilador de TypeScript que usa el SDK para su propio desarrollo.
 
-Hay dialectos de HTML, CSS y frameworks planificados; hasta que existan, edita esos archivos con [`find` de `@pbuilder/sdk/commons`](/es/guides/modify/#archivos-sin-dialecto).
+Hay dialectos de HTML, Vue y Svelte planificados; hasta que existan, edita esos archivos con [`find` de `@pbuilder/sdk/commons`](/es/guides/modify/#archivos-sin-dialecto).
 
 ## `astLibrary`
 

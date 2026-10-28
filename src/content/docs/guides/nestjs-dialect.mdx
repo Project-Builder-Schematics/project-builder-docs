@@ -38,8 +38,8 @@ export class AppModule {}
 
 The handle carries every [TypeScript dialect](/guides/modify/) op: `addImport`,
 `addDefaultImport`, `addNamespaceImport`, `addTypeImport`, `addSideEffectImport`,
-`addReExport`, `addExportAll`, `addFunction`, `addVariable`, `addClass`, `removeImport`,
-`removeExport` and `removeExportAll`. An op the TypeScript dialect gains later is available
+`addReExport`, `addExportAll`, `addFunction`, `addVariable`, `addClass`, `addArrayElement`,
+`addClassProperty`, `removeImport`, `removeExport` and `removeExportAll`. An op the TypeScript dialect gains later is available
 here too.
 
 ## `@Module` ops
@@ -67,7 +67,8 @@ which adds an `import` statement.
 
 A new entry follows the layout of the list it joins. A one-line list stays on one line, a
 multi-line list gets a new line at the indentation of its last entry, and a trailing comma
-stays trailing. Everything outside the inserted text is byte-identical.
+stays trailing. A comma inside a comment after the last entry (`[A /* x, y */]`) is not taken
+for a trailing comma. Everything outside the inserted text is byte-identical.
 
 ## Rejections
 
@@ -81,11 +82,27 @@ An op rejects, and the file is left unchanged, when:
 Like the TypeScript dialect, `find(path)` accepts any `.ts` path. A file without `@Module`
 fails only when one of these ops runs.
 
+## Entries that are not a class name
+
+The `@Module` ops take a class name. For an entry such as `ConfigModule.forRoot()` or
+`{ provide: TOKEN, useValue: 1 }`, use the inherited
+[`addArrayElement`](/guides/modify/#nested-arrays-addarrayelement) with a `decorator` root, and
+add the import yourself:
+
+```ts
+await nestjs
+  .find("src/app.module.ts")
+  .addImport("ConfigModule", "@nestjs/config")
+  .addArrayElement({ decorator: "Module", path: ["imports"] }, { expression: "ConfigModule.forRoot()" });
+// before: @Module({ imports: [] })
+// after:  @Module({ imports: [ConfigModule.forRoot()] })
+```
+
 ## Custom edits with `.modify()`
 
-Use `.modify(fn)` for entries that are not a plain class name, such as `ConfigModule.forRoot()`
-or `{ provide: TOKEN, useValue: 1 }`, and for files the ops reject. The callback receives the
-live ts-morph `SourceFile`, and the module's `astLibrary` export is ts-morph itself:
+Use `.modify(fn)` for files the ops reject and for edits no op covers. The callback receives the
+live ts-morph `SourceFile`, and the module's `astLibrary` export is ts-morph itself. This
+example makes the same edit as the `addArrayElement` call above, by hand:
 
 ```ts
 import * as nestjs from "@pbuilder/sdk/nestjs";
