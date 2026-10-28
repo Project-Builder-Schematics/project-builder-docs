@@ -7,9 +7,9 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-Para cualquier cosa más grande que un par de archivos, no escribas un `create()` por archivo.
-Mantén una carpeta de archivos de plantilla dentro del paquete de tu schematic y replícala con
-**`scaffold`**, el verbo sobre el que se construyen la mayoría de los generadores multi-archivo.
+Para más de un par de archivos, mantén una carpeta de archivos de plantilla dentro del paquete
+de tu schematic y replícala con `scaffold` en lugar de escribir un `create()` por archivo. La
+mayoría de los generadores multi-archivo se construyen sobre `scaffold`.
 
 ## Replicar una carpeta de plantillas
 
@@ -42,14 +42,14 @@ Con `name: "userProfile"` esto emite `src/services/user-profile/user-profile.ser
 `…/user-profile.spec.ts` y `…/config/settings.json`, con los contenidos renderizados contra el
 mismo `options`, usando el [lenguaje de plantillas](/es/guides/templates/).
 
-`from` es **local al paquete**: se resuelve relativo a la carpeta de tu schematic, como
+`from` es local al paquete: se resuelve relativo a la carpeta de tu schematic, como
 `copyIn` y `create({ templateFile })`. El CLI pasa la ubicación del paquete automáticamente; en
 tests pasas `packageDir` tú mismo (típicamente `import.meta.dir`).
 
 ## Nombres de archivo dinámicos
 
-Los nombres de archivos y carpetas transportan valores dinámicos mediante **tokens de nombre de
-archivo**:
+Los nombres de archivos y carpetas transportan valores dinámicos mediante tokens de nombre de
+archivo:
 
 - `__name__` se convierte en `{= .name =}`, la opción `name` renderizada en la ruta.
 - `__name@pipe__` se convierte en `{= .name | pipe =}`. Se aplican los mismos 7 pipes que en
@@ -63,7 +63,7 @@ engine, exactamente igual que para las plantillas de `create`.
 
 ## Controles por entrada
 
-Tres controles más dan forma al destino de cada entrada, aplicados en un **orden fijo**:
+Tres controles más dan forma al destino de cada entrada, aplicados en un orden fijo:
 `rename` primero, la traducción de tokens segundo, la eliminación de `.template` al final.
 
 ### El sufijo `.template`
@@ -95,7 +95,7 @@ vacíos, así que si la presencia de una carpeta importa, incluye un archivo pla
 
 Cada archivo superviviente se clasifica automáticamente: el texto válido y dentro del
 presupuesto se renderiza como plantilla; los archivos binarios o que exceden el presupuesto
-viajan **tal cual** (como `copyIn`). No decides a mano qué archivos se renderizan y cuáles no.
+viajan tal cual (como `copyIn`).
 
 ## Colisiones y `force`
 
@@ -105,9 +105,9 @@ del objeto de argumentos para una sobrescritura deliberada.
 
 ## Casos borde
 
-- Los **directorios symlinkeados** anidados dentro de `from` se omiten silenciosamente; una raíz
+- Los directorios symlinkeados anidados dentro de `from` se omiten silenciosamente; una raíz
   `from` symlinkeada rechaza de plano.
-- Una sola llamada a `scaffold` tiene un tope de **10,000 entradas**.
+- Una sola llamada a `scaffold` tiene un tope de 10,000 entradas.
 
 ## Próximos pasos
 

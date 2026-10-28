@@ -14,7 +14,7 @@ single `options` object. This page covers the language you write inside them.
 The syntax comes from Go's `text/template`, **not** JavaScript template literals. `{= .name =}`
 is not `${name}`; loops are `range`, not `.map()`; comparisons are written operator-first
 (`eq a b`), not infix (`a === b`). JavaScript's `===`, `&&`, `||`, `!`, `<`, `>` **do not exist**
-in a template. Guessing from JS habits will mislead you. The sections below map each JS pattern
+in a template. The sections below map each JS pattern
 to its template form.
 </Aside>
 
@@ -39,13 +39,13 @@ renders to path `src/my-thing.ts` with content:
 export const MyThing = 1;
 ```
 
-Three pieces are in play:
+The call takes three parts:
 
 | You pass | What it does |
 |---|---|
-| `path` (first argument) | A **template string**, rendered to produce the output file path. |
-| `template` | A template string, rendered to produce the **file's byte content**. |
-| `options` | The **data context**: the single set of values shared by both renders. |
+| `path` (first argument) | A template string, rendered to produce the output file path. |
+| `template` | A template string, rendered to produce the file's byte content. |
+| `options` | The data context: the single set of values shared by both renders. |
 
 The `templateFile` overload, `create(path, { templateFile, options })`, reads a package-local
 file instead of an inline `template` string; everything on this page applies to it unchanged.
@@ -134,7 +134,7 @@ unless you ask for one: `.` is the item, and `.name` reads the `name` field of t
 
 over `["x", "y"]` → `[x][y]`.
 
-**Want the index and the value?** Declare them with `$` variables and `:=`:
+To get the index and the value, declare them with `$` variables and `:=`:
 
 ```
 {= range $i, $v := .items =}{= $i =}:{= $v =} {= end =}
@@ -177,8 +177,8 @@ export class UserProfileComponent {
 
 ## Conditionals: `if`, but the operators come first
 
-This is the biggest surprise: a comparison is a **function call with the operator name first**,
-then its operands, the opposite of JavaScript's infix style:
+A comparison is a **function call with the operator name first**, then its operands, the
+opposite of JavaScript's infix style:
 
 | JavaScript | Template |
 |---|---|
@@ -283,7 +283,7 @@ and reuse it instead of repeating the pipe:
 <Aside type="note">
 **Not available: sub-templates.** `define`, `template`, and `block` are blocked at parse time.
 A template using them fails with a typed error and writes nothing. This is a deliberate safety
-limit, not an oversight.
+limit.
 </Aside>
 
 ## Templating the output path
@@ -318,7 +318,7 @@ pipe expression (`{= .name =}`) is never trimmed.
 
 ## When something goes wrong
 
-Every failure is a **typed, positioned** error (it names a `File:Line:Column`) and, on failure,
+Every failure is a typed, positioned error (it names a `File:Line:Column`) and, on failure,
 **no files are written**: the engine fails the whole render closed rather than producing a
 partial file. A mistyped option name gives you the exact line and column of the reference.
 Because the SDK never renders, all template errors surface at run time, never at the moment
@@ -326,6 +326,6 @@ Because the SDK never renders, all template errors surface at run time, never at
 
 ## Next steps
 
-For anything bigger than a couple of files, don't write one `create()` per file. Keep a folder
-of template files and mirror it with [`scaffold()`](/guides/scaffolding/). The rest of the
+For anything bigger than a couple of files, keep a folder of template files and mirror it with
+[`scaffold()`](/guides/scaffolding/) instead of writing one `create()` per file. The rest of the
 mutation surface lives in [mutation verbs](/guides/mutation-verbs/).

@@ -7,9 +7,9 @@ sidebar:
 
 import { Aside } from '@astrojs/starlight/components';
 
-For anything bigger than a couple of files, don't write one `create()` per file. Keep a folder
-of template files inside your schematic package and mirror it with **`scaffold`**, the verb
-most multi-file generators are built on.
+For more than a couple of files, keep a folder of template files inside your schematic package
+and mirror it with `scaffold` instead of writing one `create()` per file. Most multi-file
+generators are built on `scaffold`.
 
 ## Mirroring a template folder
 
@@ -42,13 +42,13 @@ With `name: "userProfile"` this emits `src/services/user-profile/user-profile.se
 `…/user-profile.spec.ts`, and `…/config/settings.json`, with contents rendered against the same
 `options`, using the [template language](/guides/templates/).
 
-`from` is **package-local**: it resolves relative to your schematic's folder, like `copyIn` and
+`from` is package-local: it resolves relative to your schematic's folder, like `copyIn` and
 `create({ templateFile })`. The CLI passes the package location automatically; in tests you pass
 `packageDir` yourself (typically `import.meta.dir`).
 
 ## Dynamic file names
 
-File and folder names carry dynamic values through **filename tokens**:
+File and folder names carry dynamic values through filename tokens:
 
 - `__name__` becomes `{= .name =}`, the `name` option rendered into the path.
 - `__name@pipe__` becomes `{= .name | pipe =}`. The same 7 pipes as templates apply, so
@@ -62,7 +62,7 @@ as for `create` templates.
 
 ## Per-entry controls
 
-Three more controls shape each entry's destination, applied in a **pinned order**: `rename`
+Three more controls shape each entry's destination, applied in a pinned order: `rename`
 first, token translation second, `.template` strip last.
 
 ### The `.template` suffix
@@ -92,8 +92,7 @@ ship a placeholder file in it.
 ## How each file travels
 
 Each surviving file is classified automatically: valid, in-budget text renders as a template;
-binary or over-budget files travel **verbatim** (as `copyIn`). You don't opt files in or out of
-rendering by hand.
+binary or over-budget files travel verbatim (as `copyIn`).
 
 ## Collisions and `force`
 
@@ -103,9 +102,9 @@ inside the args object for a deliberate overwrite.
 
 ## Edge cases
 
-- Nested **symlinked directories** inside `from` are skipped silently; a symlinked `from` root
+- Nested symlinked directories inside `from` are skipped silently; a symlinked `from` root
   rejects outright.
-- A single `scaffold` call caps at **10,000 entries**.
+- A single `scaffold` call caps at 10,000 entries.
 
 ## Next steps
 

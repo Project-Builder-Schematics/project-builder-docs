@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-The `builder` CLI is AI-first by design: every command has a machine-readable JSON mode, and every error carries a structured code with actionable suggestions. This page documents the user-facing output contract (formats, theming, verbosity) and the full error and exit-code reference.
+The `builder` CLI is AI-first: every command has a machine-readable JSON mode, and every error carries a structured code with actionable suggestions. This page documents the user-facing output contract (formats, theming, verbosity) and the full error and exit-code reference.
 
 ## Output formats
 
@@ -58,7 +58,7 @@ BUILDER_THEME=light builder info
 BUILDER_THEME=dark builder --theme=light info
 ```
 
-Auto-detection is lazy: an explicit `--theme` or `BUILDER_THEME` skips it entirely. In unusual PTY automation setups the background-color query can stall startup for up to 5 seconds before falling back; set `BUILDER_THEME` to bypass detection. When stdout is piped or the terminal reports no color support, output degrades gracefully to plain text.
+Auto-detection is lazy: an explicit `--theme` or `BUILDER_THEME` skips it entirely. In unusual PTY automation setups the background-color query can stall startup for up to 5 seconds before falling back; set `BUILDER_THEME` to bypass detection. When stdout is piped or the terminal reports no color support, output falls back to plain text.
 
 ## Error contract
 
@@ -175,7 +175,7 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | Code | Reason | Exit | Message | Repair |
 |---|---|---|---|---|
 | `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provide a compatible SDK at `node_modules/@pbuilder/sdk` (see below) |
-| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but required distribution files are missing — reinstall it |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but required distribution files are missing; reinstall it |
 | `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Check permissions and dangling symlinks on `node_modules/@pbuilder/sdk` |
 | `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Fix the value named in `detail`, for example `project-builder.json.sdk.version: expected a numeric version floor` |
 | `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Check that the workspace `package.json` is readable and not oversized |
@@ -199,12 +199,12 @@ These codes appear only when an external root is named by `--sdk-root`, `BUILDER
 
 | Code | Reason | Exit | Message | Repair |
 |---|---|---|---|---|
-| `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Set `"sdk": {"root": "<directory>"}` — absolute, or relative to `project-builder.json` |
+| `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Set `"sdk": {"root": "<directory>"}` with an absolute path or one relative to `project-builder.json` |
 | `execute_sdk_root_invalid` | `sdk_root_unsupported_scheme` | 4 | sdk root is not a supported location — a URL or drive letter is not accepted | Point `--sdk-root` (or `BUILDER_SDK_ROOT`) at a local directory. Only these two can hit it |
 | `execute_sdk_root_invalid` | `sdk_root_unresolvable` | 4 | sdk.root does not resolve to a readable directory | Point `sdk.root` at an existing, readable `@pbuilder/sdk` package directory |
-| `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Point it at the package directory whose `package.json` name is `@pbuilder/sdk` — not its parent |
+| `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Point it at the package directory whose `package.json` name is `@pbuilder/sdk`, not its parent |
 | `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstall or rebuild the SDK so `dist/bin/pbuilder-runner.js` and `dist/transport` are present |
-| `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` names the dependency (for example `ts-morph`). Point `sdk.root` at a complete installation, such as the one `bun add -g @pbuilder/sdk` creates — not a package-manager cache |
+| `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` names the dependency (for example `ts-morph`). Point `sdk.root` at a complete installation, such as the one `bun add -g @pbuilder/sdk` creates, not a package-manager cache |
 | `execute_sdk_root_invalid` | `sdk_root_writable_by_others` | 4 | sdk.root itself is writable by its group or by any user | `chmod go-w` the root so only its owner can write to it |
 | `execute_sdk_root_invalid` | `sdk_ancestor_world_writable` | 4 | a directory above sdk.root is writable by any user and is not sticky | `detail` gives the depth. `chmod o-w` that directory, or move the SDK under a directory only you can write to |
 | `execute_sdk_root_invalid` | `sdk_root_untrusted_owner` | 4 | sdk.root, or a directory above it, is owned by another user | Move the SDK under a path owned by you or by root |
