@@ -316,8 +316,10 @@ expression and is inserted verbatim, like `{ expression }`. The op adds no impor
 
 ## The React dialect
 
-`@pbuilder/sdk/react` mutates `.tsx` files, and `find()` requires the explicit `.tsx` extension
-(extensionless and `.jsx` paths are rejected, never normalized). The handle carries every
+`@pbuilder/sdk/react` mutates `.tsx` and `.jsx` files, and `find()` requires one of those two
+extensions on the path. An extensionless path is rejected, never normalized, and any other
+extension rejects with `.tsx and .jsx are the only extensions the React dialect supports`; a
+`.ts` path points you to `@pbuilder/sdk/typescript`. The handle carries every
 [TypeScript dialect](#the-typescript-dialect) op (`addImport`, `addDefaultImport`,
 `sortImports` and the rest) plus JSX and component ops, with `.modify(fn)` as the escape hatch
 for everything else:
@@ -481,6 +483,33 @@ or sanitisation. By contrast, component, tag and prop names are validated name a
 not a trusted-code channel.
 </Aside>
 
+### `.jsx` files
+
+A `.jsx` file gets the same handle as a `.tsx` one. The SDK parses it as JavaScript with JSX, so
+the JSX, hook and import ops behave as they do on `.tsx`:
+
+```ts
+// src/App.jsx before:
+// export default function App() {
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Home />} />
+//     </Routes>
+//   );
+// }
+await react
+  .find("src/App.jsx")
+  .addImport("Users", "./Users")
+  .addHookCall("App", "const t = useTranslation();")
+  .addJsxChild("Routes", '<Route path="/users" element={<Users />} />');
+```
+
+A `.jsx` file cannot hold TypeScript syntax, so three ops reject on it at call time and leave the
+file unchanged: `addTypeImport`, `addComponentProp`, and `addClassProperty` when you pass `scope`
+or `readonly`. Without those two options, `addClassProperty` works on `.jsx` too. The error names
+the op and says the edit needs `.modify()`, for example
+`addComponentProp is not available for .jsx files`.
+
 ## Idempotency: safe to re-run
 
 Factories re-run against already-generated projects, and the import ops are built for that:
@@ -496,7 +525,7 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 | You need to… | Use |
 |---|---|
 | Add, remove or sort imports, add a top-level declaration, append to an array, add a class property, edit one JSX element's props, children, wrapper or tag, add a hook call or a prop to a React component | The dialect's [named ops](#the-typescript-dialect) |
-| Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
+| Make any other structural change to a `.ts`, `.tsx` or `.jsx` file | `.modify(fn)` on the dialect handle |
 | Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
 | Register a component, provider or route, or add a signal or `inject()` member in Angular | The [Angular dialect](/guides/angular-dialect/) |
 | Edit a JSON, YAML or CSS file | The [JSON](/guides/json-dialect/), [YAML](/guides/yaml-dialect/) or [CSS](/guides/css-dialect/) dialect |
@@ -522,7 +551,7 @@ type Routes = astLibrary.ArrayLiteralExpression; // type-only access
 ```
 
 Use the `astLibrary` of the dialect whose handle you are editing: `@pbuilder/sdk/typescript`
-for `.ts`, `@pbuilder/sdk/react` for `.tsx`. You do not need to add ts-morph to your own
+for `.ts`, `@pbuilder/sdk/react` for `.tsx` and `.jsx`. You do not need to add ts-morph to your own
 dependencies to work with the AST. Each dialect owns its library and version; which library
 backs each dialect is listed in [AST libraries](/reference/ast-libraries/).
 
@@ -666,7 +695,7 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Files without a dialect
 
-Dialects exist for `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml`, `.yml` and `.css` today. Any other
+Dialects exist for `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml` and `.css` today. Any other
 file (a Markdown index, an `.scss` stylesheet, an `.env` file) is still editable with `find` from `@pbuilder/sdk/commons`: it
 returns a handle for **any** path, with `read()` plus the text-level verbs
 (`replaceContent`, `rename`, `move`, `copy`, `remove`). There is no AST: read the content,

@@ -328,8 +328,10 @@ declaración no cambia nada, y cualquier otro miembro llamado `name`, incluido u
 
 ## El dialecto de React
 
-`@pbuilder/sdk/react` muta archivos `.tsx`, y `find()` requiere la extensión `.tsx` explícita
-(las rutas sin extensión y las `.jsx` se rechazan, nunca se normalizan). El handle tiene todas
+`@pbuilder/sdk/react` muta archivos `.tsx` y `.jsx`, y `find()` requiere una de esas dos
+extensiones en la ruta. Una ruta sin extensión se rechaza, nunca se normaliza, y cualquier otra
+extensión se rechaza con `.tsx and .jsx are the only extensions the React dialect supports`; una
+ruta `.ts` te remite a `@pbuilder/sdk/typescript`. El handle tiene todas
 las ops del [dialecto de TypeScript](#el-dialecto-de-typescript) (`addImport`,
 `addDefaultImport`, `sortImports` y el resto) más ops de JSX y de componente, con `.modify(fn)`
 como escape para todo lo demás:
@@ -500,6 +502,33 @@ componente, de tag y de prop son argumentos de nombre validados y no son un cana
 confiable.
 </Aside>
 
+### Archivos `.jsx`
+
+Un archivo `.jsx` recibe el mismo handle que uno `.tsx`. El SDK lo parsea como JavaScript con
+JSX, así que las ops de JSX, de hooks y de imports se comportan igual que en `.tsx`:
+
+```ts
+// src/App.jsx antes:
+// export default function App() {
+//   return (
+//     <Routes>
+//       <Route path="/" element={<Home />} />
+//     </Routes>
+//   );
+// }
+await react
+  .find("src/App.jsx")
+  .addImport("Users", "./Users")
+  .addHookCall("App", "const t = useTranslation();")
+  .addJsxChild("Routes", '<Route path="/users" element={<Users />} />');
+```
+
+Un archivo `.jsx` no puede contener sintaxis de TypeScript, así que tres ops lo rechazan al
+llamarlas y dejan el archivo sin cambios: `addTypeImport`, `addComponentProp`, y
+`addClassProperty` cuando le pasas `scope` o `readonly`. Sin esas dos opciones,
+`addClassProperty` también funciona en `.jsx`. El error nombra la op y dice que esa edición
+necesita `.modify()`, por ejemplo `addComponentProp is not available for .jsx files`.
+
 ## Idempotencia: seguro de re-ejecutar
 
 Los factories se re-ejecutan contra proyectos ya generados, y las ops de import están
@@ -517,7 +546,7 @@ edición:
 | Necesitas… | Usa |
 |---|---|
 | Agregar, quitar u ordenar imports, agregar una declaración de nivel superior, agregar a un array, agregar una propiedad de clase, editar las props, los hijos, el envoltorio o el tag de un elemento JSX, agregar una llamada a hook o una prop a un componente de React | Las [ops nombradas](#el-dialecto-de-typescript) del dialecto |
-| Hacer cualquier otro cambio estructural en un archivo `.ts` o `.tsx` | `.modify(fn)` sobre el handle del dialecto |
+| Hacer cualquier otro cambio estructural en un archivo `.ts`, `.tsx` o `.jsx` | `.modify(fn)` sobre el handle del dialecto |
 | Registrar un provider, controller, import de módulo o export en un `@Module` de NestJS | El [dialecto NestJS](/es/guides/nestjs-dialect/) |
 | Registrar un componente, provider o ruta, o agregar un miembro signal o `inject()` en Angular | El [dialecto Angular](/es/guides/angular-dialect/) |
 | Editar un archivo JSON, YAML o CSS | El dialecto [JSON](/es/guides/json-dialect/), [YAML](/es/guides/yaml-dialect/) o [CSS](/es/guides/css-dialect/) |
@@ -544,7 +573,7 @@ type Routes = astLibrary.ArrayLiteralExpression; // type-only access
 ```
 
 Usa el `astLibrary` del dialecto cuyo handle estás editando: `@pbuilder/sdk/typescript` para
-`.ts`, `@pbuilder/sdk/react` para `.tsx`. No necesitas agregar ts-morph a tus propias
+`.ts`, `@pbuilder/sdk/react` para `.tsx` y `.jsx`. No necesitas agregar ts-morph a tus propias
 dependencias para trabajar con el AST. Cada dialecto es dueño de su librería y su versión; qué
 librería respalda a cada dialecto está en [Librerías AST](/es/reference/ast-libraries/).
 
@@ -690,7 +719,7 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Archivos sin dialecto
 
-Hoy existen dialectos para `.ts`, `.tsx`, `.json`, `.jsonc`, `.yaml`, `.yml` y `.css`. Cualquier
+Hoy existen dialectos para `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml` y `.css`. Cualquier
 otro archivo (un índice en Markdown, una hoja de estilos `.scss`, un archivo `.env`) se puede editar igual con `find`
 de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `read()` y los verbos
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
