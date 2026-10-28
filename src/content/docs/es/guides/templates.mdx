@@ -14,8 +14,7 @@ el mismo y único objeto `options`. Esta página cubre el lenguaje que escribes 
 La sintaxis viene del `text/template` de Go, **no** de los template literals de JavaScript.
 `{= .name =}` no es `${name}`; los loops son `range`, no `.map()`; las comparaciones se escriben
 con el operador primero (`eq a b`), no infijas (`a === b`). Los `===`, `&&`, `||`, `!`, `<`, `>`
-de JavaScript **no existen** en una plantilla. Adivinar desde los hábitos de JS te va a
-despistar. Las secciones de abajo mapean cada patrón de JS a su forma en plantilla.
+de JavaScript **no existen** en una plantilla. Las secciones de abajo mapean cada patrón de JS a su forma en plantilla.
 </Aside>
 
 ## Dónde ocurre el renderizado
@@ -40,13 +39,13 @@ renderiza a la ruta `src/my-thing.ts` con el contenido:
 export const MyThing = 1;
 ```
 
-Tres piezas están en juego:
+La llamada recibe tres partes:
 
 | Tú pasas | Qué hace |
 |---|---|
-| `path` (primer argumento) | Un **string de plantilla**, renderizado para producir la ruta del archivo de salida. |
-| `template` | Un string de plantilla, renderizado para producir el **contenido en bytes del archivo**. |
-| `options` | El **contexto de datos**: el único conjunto de valores compartido por ambos renderizados. |
+| `path` (primer argumento) | Un string de plantilla, renderizado para producir la ruta del archivo de salida. |
+| `template` | Un string de plantilla, renderizado para producir el contenido en bytes del archivo. |
+| `options` | El contexto de datos: el único conjunto de valores compartido por ambos renderizados. |
 
 El overload `templateFile`, `create(path, { templateFile, options })`, lee un archivo local
 del paquete en lugar de un string `template` inline; todo lo de esta página le aplica sin
@@ -138,7 +137,7 @@ parámetro salvo que pidas uno: `.` es el ítem, y `.name` lee el campo `name` d
 
 sobre `["x", "y"]` → `[x][y]`.
 
-**¿Quieres el índice y el valor?** Declara ambos con variables `$` y `:=`:
+Para obtener el índice y el valor, declara ambos con variables `$` y `:=`:
 
 ```
 {= range $i, $v := .items =}{= $i =}:{= $v =} {= end =}
@@ -182,8 +181,8 @@ export class UserProfileComponent {
 
 ## Condicionales: `if`, pero los operadores van primero
 
-Esta es la mayor sorpresa: una comparación es una **llamada a función con el nombre del
-operador primero**, y luego sus operandos, lo opuesto al estilo infijo de JavaScript:
+Una comparación es una **llamada a función con el nombre del operador primero**, y luego sus
+operandos, lo opuesto al estilo infijo de JavaScript:
 
 | JavaScript | Plantilla |
 |---|---|
@@ -290,7 +289,7 @@ con pipe una sola vez y reutilízalo en lugar de repetir el pipe:
 <Aside type="note">
 **No disponible: sub-plantillas.** `define`, `template` y `block` están bloqueados en tiempo de
 parseo. Una plantilla que los usa falla con un error tipado y no escribe nada. Es un límite de
-seguridad deliberado, no un descuido.
+seguridad deliberado.
 </Aside>
 
 ## Plantillas en la ruta de salida
@@ -326,7 +325,7 @@ línea que contiene una expresión de campo o pipe (`{= .name =}`) nunca se reco
 
 ## Cuando algo sale mal
 
-Todo fallo es un error **tipado y posicionado** (nombra un `File:Line:Column`) y, en caso de
+Todo fallo es un error tipado y posicionado (nombra un `File:Line:Column`) y, en caso de
 fallo, **no se escribe ningún archivo**: el engine falla el renderizado completo de forma
 cerrada en lugar de producir un archivo parcial. Un nombre de opción mal escrito te da la línea
 y columna exactas de la referencia. Como el SDK nunca renderiza, todos los errores de plantilla
@@ -335,7 +334,7 @@ aparecen en tiempo de ejecución, nunca en el momento en que se llama a `create(
 
 ## Próximos pasos
 
-Para cualquier cosa más grande que un par de archivos, no escribas un `create()` por archivo.
-Mantén una carpeta de archivos de plantilla y replícala con
-[`scaffold()`](/es/guides/scaffolding/). El resto de la superficie de mutación vive en
+Para cualquier cosa más grande que un par de archivos, mantén una carpeta de archivos de
+plantilla y replícala con [`scaffold()`](/es/guides/scaffolding/) en lugar de escribir un
+`create()` por archivo. El resto de la superficie de mutación vive en
 [verbos de mutación](/es/guides/mutation-verbs/).

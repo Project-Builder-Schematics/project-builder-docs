@@ -199,7 +199,7 @@ copy("src/template.ts", "src/generated/output.ts");
 function copyIn(from: string, to: string, opts?: { force?: boolean }): void;
 ```
 
-Copia UN archivo local del paquete (`from`, resuelto contra el `packageDir` del run) al árbol,
+Copia exactamente un archivo local del paquete (`from`, resuelto contra el `packageDir` del run) al árbol,
 siempre por-referencia. Nunca se clasifica ni se renderiza, incluso cuando la fuente es texto
 plano que contiene secuencias con aspecto de plantilla. Es el hermano de `copy` para fuentes
 locales del paquete; contrástalo con `create({ templateFile })`, que explícitamente
@@ -236,8 +236,8 @@ staging del contenido árbol-a-árbol sobre el que el fake puede encadenar) es d
 ## `modify` — la mutación estructural
 
 La octava mutación es la que no viene de `@pbuilder/sdk/commons`, por diseño.
-Todos los verbos anteriores tratan un archivo como **texto**; `modify` es una edición
-**estructural**, y para editar un archivo estructuralmente primero hay que entenderlo, lo
+Todos los verbos anteriores tratan un archivo como texto; `modify` es una edición
+estructural, y para editar un archivo estructuralmente primero hay que entenderlo, lo
 que significa parsearlo a un AST. Ese entendimiento vive en los
 [dialectos](/es/guides/modify/):
 
@@ -268,8 +268,8 @@ del propio paquete, resuelta contra el `packageDir` del run. La regla para el au
 > schematic lee vive dentro de su paquete.
 
 El SDK filtra la forma *literal* de la ruta (sin segmento `..`, sin forma absoluta) antes de
-tocar el disco. Los symlinks se siguen sin verificar su destino, un residuo deliberado y
-documentado, cubierto en el `SECURITY.md` del SDK, no un descuido.
+tocar el disco. Los symlinks se siguen sin verificar su destino. Es un riesgo residual deliberado y
+documentado, cubierto en el `SECURITY.md` del SDK.
 
 ## Leer archivos: `find(path).read()`
 

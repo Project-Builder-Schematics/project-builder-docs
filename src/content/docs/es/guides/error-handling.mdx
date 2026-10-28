@@ -8,8 +8,8 @@ sidebar:
 import { Aside } from '@astrojs/starlight/components';
 
 Un verbo de autoría que resulta rechazado, ya sea por el engine o por el propio SDK antes de
-cualquier ida y vuelta, lanza `AuthoringError`. Lleva todo lo que necesitas para recuperarte y
-usa vocabulario de autor, sin terminología interna del engine.
+cualquier ida y vuelta, lanza `AuthoringError`. Lleva todo lo que necesitas para recuperarte, en
+vocabulario de autor.
 
 ## Fail-closed por diseño
 
@@ -157,24 +157,23 @@ switch (err.reason) {
 
 ## Escribir buenos caminos de fallo
 
-El contrato de errores premia a los factories que tratan el rechazo como un resultado esperado
-y diseñado:
+Escribe factories que traten el rechazo como un resultado esperado:
 
-- **Previene `path-collision` leyendo primero.** El rechazo más común es una re-ejecución que
+- Previene `path-collision` leyendo primero. El rechazo más común es una re-ejecución que
   choca con un archivo creado por el run anterior. Ramifica sobre
   [la tricotomía de `find().read()`](/es/guides/mutation-verbs/#leer-archivos-findpathread)
   (crear cuando está ausente, actualizar cuando está presente) en lugar de recurrir a
   `{ force: true }`, que convierte cada re-ejecución en una sobrescritura silenciosa.
-- **Pasa `force: true` solo cuando sobrescribir es la intención.** Las colisiones fail-closed
-  son el SDK protegiendo la salida anterior; forzarlas elimina esa protección para todas las
-  ejecuciones futuras, no solo esta.
-- **Deja que los estados inesperados fallen ruidosamente.** Un run rechazado descarta todo
+- Pasa `force: true` solo cuando sobrescribir es la intención. Las colisiones fail-closed
+  son el SDK protegiendo la salida anterior; forzarlas elimina esa protección para esta
+  ejecución y todas las futuras.
+- Deja que los estados inesperados fallen ruidosamente. Un run rechazado descarta todo
   y deja el árbol intacto, así que lanzar siempre es seguro. Un factory que detecta un estado que
   no entiende debería lanzar en lugar de adivinar.
-- **Haz `switch` exhaustivo sobre `reason`.** La unión cerrada implica que el compilador te
+- Haz `switch` exhaustivo sobre `reason`. La unión cerrada implica que el compilador te
   avisa cuando una nueva versión del SDK agrega (o elimina) una causa de rechazo, como
   muestra la eliminación de `source-outside-package` de arriba.
-- **En tests, escribe aserciones sobre los campos estructurados.** `result.error.verb`, `.path`
+- En tests, escribe aserciones sobre los campos estructurados. `result.error.verb`, `.path`
   y `.reason` fijan *cuál* directiva falló y *por qué*, lo que las hace mucho más resistentes a mutaciones que
   hacer matching sobre el texto de `message`. Recuerda la peculiaridad de la etiqueta
   `"modify"` cuando la llamada fallida es un `replaceContent`.

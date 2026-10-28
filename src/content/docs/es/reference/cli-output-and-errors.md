@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-La CLI `builder` es AI-first por diseño: cada comando tiene un modo JSON legible por máquinas, y cada error lleva un código estructurado con sugerencias accionables. Esta página documenta el contrato de salida de cara al usuario (formatos, temas, verbosidad) y la referencia completa de errores y códigos de salida.
+La CLI `builder` es AI-first: cada comando tiene un modo JSON legible por máquinas, y cada error lleva un código estructurado con sugerencias accionables. Esta página documenta el contrato de salida de cara al usuario (formatos, temas, verbosidad) y la referencia completa de errores y códigos de salida.
 
 ## Formatos de salida
 
@@ -58,7 +58,7 @@ BUILDER_THEME=light builder info
 BUILDER_THEME=dark builder --theme=light info
 ```
 
-La autodetección es perezosa: un `--theme` o `BUILDER_THEME` explícito la omite por completo. En configuraciones inusuales de automatización con PTY, la consulta del color de fondo puede demorar el arranque hasta 5 segundos antes de recurrir al fallback; establece `BUILDER_THEME` para evitar la detección. Cuando stdout está en un pipe o la terminal no reporta soporte de color, la salida se degrada con gracia a texto plano.
+La autodetección es perezosa: un `--theme` o `BUILDER_THEME` explícito la omite por completo. En configuraciones inusuales de automatización con PTY, la consulta del color de fondo puede demorar el arranque hasta 5 segundos antes de recurrir al fallback; establece `BUILDER_THEME` para evitar la detección. Cuando stdout está en un pipe o la terminal no reporta soporte de color, la salida pasa a texto plano.
 
 ## Contrato de errores
 
@@ -175,7 +175,7 @@ Un `init` fallido deja en disco las salidas escritas antes del fallo. Una vez co
 | Código | Reason | Salida | Mensaje | Reparación |
 |---|---|---|---|---|
 | `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provee un SDK compatible en `node_modules/@pbuilder/sdk` (ver más abajo) |
-| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | El paquete está, pero faltan archivos de distribución requeridos — reinstálalo |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | El paquete está, pero faltan archivos de distribución requeridos; reinstálalo |
 | `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Revisa los permisos y los symlinks rotos en `node_modules/@pbuilder/sdk` |
 | `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Corrige el valor indicado en `detail`, por ejemplo `project-builder.json.sdk.version: expected a numeric version floor` |
 | `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Verifica que el `package.json` del workspace sea legible y no exceda el tamaño permitido |
@@ -199,12 +199,12 @@ Estos códigos solo aparecen cuando se indica una raíz externa con `--sdk-root`
 
 | Código | Reason | Salida | Mensaje | Reparación |
 |---|---|---|---|---|
-| `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Define `"sdk": {"root": "<directory>"}` — absoluta, o relativa a `project-builder.json` |
+| `execute_sdk_root_invalid` | `sdk_root_value_invalid` | 4 | sdk.root in project-builder.json must be a non-empty string path | Define `"sdk": {"root": "<directory>"}` con una ruta absoluta o relativa a `project-builder.json` |
 | `execute_sdk_root_invalid` | `sdk_root_unsupported_scheme` | 4 | sdk root is not a supported location — a URL or drive letter is not accepted | Apunta `--sdk-root` (o `BUILDER_SDK_ROOT`) a un directorio local. Solo esas dos fuentes pueden producirlo |
 | `execute_sdk_root_invalid` | `sdk_root_unresolvable` | 4 | sdk.root does not resolve to a readable directory | Apunta `sdk.root` a un directorio de paquete `@pbuilder/sdk` existente y legible |
-| `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Apúntalo al directorio del paquete cuyo `package.json` tiene `name` `@pbuilder/sdk` — no a su padre |
+| `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Apúntalo al directorio del paquete cuyo `package.json` tiene `name` `@pbuilder/sdk`, no a su padre |
 | `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstala o recompila el SDK para que existan `dist/bin/pbuilder-runner.js` y `dist/transport` |
-| `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` nombra la dependencia (por ejemplo `ts-morph`). Apunta `sdk.root` a una instalación completa, como la que crea `bun add -g @pbuilder/sdk` — no a una caché del gestor de paquetes |
+| `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` nombra la dependencia (por ejemplo `ts-morph`). Apunta `sdk.root` a una instalación completa, como la que crea `bun add -g @pbuilder/sdk`, no a una caché del gestor de paquetes |
 | `execute_sdk_root_invalid` | `sdk_root_writable_by_others` | 4 | sdk.root itself is writable by its group or by any user | Aplica `chmod go-w` a la raíz para que solo su dueño pueda escribir |
 | `execute_sdk_root_invalid` | `sdk_ancestor_world_writable` | 4 | a directory above sdk.root is writable by any user and is not sticky | `detail` indica la profundidad. Aplica `chmod o-w` a ese directorio, o mueve el SDK bajo un directorio en el que solo tú puedas escribir |
 | `execute_sdk_root_invalid` | `sdk_root_untrusted_owner` | 4 | sdk.root, or a directory above it, is owned by another user | Mueve el SDK bajo una ruta que te pertenezca a ti o a root |

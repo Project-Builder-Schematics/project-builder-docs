@@ -11,7 +11,7 @@ By default, `builder execute` reads `project-builder.json`, and every collection
 schema it registers, from the working directory. `--manifest` points those reads somewhere
 else on the same machine, while generated files still land in the working directory.
 
-The motivating case is **git worktrees**: your schematics are not committed to the
+The motivating case is git worktrees: your schematics are not committed to the
 application repository, so a worktree created next to the main checkout does not have them.
 With `--manifest`, every checkout runs the same schematics from one place.
 

@@ -126,7 +126,7 @@ Con `--no-sdk-dependency`, `init` imprime una advertencia con las formas de prov
 Con `--dry-run`, `init` no escribe ni instala nada:
 
 - Lee el `package.json` real solo cuando se solicita alguna entrada, y lista únicamente las entradas que realmente faltan (por ejemplo `Would modify: package.json (generate:types)`), más la instalación cuando se ejecutaría. Los campos inválidos hacen fallar la previsualización igual que una ejecución real.
-- El conjunto de artefactos de skill y el marcador del archivo de agente siempre aparecen como creaciones/anexos planificados, sin importar lo que ya exista en disco. Tómalos como un plan, no como una predicción exacta.
+- El conjunto de artefactos de skill y el marcador del archivo de agente siempre aparecen como creaciones/anexos planificados, sin importar lo que ya exista en disco. Tómalos como un plan: la ejecución real puede diferir.
 
 ### Ejemplos
 

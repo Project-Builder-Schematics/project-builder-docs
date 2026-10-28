@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 When string-level mutation isn't enough ("add an import to this module", "set a prop on this
 JSX element"), **dialects** provide structured, AST-aware operations for one file type. A dialect
-never edits text by search-and-replace: it parses the file into an **AST**, mutates the tree, and
+never edits text by search-and-replace: it parses the file into an AST, mutates the tree, and
 prints the result back. Each file type gets the AST library that fits it best. The
 `@pbuilder/sdk/typescript` and `@pbuilder/sdk/react` dialects covered on this page are both built
 on TypeScript's own AST (surfaced through ts-morph), because TS and TSX share a grammar. JSON and
@@ -22,8 +22,7 @@ The React dialect, the [NestJS dialect](/guides/nestjs-dialect/) and the
 
 A dialect's entry point is its own `find(path)`: it opens a **coalescing, awaitable handle**.
 Every op you chain mutates the same live AST, and the handle serializes to exactly **one**
-`replaceContent`-style directive when it flushes. Chaining three ops does not produce three
-writes.
+`replaceContent`-style directive when it flushes.
 
 ```ts
 import * as ts from "@pbuilder/sdk/typescript";
@@ -514,8 +513,8 @@ the op and says the edit needs `.modify()`, for example
 
 Factories re-run against already-generated projects, and the import ops are built for that:
 `addImport` called twice with the same name and module never duplicates the import line, and
-`removeImport` on an absent binding is a no-op (zero directives emitted). You get re-runnable
-import management without writing your own "is it already there?" check.
+`removeImport` on an absent binding is a no-op (zero directives emitted), so you don't need
+your own "is it already there?" check.
 
 ## Custom edits with `.modify()`
 
@@ -666,7 +665,7 @@ export function App() {
 }
 ```
 
-Both examples check before they edit, so a re-run writes nothing. That is the same
+Both examples check before they edit, so a re-run writes nothing, the same
 [idempotency](#idempotency-safe-to-re-run) the named ops give you.
 
 ### Rules for custom edits
@@ -755,7 +754,7 @@ Two differences from a dialect edit:
   add signal and `inject()` members.
 - [AST libraries](/reference/ast-libraries/): which library and version back each dialect,
   and how `astLibrary` exposes them.
-- **Building a dialect of your own** is a contributor-level surface. Every dialect must export
+- Building a dialect of your own is a contributor-level surface. Every dialect must export
   its complete library as `astLibrary`, and its conformance fixture must pass the actual module
   and a library exercise. See the SDK's
   [dialect authoring guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration).

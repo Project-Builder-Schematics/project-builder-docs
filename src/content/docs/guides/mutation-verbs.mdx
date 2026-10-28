@@ -195,7 +195,7 @@ copy("src/template.ts", "src/generated/output.ts");
 function copyIn(from: string, to: string, opts?: { force?: boolean }): void;
 ```
 
-Copies ONE package-local file (`from`, resolved against the run's `packageDir`) into the
+Copies exactly one package-local file (`from`, resolved against the run's `packageDir`) into the
 tree, always by-reference. It is never classified or rendered, even when the source is plain
 text containing template-like sequences. This is `copy`'s sibling for package-local sources;
 contrast with `create({ templateFile })`, which explicitly **renders** a package-local
@@ -232,7 +232,7 @@ can chain over) is deliberate.
 ## `modify` — the structural mutation
 
 The eighth mutation is the one that doesn't come from `@pbuilder/sdk/commons`, by
-design. Every verb above treats a file as **text**; `modify` is a **structural** edit,
+design. Every verb above treats a file as text; `modify` is a structural edit,
 and to edit a file structurally you first have to understand it, which means parsing it
 into an AST. That understanding lives in the [dialects](/guides/modify/):
 
@@ -263,8 +263,8 @@ package's own disk, resolved against the run's `packageDir`. The author rule:
 > reads lives inside its package.
 
 The SDK screens the *literal* path shape (no `..` segment, no absolute form) before touching
-disk. Symlinks are followed without target verification, a deliberate, documented residual
-covered in the SDK's `SECURITY.md`, not an oversight.
+disk. Symlinks are followed without target verification. This is a deliberate, documented
+residual risk covered in the SDK's `SECURITY.md`.
 
 ## Reading files: `find(path).read()`
 

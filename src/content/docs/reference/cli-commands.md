@@ -126,7 +126,7 @@ When `--no-sdk-dependency` is set, `init` prints a warning with the ways to prov
 With `--dry-run`, `init` writes nothing and installs nothing:
 
 - It reads the real `package.json` only when an entry is requested, and lists only the entries that are actually missing (for example `Would modify: package.json (generate:types)`), plus the install step when it would run. Invalid fields fail the preview the same way they fail a real run.
-- The skill artefact set and the agent marker always appear as planned creates/appends, whatever already exists on disk. Treat them as a plan, not an exact prediction.
+- The skill artefact set and the agent marker always appear as planned creates/appends, whatever already exists on disk. Treat them as a plan: the real run may differ.
 
 ### Examples
 

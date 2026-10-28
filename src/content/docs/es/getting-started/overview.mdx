@@ -11,27 +11,27 @@ Project Builder les da a los desarrolladores, y a los agentes de IA que trabajan
 ellos, generación de código determinista. Un prompt produce algo distinto en cada
 ejecución; un **schematic**, un programa de mutación de archivos tipado y testeable,
 produce los mismos archivos, byte por byte, cada vez. Tú (o tu agente) codificas el cambio
-una vez, y a partir de ahí la generación es un programa que ejecutas, no una salida que
-revisas.
+una vez, y a partir de ahí ejecutas ese programa en lugar de revisar la salida
+generada.
 
 ## Construido para complementar a la IA
 
 Como artesanos del software queremos construir software de calidad, y la calidad empieza
-con código **predecible y repetible**. La IA es una colaboradora capaz, pero su salida es
+con código predecible y repetible. La IA es una colaboradora capaz, pero su salida es
 *variable*: la misma petición produce código distinto en cada ejecución.
 Project Builder está diseñado para complementar esa variabilidad. Deja que la IA
 decida **qué** construir, y deja que un schematic haga determinista el **cómo**.
 
-Ese determinismo rinde frutos de dos maneras:
+Ese determinismo mantiene consistente el código generado y ahorra tiempo y dinero:
 
-- **Consistencia.** Cada servicio, componente o módulo generado por un schematic sigue la
+- Cada servicio, componente o módulo generado por un schematic sigue la
   misma estructura y las mismas convenciones, así que lo que la IA produce el viernes no se
   desvía de lo que produjo el lunes.
-- **Tiempo y dinero.** Un cambio codificado una vez se ejecuta en milisegundos en cada
+- Un cambio codificado una vez se ejecuta en milisegundos en cada
   ejecución. No gastas tokens en regenerarlo ni ciclos de revisión en volver a
   validar una salida que nunca debió cambiar.
 
-Los schematics también **crecen con tu base de código y con tu equipo**.
+Los schematics también crecen con tu base de código y con tu equipo.
 Cada patrón que codificas se convierte en un bloque de construcción reutilizable y
 versionado que los nuevos integrantes del equipo, humanos o agentes, pueden ejecutar
 desde el primer día.

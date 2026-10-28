@@ -8,8 +8,8 @@ sidebar:
 import { Aside } from '@astrojs/starlight/components';
 
 An authoring verb that gets rejected, either by the engine or by the SDK itself before any
-round-trip, throws `AuthoringError`. It carries everything you need to recover and uses author
-vocabulary, with no engine-internal terminology.
+round-trip, throws `AuthoringError`. It carries everything you need to recover, in author
+vocabulary.
 
 ## Fail-closed by design
 
@@ -155,24 +155,23 @@ switch (err.reason) {
 
 ## Writing good failure paths
 
-The error contract rewards factories that treat rejection as an expected,
-designed outcome:
+Write factories that treat rejection as an expected outcome:
 
-- **Prevent `path-collision` by reading first.** The most common rejection is a re-run
+- Prevent `path-collision` by reading first. The most common rejection is a re-run
   hitting a file the previous run created. Branch on
   [`find().read()`'s trichotomy](/guides/mutation-verbs/#reading-files-findpathread)
   (create when absent, update when present) instead of reaching for `{ force: true }`, which
   turns every re-run into a silent overwrite.
-- **Pass `force: true` only when overwriting is the intent.** Fail-closed collisions are the
-  SDK protecting earlier output; forcing them away removes that protection for every future
-  run, not just this one.
-- **Let unexpected states fail loud.** A rejected run discards everything and leaves the tree
+- Pass `force: true` only when overwriting is the intent. Fail-closed collisions are the
+  SDK protecting earlier output; forcing them away removes that protection for this run and
+  every future one.
+- Let unexpected states fail loud. A rejected run discards everything and leaves the tree
   untouched, so throwing is always safe. A factory that detects a state it doesn't
   understand should throw rather than guess.
-- **Switch exhaustively on `reason`.** The closed union means the compiler tells you when a
+- Switch exhaustively on `reason`. The closed union means the compiler tells you when a
   new SDK version adds (or removes) a rejection cause, as the `source-outside-package` removal
   above shows.
-- **In tests, assert on the structured fields.** `result.error.verb`, `.path`, and `.reason`
+- In tests, assert on the structured fields. `result.error.verb`, `.path`, and `.reason`
   pin down *which* directive failed and *why*, which makes them far more mutation-resistant than
   matching on `message` text. Remember the `"modify"` label quirk when the failing call is a
   `replaceContent`.
