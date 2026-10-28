@@ -125,7 +125,7 @@ un error de compilación si falta un valor:
 | `source-unreadable` | Una fuente local del paquete existe pero no pudo leerse. |
 
 <Aside type="caution">
-`source-outside-package` se eliminó en `@pbuilder/sdk` `0.2.0`. El SDK ya no re-deriva un techo
+`source-outside-package` se eliminó de `@pbuilder/sdk`. El SDK ya no re-deriva un techo
 de contención para las fuentes locales del paquete. Migración: elimina el brazo
 `case "source-outside-package":` de cualquier `switch (err.reason)` exhaustivo. TypeScript te
 lo va a señalar.

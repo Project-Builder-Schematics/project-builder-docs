@@ -17,7 +17,7 @@ sidebar:
 }
 ```
 
-Once `@pbuilder/sdk` is installed, editors with JSON schema support (VS Code, JetBrains IDEs, and any editor running a JSON language server) validate the file and autocomplete its keys. The schema ships with `@pbuilder/sdk` `0.5.0` and later. With an [external SDK root](/reference/cli-commands/#external-sdk-root-sdkroot), `node_modules/@pbuilder/sdk` is a link to that root, so the same path still resolves.
+Once `@pbuilder/sdk` is installed, editors with JSON schema support (VS Code, JetBrains IDEs, and any editor running a JSON language server) validate the file and autocomplete its keys. With an [external SDK root](/reference/cli-commands/#external-sdk-root-sdkroot), `node_modules/@pbuilder/sdk` is a link to that root, so the same path still resolves.
 
 ## Example
 

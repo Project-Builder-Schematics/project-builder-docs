@@ -302,7 +302,7 @@ Schematic flag tokens follow these rules:
 - **Placement.** Put it before `<collection>:<schematic>`. After the positional it is rejected (`invalid_input`), never passed to the schematic.
 - **Trust.** The root, and every directory above it, must not be writable by other users or by a group (a world-writable ancestor with the sticky bit is allowed), and must be owned by you or by root. The filesystem root and your home directory itself are refused.
 - **Paths in the manifest** must be relative to the manifest root and stay inside it.
-- **SDK.** The run uses the working directory's own `@pbuilder/sdk` (0.3.1 or later), installed in a real `node_modules` or named with [`--sdk-root` or `BUILDER_SDK_ROOT`](#--sdk-root-and-builder_sdk_root). The manifest root and its ancestors must not contain another `@pbuilder/sdk` copy, or the run fails with a split module graph. `sdk.root` and `sdk.version` in the external manifest are ignored.
+- **SDK.** The run uses the working directory's own `@pbuilder/sdk`, installed in a real `node_modules` or named with [`--sdk-root` or `BUILDER_SDK_ROOT`](#--sdk-root-and-builder_sdk_root). The manifest root and its ancestors must not contain another `@pbuilder/sdk` copy, or the run fails with a split module graph. `sdk.root` and `sdk.version` in the external manifest are ignored.
 - **Warnings.** A root that came from `BUILDER_MANIFEST` is announced with `warn_manifest_root_ambient`; an ignored external `sdk.root` with `warn_manifest_sdk_root_ignored`.
 
 ### Flags

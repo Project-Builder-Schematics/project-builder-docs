@@ -302,7 +302,7 @@ Los tokens de flags de schematic siguen estas reglas:
 - **Ubicación.** Ponlo antes de `<collection>:<schematic>`. Después del posicional se rechaza (`invalid_input`); nunca se pasa al schematic.
 - **Confianza.** Ni la raíz ni ningún directorio por encima pueden ser escribibles por otros usuarios o por un grupo (se permite un ancestro escribible por todos con sticky bit), y deben pertenecerte a ti o a root. Se rechazan la raíz del sistema de archivos y tu propio directorio home.
 - **Las rutas del manifiesto** deben ser relativas a la raíz del manifiesto y quedar dentro de ella.
-- **SDK.** La ejecución usa el `@pbuilder/sdk` del propio directorio de trabajo (0.3.1 o posterior), instalado en un `node_modules` real o indicado con [`--sdk-root` o `BUILDER_SDK_ROOT`](#--sdk-root-y-builder_sdk_root). La raíz del manifiesto y sus ancestros no deben contener otra copia de `@pbuilder/sdk`, o la ejecución falla con un split module graph. Se ignoran `sdk.root` y `sdk.version` del manifiesto externo.
+- **SDK.** La ejecución usa el `@pbuilder/sdk` del propio directorio de trabajo, instalado en un `node_modules` real o indicado con [`--sdk-root` o `BUILDER_SDK_ROOT`](#--sdk-root-y-builder_sdk_root). La raíz del manifiesto y sus ancestros no deben contener otra copia de `@pbuilder/sdk`, o la ejecución falla con un split module graph. Se ignoran `sdk.root` y `sdk.version` del manifiesto externo.
 - **Advertencias.** Una raíz que vino de `BUILDER_MANIFEST` se anuncia con `warn_manifest_root_ambient`; un `sdk.root` externo ignorado, con `warn_manifest_sdk_root_ignored`.
 
 ### Flags
