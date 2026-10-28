@@ -319,8 +319,8 @@ expression and is inserted verbatim, like `{ expression }`. The op adds no impor
 `@pbuilder/sdk/react` mutates `.tsx` files, and `find()` requires the explicit `.tsx` extension
 (extensionless and `.jsx` paths are rejected, never normalized). The handle carries every
 [TypeScript dialect](#the-typescript-dialect) op (`addImport`, `addDefaultImport`,
-`sortImports` and the rest) plus four JSX ops, with `.modify(fn)` as the escape hatch for
-everything else:
+`sortImports` and the rest) plus JSX and component ops, with `.modify(fn)` as the escape hatch
+for everything else:
 
 ```ts
 import * as react from "@pbuilder/sdk/react";
@@ -340,6 +340,9 @@ await react
 | `removeJsxProp(target, prop)` | Removes a prop from **the one** element `target` names. An absent prop is a no-op, and a `{...spread}` is never touched, even when it may carry the prop. |
 | `addJsxChild(target, jsx)` | Appends `jsx`, one JSX element or fragment, as the last child of **the one** element `target` names. A child with the same text already there is a no-op. |
 | `wrapJsxElement(target, wrapper)` | Wraps **the one** element `target` names in `wrapper`, a self-closing JSX element whose props are kept. A no-op when the target is already directly inside that tag. |
+| `renameJsxElement(target, tag)` | Renames **the one** element `target` names, opening and closing tag together. Imports are not touched. |
+| `addHookCall(component, statement)` | Inserts one statement into the body of the component named `component`, after its leading hook calls. An identical statement already there is a no-op. |
+| `addComponentProp(component, name, type, opts?)` | Adds `name: type` (`name?:` with `{ optional: true }`) to the component's props type and to its destructured parameter. The same name and type is a no-op; a different type rejects. |
 
 The import ops are the TypeScript dialect's own, with the same rules, so
 `addImport("React", "react")` prints `import { React } from "react"`. For
@@ -366,7 +369,7 @@ await react
 
 A reject message names the tag and the prop names, never the prop values.
 
-### Children and wrappers
+### Children, wrappers and renames
 
 `addJsxChild` puts the child on its own line at the siblings' indentation, or inline when the
 element's content is inline. A self-closing target becomes an open/close pair. `jsx` must be
@@ -395,7 +398,68 @@ await react.find("src/main.tsx").wrapJsxElement("App", "<QueryProvider client={q
 // -> root.render(<QueryProvider client={queryClient}><App /></QueryProvider>);
 ```
 
-Neither op adds an import, so pair them with `addImport`.
+`renameJsxElement` changes the opening and closing tag together. Nested elements with the same
+tag are left alone, and renaming to the same tag is a no-op:
+
+```ts
+// src/Toolbar.tsx before: <Button onClick={save}>Save</Button>
+await react
+  .find("src/Toolbar.tsx")
+  .addImport("PrimaryButton", "./ui")
+  .renameJsxElement("Button", "PrimaryButton");
+// -> <PrimaryButton onClick={save}>Save</PrimaryButton>
+```
+
+None of these ops adds an import, so pair them with `addImport`.
+
+### Component ops
+
+`addHookCall` and `addComponentProp` take a `component` name. The op looks for it among the
+file's top-level `function Name` declarations, exported or not, and top-level `const Name =`
+arrow functions or function expressions. A wrapped component (`memo(...)`, `forwardRef(...)`)
+is not found, and zero or several matches reject.
+
+`addHookCall(component, statement)` inserts `statement` after the component's leading hook
+calls (statements that call `useX(...)` or `React.useX(...)`), or first when there are none,
+at the body's indentation. `statement` must be exactly one statement. An identical statement
+already in the body is a no-op, and an expression-bodied arrow (`() => <div />`) rejects
+because it has no statements to add to:
+
+```ts
+// src/Form.tsx before:
+// export function Form() {
+//   const [name, setName] = useState("");
+//   return <form />;
+// }
+await react.find("src/Form.tsx").addHookCall("Form", "const t = useTranslation();");
+// -> export function Form() {
+// ->   const [name, setName] = useState("");
+// ->   const t = useTranslation();
+// ->   return <form />;
+// -> }
+```
+
+`addComponentProp(component, name, type, options?)` adds `name: type`, or `name?: type` with
+`{ optional: true }`, to the component's props type. When the props parameter is destructured,
+it also adds `name` to the destructuring, before a `...rest` element. The props type is the
+first parameter's inline type literal, or an `interface` or `type` literal declared in the same
+file and referenced by name. An imported or untyped props type rejects. A component without
+parameters gets `({ name }: { name: type })`. The same name with the same type text is a no-op,
+and a different type rejects. `type` must be exactly one type:
+
+```ts
+// src/Card.tsx before:
+// interface CardProps {
+//   title: string;
+// }
+// export function Card({ title }: CardProps) { ... }
+await react.find("src/Card.tsx").addComponentProp("Card", "subtitle", "string", { optional: true });
+// -> interface CardProps {
+// ->   title: string;
+// ->   subtitle?: string;
+// -> }
+// -> export function Card({ title, subtitle }: CardProps) { ... }
+```
 
 Two React-specific subtleties:
 
@@ -409,11 +473,12 @@ Two React-specific subtleties:
   around it; renaming the existing binding or choosing a different `name` is on you.
 
 <Aside type="caution" title="The trust boundary">
-`setJsxProp`'s `value`, `addJsxChild`'s `jsx` and `wrapJsxElement`'s `wrapper` are emitted
-verbatim into executable code, with the same trust boundary as the TypeScript `source` strings.
-The SDK checks that `jsx` and `wrapper` are one JSX node, and does no escaping or sanitisation.
-By contrast, tag and prop names are validated name arguments and are not a trusted-code
-channel.
+`setJsxProp`'s `value`, `addJsxChild`'s `jsx`, `wrapJsxElement`'s `wrapper`, `addHookCall`'s
+`statement` and `addComponentProp`'s `type` are emitted verbatim into executable code, with the
+same trust boundary as the TypeScript `source` strings. The SDK checks that each is one JSX node,
+one statement or one type, and rejects it without echoing it when it is not. It does no escaping
+or sanitisation. By contrast, component, tag and prop names are validated name arguments and are
+not a trusted-code channel.
 </Aside>
 
 ## Idempotency: safe to re-run
@@ -430,7 +495,7 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 
 | You need to… | Use |
 |---|---|
-| Add, remove or sort imports, add a top-level declaration, append to an array, add a class property, edit one JSX element's props, children or wrapper | The dialect's [named ops](#the-typescript-dialect) |
+| Add, remove or sort imports, add a top-level declaration, append to an array, add a class property, edit one JSX element's props, children, wrapper or tag, add a hook call or a prop to a React component | The dialect's [named ops](#the-typescript-dialect) |
 | Make any other structural change to a `.ts` or `.tsx` file | `.modify(fn)` on the dialect handle |
 | Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
 | Register a component, provider or route, or add a signal or `inject()` member in Angular | The [Angular dialect](/guides/angular-dialect/) |
