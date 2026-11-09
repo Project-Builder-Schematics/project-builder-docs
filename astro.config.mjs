@@ -114,11 +114,6 @@ export default defineConfig({
 					link: '/roadmap/',
 				},
 				{
-					label: 'Beta testing',
-					translations: { es: 'Programa beta' },
-					link: '/beta-testing/',
-				},
-				{
 					label: 'Workbenches ↗',
 					link: 'https://hyperxq.github.io/Project-Builder-workbenches-/',
 					attrs: { target: '_blank' },
