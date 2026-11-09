@@ -1,8 +1,30 @@
 // @ts-check
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import favicons from 'astro-favicons';
+
+const locales = {
+	root: { label: 'English', lang: 'en' },
+	es: { label: 'Español', lang: 'es' },
+};
+
+/** @param {string} url */
+function lastCommitDate(url) {
+	const slug = new URL(url).pathname.replace(/^\/|\/$/g, '');
+	// Untranslated pages are served from the root-locale file, so fall back to it.
+	const slugs = [slug, slug.replace(/^es(\/|$)/, '')];
+	const file = slugs
+		.map((s) => `src/content/docs/${s || 'index'}`)
+		.flatMap((base) => [`${base}.mdx`, `${base}.md`, `${base}/index.mdx`, `${base}/index.md`])
+		.find(existsSync);
+	if (!file) return undefined;
+	const date = execFileSync('git', ['log', '-1', '--format=%cI', '--', file], { encoding: 'utf8' }).trim();
+	return date || undefined;
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -17,10 +39,7 @@ export default defineConfig({
 			description:
 				'Documentation for Project Builder — build, extend, and automate project scaffolding with schematics.',
 			defaultLocale: 'root',
-			locales: {
-				root: { label: 'English', lang: 'en' },
-				es: { label: 'Español', lang: 'es' },
-			},
+			locales,
 			logo: {
 				src: './src/assets/logo.svg',
 			},
@@ -105,6 +124,14 @@ export default defineConfig({
 					attrs: { target: '_blank' },
 				},
 			],
+		}),
+		// Registering sitemap here replaces Starlight's built-in one, so the i18n mapping is repeated.
+		sitemap({
+			i18n: {
+				defaultLocale: 'root',
+				locales: Object.fromEntries(Object.entries(locales).map(([key, { lang }]) => [key, lang])),
+			},
+			serialize: (item) => ({ ...item, lastmod: lastCommitDate(item.url) }),
 		}),
 		favicons(),
 	],
