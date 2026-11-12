@@ -1,0 +1,118 @@
+---
+title: Use Project Builder with AI coding agents
+description: Give AI coding agents deterministic code generation. The agent picks the schematic and its inputs; the schematic writes the same files every run.
+sidebar:
+  order: 0
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An AI coding agent such as Claude Code, Codex or Cursor writes different code each time you
+ask for the same thing. For one-off work that is fine. For the code your project repeats
+(services, components, modules, config entries) you want the same structure every time.
+
+Project Builder splits the job. The agent decides **what** to build: which schematic to run
+and with which inputs. The schematic decides **how**: it is a typed, tested program, so the
+same inputs produce the same files, byte for byte, on every run.
+
+<Aside type="note" title="Beta">
+Project Builder is in beta. Some commands are not implemented yet, and behavior can change
+between releases. The [CLI commands](/reference/cli-commands/) reference lists what is
+available today.
+</Aside>
+
+## Rules files vs schematics
+
+The usual way to keep an agent consistent is a rules file: `AGENTS.md`, `CLAUDE.md` or
+`.cursorrules`. A rules file describes your conventions, and the agent tries to follow
+them. Nothing checks that it did.
+
+A schematic enforces the convention:
+
+- Its inputs are declared in `schema.json`, and `builder execute` validates them before
+  anything runs.
+- Its logic is code you can [test in memory](/getting-started/testing/), like any other
+  function.
+- Running it twice with the same inputs gives the same result, so you review the schematic
+  once instead of reviewing every generated file.
+
+Keep the rules file for judgment calls. Move the patterns you repeat into schematics, and
+let the agent run them.
+
+## Set up your project for an agent
+
+Run `builder init` in your repository. Besides `project-builder.json` and the `schematics/`
+folder, it writes two things for agents:
+
+- A skill in `.claude/skills/pbuilder/`: `SKILL.md` routes the agent to `use.md`
+  (run a schematic), `choose.md` (pick one) and `create.md` (author one).
+- A reference block in `AGENTS.md`, or in `CLAUDE.md` when that is the file your project
+  uses, so the agent knows the skill exists.
+
+When the agent runs `init` itself, turn off the prompts and ask for JSON:
+
+```sh
+builder init --non-interactive --json --package-manager=pnpm --mcp=no .
+```
+
+Add `--dry-run` to preview every planned write without touching the disk. See
+[`builder init`](/reference/cli-commands/#builder-init) for every flag, and
+[Evaluate without adopting the SDK](/guides/evaluate-without-sdk/) to try it without
+changing `package.json`.
+
+## How an agent runs a schematic
+
+1. Find the schematic. `builder info` lists the registered collections,
+   `builder info <collection>` lists its schematics, and
+   `builder info <collection>:<schematic>` shows the inputs it accepts.
+2. Run it with explicit inputs.
+
+   ```sh
+   builder --output=json execute default:my-component --name=button
+   ```
+
+   Pass every input as a flag. Prompts for sensitive inputs are refused outside a terminal,
+   so an agent cannot rely on them.
+3. Read the result. When stdout is not a terminal, the CLI writes NDJSON by default, so an
+   agent's shell gets machine-readable output without extra flags. Every error carries a
+   structured code and a suggested fix.
+
+<Aside type="caution" title="Put CLI flags before the schematic name">
+Everything after `<collection>:<schematic>` is passed to the schematic as an input.
+`builder execute default:my-component --output=json` sends `--output` to the schematic, not
+to the CLI. See [flag placement](/reference/cli-output-and-errors/#flag-placement-with-builder-execute).
+</Aside>
+
+### Exit codes
+
+The exit code tells the agent what kind of failure happened without parsing text:
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 2 | Usage: a flag, argument or input was wrong. Fix the call and retry. |
+| 3 | Config: the project's own configuration is missing or invalid. |
+| 4 | SDK: `@pbuilder/sdk` is missing or the version does not match. |
+| 5 | Engine: the schematic failed while running. |
+| 1 | Internal or not-yet-implemented. |
+
+The full list, with every error code and its remedy, is in
+[CLI output and errors](/reference/cli-output-and-errors/#exit-codes).
+
+## When the agent should write a schematic
+
+A schematic automates code that already works. When the agent (or you) has written the
+same pattern by hand a few times and it is tested, encode it with
+`builder new schematic`. From then on the agent runs it instead of writing it again. The
+skill's `create.md` covers this step.
+
+Do not ask the agent to invent a schematic for something you have done once. See
+[the golden rule](/getting-started/overview/#what-is-a-schematic).
+
+## Current limits
+
+- `builder execute --dry-run` is not supported by the native engine yet: it is rejected
+  before anything runs. Review the agent's changes with `git diff` after the run.
+- `builder add`, `remove`, `sync` and `validate` are not implemented yet.
+- `--non-interactive` on `builder execute` is reserved and only prints a warning. Passing
+  every input as a flag is what keeps a run free of prompts.

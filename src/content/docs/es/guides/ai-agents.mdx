@@ -1,0 +1,122 @@
+---
+title: Usar Project Builder con agentes de IA
+description: Generación de código determinista para agentes de IA. El agente elige el schematic y sus entradas; el schematic escribe los mismos archivos en cada ejecución.
+sidebar:
+  order: 0
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Un agente de programación con IA, como Claude Code, Codex o Cursor, escribe código distinto
+cada vez que le pides lo mismo. Para trabajo puntual no importa. Para el código que tu
+proyecto repite (servicios, componentes, módulos, entradas de configuración) quieres la
+misma estructura siempre.
+
+Project Builder divide el trabajo. El agente decide **qué** construir: qué schematic
+ejecutar y con qué entradas. El schematic decide **cómo**: es un programa tipado y
+testeado, así que las mismas entradas producen los mismos archivos, byte por byte, en cada
+ejecución.
+
+<Aside type="note" title="Beta">
+Project Builder está en beta. Algunos comandos todavía no están implementados y el
+comportamiento puede cambiar entre versiones. La referencia de
+[comandos de la CLI](/es/reference/cli-commands/) lista lo que está disponible hoy.
+</Aside>
+
+## Archivos de reglas vs schematics
+
+La forma habitual de mantener consistente a un agente es un archivo de reglas: `AGENTS.md`,
+`CLAUDE.md` o `.cursorrules`. Un archivo de reglas describe tus convenciones y el agente
+intenta seguirlas. Nada comprueba que lo haya hecho.
+
+Un schematic aplica la convención:
+
+- Sus entradas están declaradas en `schema.json`, y `builder execute` las valida antes de
+  ejecutar nada.
+- Su lógica es código que puedes [testear en memoria](/es/getting-started/testing/), como
+  cualquier otra función.
+- Ejecutarlo dos veces con las mismas entradas da el mismo resultado, así que revisas el
+  schematic una vez en lugar de revisar cada archivo generado.
+
+Deja el archivo de reglas para las decisiones de criterio. Pasa a schematics los patrones
+que repites y deja que el agente los ejecute.
+
+## Preparar tu proyecto para un agente
+
+Ejecuta `builder init` en tu repositorio. Además de `project-builder.json` y la carpeta
+`schematics/`, escribe dos cosas para los agentes:
+
+- Una skill en `.claude/skills/pbuilder/`: `SKILL.md` dirige al agente a `use.md`
+  (ejecutar un schematic), `choose.md` (elegir uno) y `create.md` (crear uno).
+- Un bloque de referencia en `AGENTS.md`, o en `CLAUDE.md` cuando ese es el archivo que
+  usa tu proyecto, para que el agente sepa que la skill existe.
+
+Cuando el agente ejecuta `init` por su cuenta, desactiva los prompts y pide JSON:
+
+```sh
+builder init --non-interactive --json --package-manager=pnpm --mcp=no .
+```
+
+Agrega `--dry-run` para ver cada escritura planificada sin tocar el disco. Consulta
+[`builder init`](/es/reference/cli-commands/#builder-init) para todos los flags, y
+[Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/) para probarlo sin cambiar
+`package.json`.
+
+## Cómo ejecuta un agente un schematic
+
+1. Encuentra el schematic. `builder info` lista las colecciones registradas,
+   `builder info <collection>` lista sus schematics y
+   `builder info <collection>:<schematic>` muestra las entradas que acepta.
+2. Ejecútalo con entradas explícitas.
+
+   ```sh
+   builder --output=json execute default:my-component --name=button
+   ```
+
+   Pasa cada entrada como flag. Los prompts para entradas sensibles se rechazan fuera de
+   una terminal, así que un agente no puede depender de ellos.
+3. Lee el resultado. Cuando stdout no es una terminal, la CLI escribe NDJSON por
+   defecto, así que la shell del agente recibe salida legible por máquina sin flags extra.
+   Cada error trae un código estructurado y una corrección sugerida.
+
+<Aside type="caution" title="Pon los flags de la CLI antes del nombre del schematic">
+Todo lo que va después de `<collection>:<schematic>` se pasa al schematic como entrada.
+`builder execute default:my-component --output=json` le envía `--output` al schematic, no a
+la CLI. Consulta [la posición de los flags](/es/reference/cli-output-and-errors/).
+</Aside>
+
+### Códigos de salida
+
+El código de salida le dice al agente qué tipo de fallo ocurrió sin tener que analizar
+texto:
+
+| Código | Significado |
+|---|---|
+| 0 | Éxito |
+| 2 | Uso: un flag, argumento o entrada era incorrecto. Corrige la llamada y reintenta. |
+| 3 | Configuración: falta la configuración del proyecto o no es válida. |
+| 4 | SDK: falta `@pbuilder/sdk` o la versión no coincide. |
+| 5 | Motor: el schematic falló durante la ejecución. |
+| 1 | Interno o todavía no implementado. |
+
+La lista completa, con cada código de error y su solución, está en
+[Salida y errores de la CLI](/es/reference/cli-output-and-errors/).
+
+## Cuándo debería el agente escribir un schematic
+
+Un schematic automatiza código que ya funciona. Cuando el agente (o tú) escribió a mano el
+mismo patrón varias veces y está testeado, codifícalo con `builder new schematic`. A partir
+de ahí el agente lo ejecuta en lugar de volver a escribirlo. El `create.md` de la skill
+cubre este paso.
+
+No le pidas al agente que invente un schematic para algo que hiciste una sola vez. Consulta
+[la regla de oro](/es/getting-started/overview/).
+
+## Límites actuales
+
+- `builder execute --dry-run` todavía no está soportado por el motor nativo: se rechaza
+  antes de ejecutar nada. Revisa los cambios del agente con `git diff` después de la
+  ejecución.
+- `builder add`, `remove`, `sync` y `validate` todavía no están implementados.
+- `--non-interactive` en `builder execute` está reservado y solo imprime una advertencia.
+  Lo que mantiene una ejecución sin prompts es pasar cada entrada como flag.
