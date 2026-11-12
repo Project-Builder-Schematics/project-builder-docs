@@ -1,7 +1,7 @@
 ---
 import { Image } from "astro:assets";
 
-import LeoOmg from "../assets/leo.webp";
+import LeoHappy from "../assets/leo-happy.svg";
 
 const es = Astro.locals.starlightRoute.locale === "es";
 ---
@@ -16,7 +16,7 @@ const es = Astro.locals.starlightRoute.locale === "es";
     </p>
   </div>
   <div class="leo__image">
-    <Image src={LeoOmg} alt="Leo pet image" width="180" />
+    <Image src={LeoHappy} alt="Leo pet image" width="180" />
   </div>
 </aside>
 
