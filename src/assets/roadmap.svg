@@ -61,12 +61,12 @@
     <path d="M 168 404 L 176 420 L 184 404 Z" fill="#7f56d9"/>
   </g>
 
-  <!-- workbenches proof card -->
+  <!-- experiments proof card -->
   <path d="M 190 586 C 200 620, 230 634, 260 638" stroke="#34343a" stroke-width="1.3" stroke-dasharray="5 5" fill="none"/>
   <rect x="264.5" y="614.5" width="420" height="52" rx="10" fill="#0a0a0c" stroke="#34343a"/>
   <circle cx="288" cy="640" r="4.5" fill="#27a644"/>
   <circle cx="288" cy="640" r="8.5" fill="none" stroke="#27a644" stroke-opacity="0.3"/>
-  <text x="304" y="636" font-size="12" font-weight="600" fill="#d0d6e0">workbenches — proving it in the field</text>
+  <text x="304" y="636" font-size="12" font-weight="600" fill="#d0d6e0">experiments — proving it in the field</text>
   <text x="304" y="653" font-size="10.5" fill="#62666d">not just built: real projects measuring its effectiveness</text>
   <polyline points="596,652 608,644 618,648 630,636 642,640 654,628 666,630" stroke="url(#rm-spark)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 
