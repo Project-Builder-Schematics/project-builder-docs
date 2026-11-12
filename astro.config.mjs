@@ -114,7 +114,8 @@ export default defineConfig({
 					link: '/roadmap/',
 				},
 				{
-					label: 'Workbenches ↗',
+					label: 'Experiments ↗',
+					translations: { es: 'Experimentos ↗' },
 					link: 'https://hyperxq.github.io/Project-Builder-workbenches-/',
 					attrs: { target: '_blank' },
 				},
