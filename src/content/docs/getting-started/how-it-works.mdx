@@ -79,7 +79,8 @@ parses code.
 ## Under the hood: an engine that speaks wire, not language
 
 The SDK is TypeScript; the engine is Go. They talk through a deliberately thin bridge: the
-engine runs a **Bun sidecar** through an adapter, and that sidecar starts the SDK's
+engine runs a **Bun sidecar** through an adapter (a pinned Bun the CLI downloads and
+verifies on first use, so you never install it), and that sidecar starts the SDK's
 **runner**, the entry point that loads your factory and opens the conversation. From
 there, everything that crosses between them is **framed JSON** on the wire: `ir.emit`,
 `tree.read`, `ir.commit`, `ir.discard`.

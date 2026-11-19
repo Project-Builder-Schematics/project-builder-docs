@@ -10,7 +10,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 Cada paso de abajo es ejecutable exactamente como está escrito. Inicializarás un
 workspace, generarás el esqueleto de un schematic, declararás sus entradas tipadas,
 escribirás el factory y lo ejecutarás dos veces para ver la idempotencia en acción.
-[Instala la CLI y Bun](/es/getting-started/installation/) primero si aún no lo has hecho.
+[Instala la CLI](/es/getting-started/installation/) primero si aún no lo has hecho.
 
 <Steps>
 
@@ -66,12 +66,12 @@ escribirás el factory y lo ejecutarás dos veces para ver la idempotencia en ac
 4. **Regenera los tipos de entrada:**
 
    ```sh
-   bunx pbuilder-codegen schematics/hello
+   npx pbuilder-codegen schematics/hello
    ```
 
    Esto reescribe `schema.generated.ts` con un tipo `Input` derivado de tu schema, así que tu
    factory queda tipado contra el schema, nunca contra una forma escrita a mano. Para
-   regenerar todos los schematics registrados de una vez, ejecuta `bunx pbuilder-codegen`
+   regenerar todos los schematics registrados de una vez, ejecuta `npx pbuilder-codegen`
    sin argumentos (ver [Generación de tipos](/es/guides/type-generation/)).
 
 5. **Escribe el factory:**
@@ -141,8 +141,8 @@ producción también omitiría el append cuando el nombre ya está en la lista.
 
 <Aside type="note">
 Si tu editor marca el import con extensión `.ts` o `bun:test`, la causa son ajustes de
-tsconfig que faltan (consulta [Probar schematics](/es/getting-started/testing/)); Bun por
-sí solo corre bien sin ellos.
+tsconfig que faltan (consulta [Probar schematics](/es/getting-started/testing/)); el
+schematic en sí corre bien sin ellos.
 </Aside>
 
 ## Dos reglas que ahorran tiempo de depuración

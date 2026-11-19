@@ -1,14 +1,13 @@
 ---
 title: Instalación
-description: Instala la CLI builder con Homebrew o un tarball, agrega Bun como runtime de los schematics e incorpora el SDK a tu proyecto.
+description: Instala la CLI builder con Homebrew o un tarball e incorpora el SDK a tu proyecto. La CLI provee el runtime de los schematics, así que no hay que instalar Bun.
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Necesitas dos cosas en tu máquina: la **CLI `builder`** (que incluye el engine) y
-**[Bun](https://bun.sh)**, el runtime en el que se ejecutan los schematics. El SDK en sí
+Lo único que instalas en tu máquina es la **CLI `builder`**, que incluye el engine. El SDK
 se agrega por proyecto, normalmente de forma automática.
 
 Ejecuta `builder --version` para comprobar la versión de la CLI que tienes instalada.
@@ -31,16 +30,14 @@ Esto requiere un Homebrew reciente. La instalación del cask está verificada en
 [releases del tap](https://github.com/Project-Builder-Schematics/homebrew-tap/releases)
 (`pbuilder_<version>_linux_amd64.tar.gz` y compañía) y coloca `builder` en tu `PATH`.
 
-Los schematics se ejecutan a través de un sidecar de [Bun](https://bun.sh), así que Bun
-también debe estar instalado:
-
-```sh
-brew install oven-sh/bun/bun   # o bien: curl -fsSL https://bun.sh/install | bash
-```
+No necesitas instalar [Bun](https://bun.sh). Los schematics se ejecutan en un sidecar de
+Bun que provee la CLI: la primera vez que ejecuta un schematic, descarga una versión fija
+de Bun, la verifica contra un hash SHA-256 conocido y la guarda en caché. Esa primera ejecución
+necesita acceso a la red; las siguientes usan la caché.
 
 <Aside type="note">
-Bun es únicamente el runtime de los schematics. Tu proyecto conserva el gestor de
-paquetes y las herramientas que ya usa (npm, pnpm, yarn, …).
+Ese Bun es solo el runtime de los schematics y nunca se agrega a tu `PATH`. Tu proyecto
+conserva el gestor de paquetes y las herramientas que ya usa (npm, pnpm, yarn, …).
 </Aside>
 
 ## Windows
@@ -63,5 +60,5 @@ npm install -D @pbuilder/sdk    # o bien: pnpm add -D / yarn add -D / bun add -d
 ¿Solo quieres probar Project Builder? Puedes usarlo sin declarar el SDK en `package.json`.
 Consulta [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/).
 
-Con la CLI y Bun en su lugar, estás listo para
+Con la CLI en su lugar, estás listo para
 [tu primer schematic](/es/getting-started/your-first-schematic/).

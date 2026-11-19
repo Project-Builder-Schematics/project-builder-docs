@@ -1,15 +1,14 @@
 ---
 title: Installation
-description: Install the builder CLI with Homebrew or a tarball, add Bun as the schematics runtime, and get the SDK into your project.
+description: Install the builder CLI with Homebrew or a tarball and get the SDK into your project. The CLI provisions the schematics runtime itself, so there is no Bun to install.
 sidebar:
   order: 3
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Two things need to be on your machine: the **`builder` CLI** (which ships the engine) and
-**[Bun](https://bun.sh)**, the runtime schematics execute in. The SDK itself is added per
-project, usually automatically.
+The only thing you install on your machine is the **`builder` CLI**, which ships the engine.
+The SDK is added per project, usually automatically.
 
 Run `builder --version` to check your installed CLI version.
 
@@ -31,15 +30,14 @@ No Homebrew at all? Download the per-platform tarball from the
 [tap's releases](https://github.com/Project-Builder-Schematics/homebrew-tap/releases)
 (`pbuilder_<version>_linux_amd64.tar.gz` and friends) and put `builder` on your `PATH`.
 
-Schematics execute through a [Bun](https://bun.sh) sidecar, so Bun must be installed too:
-
-```sh
-brew install oven-sh/bun/bun   # or: curl -fsSL https://bun.sh/install | bash
-```
+You don't need to install [Bun](https://bun.sh). Schematics run in a Bun sidecar, and the
+CLI provisions it: the first time it runs a schematic, it downloads a pinned Bun release,
+checks it against a known SHA-256 hash and caches it. That first run needs network
+access; later runs use the cache.
 
 <Aside type="note">
-Bun is only the schematics' runtime. Your project itself keeps whatever package manager
-and tooling it already uses (npm, pnpm, yarn, …).
+That Bun is only the schematics' runtime and never goes on your `PATH`. Your project
+keeps whatever package manager and tooling it already uses (npm, pnpm, yarn, …).
 </Aside>
 
 ## Windows
@@ -62,5 +60,5 @@ npm install -D @pbuilder/sdk    # or: pnpm add -D / yarn add -D / bun add -d
 Just trying Project Builder out? You can run it without declaring the SDK in
 `package.json`. See [Evaluate without adopting the SDK](/guides/evaluate-without-sdk/).
 
-With the CLI and Bun in place, you're ready for
+With the CLI in place, you're ready for
 [your first schematic](/getting-started/your-first-schematic/).

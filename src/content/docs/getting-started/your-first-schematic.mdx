@@ -9,7 +9,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 Every step below is runnable exactly as written. You'll initialise a workspace, scaffold a
 schematic, declare its typed inputs, write the factory, and execute it twice to see
-idempotency at work. [Install the CLI and Bun](/getting-started/installation/) first if
+idempotency at work. [Install the CLI](/getting-started/installation/) first if
 you haven't.
 
 <Steps>
@@ -65,12 +65,12 @@ you haven't.
 4. **Regenerate the input types:**
 
    ```sh
-   bunx pbuilder-codegen schematics/hello
+   npx pbuilder-codegen schematics/hello
    ```
 
    This rewrites `schema.generated.ts` with an `Input` type derived from your schema,
    so your factory is typed against the schema, never against a hand-written shape. To
-   regenerate every registered schematic at once, run `bunx pbuilder-codegen` with no
+   regenerate every registered schematic at once, run `npx pbuilder-codegen` with no
    arguments (see [Type generation](/guides/type-generation/)).
 
 5. **Write the factory:**
@@ -140,8 +140,8 @@ the name is already listed.
 
 <Aside type="note">
 If your editor flags the `.ts`-extension import or `bun:test`, the cause is missing
-tsconfig settings (see [Testing schematics](/getting-started/testing/)); Bun itself runs
-fine without them.
+tsconfig settings (see [Testing schematics](/getting-started/testing/)); the schematic
+itself runs fine without them.
 </Aside>
 
 ## Two rules that save debugging time

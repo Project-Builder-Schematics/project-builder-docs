@@ -14,15 +14,15 @@ from what `project-builder.json` registers; there is no second list of directori
 sync.
 
 `pbuilder-codegen` is a Node.js script, so any package runner works: `npx`, `pnpm exec`,
-`yarn`, or `bunx`. The examples use `bunx`, like the rest of these docs.
+`yarn`, or `bunx`. The examples use `npx`; swap in the runner your project uses.
 
 ## Choose a mode
 
 | You want to regenerate… | Run | What it selects |
 |---|---|---|
-| Every registered schematic in the project you are in | `bunx pbuilder-codegen` | The nearest `project-builder.json`, walking up from the current directory |
-| Every registered schematic in a specific project | `bunx pbuilder-codegen --project <directory>` | Exactly that directory's `project-builder.json`, from any working directory, with no upward search |
-| One schematic | `bunx pbuilder-codegen <schematic-directory>` | Only that directory |
+| Every registered schematic in the project you are in | `npx pbuilder-codegen` | The nearest `project-builder.json`, walking up from the current directory |
+| Every registered schematic in a specific project | `npx pbuilder-codegen --project <directory>` | Exactly that directory's `project-builder.json`, from any working directory, with no upward search |
+| One schematic | `npx pbuilder-codegen <schematic-directory>` | Only that directory |
 
 Use the project modes after editing several schemas, in CI, or as your `generate:types`
 script. Use the single-directory mode while iterating on one schematic. It is what
@@ -89,7 +89,7 @@ workspace/
 
    ```sh
    cd schematics/hello
-   bunx pbuilder-codegen
+   npx pbuilder-codegen
    ```
 
    ```text
@@ -127,7 +127,7 @@ workspace/
    script:
 
    ```sh
-   bunx pbuilder-codegen --project ./workspace
+   npx pbuilder-codegen --project ./workspace
    ```
 
    The result is the same.
@@ -196,7 +196,7 @@ without a `label`, and `legacy/broken-copy` registers the same directory again:
 ```
 
 ```text
-$ bunx pbuilder-codegen
+$ npx pbuilder-codegen
 pbuilder-codegen: "drafts/broken" ("<workspace>/schematics/broken"): "pbuilder-codegen: <workspace>/schematics/broken/schema.json: property \"title\" is missing a label"
 pbuilder-codegen: generated 1, failed 1, duplicates 1
 $ echo $?
@@ -221,14 +221,14 @@ hand.
 Let the exit status fail the job. Files on disk are not proof that the whole run succeeded:
 
 ```sh
-bunx pbuilder-codegen
+npx pbuilder-codegen
 ```
 
 If you pipe the output, keep the status, for example with `set -o pipefail` in Bash. To
 also catch schemas changed without regenerating, check for differences afterwards:
 
 ```sh
-bunx pbuilder-codegen
+npx pbuilder-codegen
 git diff --exit-code -- '*schema.generated.ts'
 ```
 
@@ -236,7 +236,7 @@ git diff --exit-code -- '*schema.generated.ts'
 
 With [`sdk.root`](/reference/cli-commands/#external-sdk-root-sdkroot), `node_modules/@pbuilder/sdk` is a link the CLI created, not a package your package manager installed, so there is no `node_modules/.bin/pbuilder-codegen` shim. Package runners then misbehave in one of these ways:
 
-- `bunx pbuilder-codegen` and `npx pbuilder-codegen` report the binary as missing, even though the SDK is present and `builder execute` works.
+- `npx pbuilder-codegen` and `bunx pbuilder-codegen` report the binary as missing, even though the SDK is present and `builder execute` works.
 - If an SDK is also installed globally, `npx` can run **that global copy** without telling you, possibly a different version from the one `sdk.root` names.
 - Recent pnpm versions run an install before `pnpm exec`. That makes the command work, but it writes a `pnpm-lock.yaml` and a shim into your project, which is the kind of change `sdk.root` exists to avoid.
 
@@ -276,7 +276,7 @@ that is a **symbolic link is refused, even if its target is inside the project**
 any other non-regular entry:
 
 ```text
-$ bunx pbuilder-codegen schematics/hello
+$ npx pbuilder-codegen schematics/hello
 pbuilder-codegen: schematics/hello/schema.generated.ts: refusing symbolic-link output
 ```
 
@@ -303,7 +303,7 @@ To migrate:
 3. Regenerate an ordinary file in place:
 
    ```sh
-   bunx pbuilder-codegen schematics/hello
+   npx pbuilder-codegen schematics/hello
    ```
 
 </Steps>

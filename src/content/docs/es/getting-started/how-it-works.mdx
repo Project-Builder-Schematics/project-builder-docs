@@ -87,7 +87,8 @@ nunca parsea código.
 ## Bajo el capó: un engine que habla el protocolo, no el lenguaje
 
 El SDK es TypeScript; el engine es Go. Se comunican a través de un puente deliberadamente
-delgado: el engine ejecuta un **sidecar de Bun** mediante un adaptador, y ese sidecar
+delgado: el engine ejecuta un **sidecar de Bun** mediante un adaptador (una versión fija de
+Bun que la CLI descarga y verifica en el primer uso, así que nunca la instalas), y ese sidecar
 arranca el **runner** del SDK, el punto de entrada que carga tu factory y abre la
 conversación. A partir de ahí, todo lo que cruza entre ambos es **JSON enmarcado** (framed
 JSON) por el cable: `ir.emit`, `tree.read`, `ir.commit`, `ir.discard`.

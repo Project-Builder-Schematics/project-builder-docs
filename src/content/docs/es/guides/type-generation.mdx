@@ -14,16 +14,16 @@ todos a partir de lo que registra `project-builder.json`; no hay una segunda lis
 directorios que mantener sincronizada.
 
 `pbuilder-codegen` es un script de Node.js, así que sirve cualquier ejecutor de paquetes:
-`npx`, `pnpm exec`, `yarn` o `bunx`. Los ejemplos usan `bunx`, como el resto de esta
-documentación.
+`npx`, `pnpm exec`, `yarn` o `bunx`. Los ejemplos usan `npx`; cámbialo por el ejecutor
+que use tu proyecto.
 
 ## Elige un modo
 
 | Quieres regenerar… | Ejecuta | Qué selecciona |
 |---|---|---|
-| Todos los schematics registrados del proyecto en el que estás | `bunx pbuilder-codegen` | El `project-builder.json` más cercano, subiendo desde el directorio actual |
-| Todos los schematics registrados de un proyecto concreto | `bunx pbuilder-codegen --project <directory>` | Exactamente el `project-builder.json` de ese directorio, desde cualquier directorio de trabajo, sin búsqueda hacia arriba |
-| Un solo schematic | `bunx pbuilder-codegen <schematic-directory>` | Solo ese directorio |
+| Todos los schematics registrados del proyecto en el que estás | `npx pbuilder-codegen` | El `project-builder.json` más cercano, subiendo desde el directorio actual |
+| Todos los schematics registrados de un proyecto concreto | `npx pbuilder-codegen --project <directory>` | Exactamente el `project-builder.json` de ese directorio, desde cualquier directorio de trabajo, sin búsqueda hacia arriba |
+| Un solo schematic | `npx pbuilder-codegen <schematic-directory>` | Solo ese directorio |
 
 Usa los modos de proyecto después de editar varios schemas, en CI o como tu script
 `generate:types`. Usa el modo de un directorio mientras iteras sobre un schematic. Es lo
@@ -91,7 +91,7 @@ workspace/
 
    ```sh
    cd schematics/hello
-   bunx pbuilder-codegen
+   npx pbuilder-codegen
    ```
 
    ```text
@@ -129,7 +129,7 @@ workspace/
    script de CI:
 
    ```sh
-   bunx pbuilder-codegen --project ./workspace
+   npx pbuilder-codegen --project ./workspace
    ```
 
    El resultado es el mismo.
@@ -200,7 +200,7 @@ directorio:
 ```
 
 ```text
-$ bunx pbuilder-codegen
+$ npx pbuilder-codegen
 pbuilder-codegen: "drafts/broken" ("<workspace>/schematics/broken"): "pbuilder-codegen: <workspace>/schematics/broken/schema.json: property \"title\" is missing a label"
 pbuilder-codegen: generated 1, failed 1, duplicates 1
 $ echo $?
@@ -228,7 +228,7 @@ Deja que el código de salida haga fallar el job. Que los archivos estén en dis
 toda la ejecución haya tenido éxito:
 
 ```sh
-bunx pbuilder-codegen
+npx pbuilder-codegen
 ```
 
 Si encadenas la salida con un pipe, conserva el código de salida, por ejemplo con
@@ -236,7 +236,7 @@ Si encadenas la salida con un pipe, conserva el código de salida, por ejemplo c
 diferencias después:
 
 ```sh
-bunx pbuilder-codegen
+npx pbuilder-codegen
 git diff --exit-code -- '*schema.generated.ts'
 ```
 
@@ -244,7 +244,7 @@ git diff --exit-code -- '*schema.generated.ts'
 
 Con [`sdk.root`](/es/reference/cli-commands/#sdk-externo-sdkroot), `node_modules/@pbuilder/sdk` es un enlace que creó la CLI, no un paquete que instaló tu gestor de paquetes, así que no hay shim `node_modules/.bin/pbuilder-codegen`. Los ejecutores de paquetes fallan entonces de una de estas formas:
 
-- `bunx pbuilder-codegen` y `npx pbuilder-codegen` reportan que falta el binario, aunque el SDK está presente y `builder execute` funciona.
+- `npx pbuilder-codegen` y `bunx pbuilder-codegen` reportan que falta el binario, aunque el SDK está presente y `builder execute` funciona.
 - Si además hay un SDK instalado globalmente, `npx` puede ejecutar **esa copia global** sin avisarte, posiblemente una versión distinta de la que indica `sdk.root`.
 - Las versiones recientes de pnpm ejecutan una instalación antes de `pnpm exec`. Eso hace que el comando funcione, pero escribe un `pnpm-lock.yaml` y un shim en tu proyecto, que es justo el tipo de cambio que `sdk.root` existe para evitar.
 
@@ -285,7 +285,7 @@ que es un **enlace simbólico se rechaza, aunque su destino esté dentro del pro
 mismo ocurre con cualquier otra entrada no regular:
 
 ```text
-$ bunx pbuilder-codegen schematics/hello
+$ npx pbuilder-codegen schematics/hello
 pbuilder-codegen: schematics/hello/schema.generated.ts: refusing symbolic-link output
 ```
 
@@ -312,7 +312,7 @@ Para migrar:
 3. Regenera un archivo normal en su lugar:
 
    ```sh
-   bunx pbuilder-codegen schematics/hello
+   npx pbuilder-codegen schematics/hello
    ```
 
 </Steps>
