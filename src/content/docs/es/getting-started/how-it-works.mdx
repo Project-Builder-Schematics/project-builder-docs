@@ -131,6 +131,6 @@ factory. Cuando la entrada se rechaza, el runner termina con código `1` y una l
 Ninguno de estos es un problema de la factory ni del handshake: materializa el JSON en un archivo
 regular (no un pipe ni un directorio) y, si es un enlace, revisa su destino. El manejo de la
 entrada del runner está definido en el código del SDK,
-[`src/transport/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/transport/runner.ts).
+[`src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts).
 El runner no es un generador independiente: sin un host que hable el protocolo por stdin/stdout,
 se detiene en el saludo.
