@@ -49,4 +49,4 @@ type Decl = astLibrary.VariableDeclaration;  // types
 
 This inventory mirrors the SDK. Update both locales in the same change whenever a dialect is added or removed, its backing library or declared version changes, the declaration stops being an exact pin, or the `astLibrary` surface changes. Check three places in the SDK: the `exports` map and `dependencies` in `package.json`, and each dialect's entry point (`src/dialects/<name>/index.ts`) and AST adapter (`src/dialects/<name>/ast.ts`). If a future declaration is a version range, document the range instead of a single version.
 
-Contributors building a dialect: the SDK's [dialect authoring guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration) covers the mandatory `astLibrary` export and the conformance fixture.
+Contributors building a dialect: the SDK's [dialect authoring guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/guides/authoring-a-dialect.md#mandatory-module-export-and-fixture-migration) covers the mandatory `astLibrary` export and the conformance fixture.

@@ -120,6 +120,6 @@ factory. When the input is rejected, the runner exits with code `1` and one line
 None of these is a factory or handshake problem: materialize the JSON into a regular file
 (not a pipe or a directory) and, for a link, check its target. The runner's input handling is
 defined in the SDK source,
-[`src/transport/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/transport/runner.ts).
+[`src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts).
 The runner is not a standalone generator: without a host speaking the protocol on stdin/stdout,
 it stops at the greeting.
