@@ -1,6 +1,6 @@
 ---
 title: Instalación
-description: Instala la CLI builder con Homebrew o un tarball e incorpora el SDK a tu proyecto. La CLI provee el runtime de los schematics, así que no hay que instalar Bun.
+description: Instala la CLI builder con Homebrew, Scoop o un archivo e incorpora el SDK a tu proyecto. La CLI provee el runtime de los schematics, así que no hay que instalar Bun.
 sidebar:
   order: 3
 ---
@@ -42,9 +42,23 @@ conserva el gestor de paquetes y las herramientas que ya usa (npm, pnpm, yarn, �
 
 ## Windows
 
-<Aside type="caution" title="Aún sin soporte">
-Las builds de la CLI para Windows están en el roadmap; mientras tanto, la vía soportada en
-Windows es WSL2 (Ubuntu), usando las instrucciones de Linux de arriba.
+Desde la v0.13.0 la CLI publica builds para Windows en amd64 y arm64. Con
+[Scoop](https://scoop.sh) instalado, agrega el tap como bucket e instala `builder.exe`:
+
+```powershell
+scoop bucket add pbuilder https://github.com/Project-Builder-Schematics/homebrew-tap
+scoop install pbuilder
+```
+
+Sin Scoop, descarga `pbuilder_<version>_windows_amd64.zip` (o `_arm64`) desde los
+[releases del tap](https://github.com/Project-Builder-Schematics/homebrew-tap/releases) y
+agrega `builder.exe` a tu `PATH`.
+
+<Aside type="caution" title="Soporte inicial">
+Las builds de Windows todavía no se verificaron en una máquina Windows real, y la suite de
+tests de la CLI en Windows sigue fallando, incluidos los chequeos de confianza del manifest
+root y del SDK root. WSL2 (Ubuntu) con las instrucciones de Linux de arriba sigue siendo la
+vía probada.
 </Aside>
 
 ## El SDK en sí
