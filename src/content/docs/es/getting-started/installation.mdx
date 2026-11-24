@@ -57,8 +57,7 @@ agrega `builder.exe` a tu `PATH`.
 <Aside type="caution" title="Soporte inicial">
 Un release se publica solo después de que un job en Windows compila `builder.exe` y ejecuta
 `--version`, `--help`, `init`, `new collection`, `new schematic` e `info` en un workspace
-nuevo. `builder execute` todavía no está verificado en Windows. En Windows ARM64 no puede
-ejecutar schematics, porque la CLI no fija un runtime de Bun para esa plataforma. Parte de la suite de tests
+nuevo. `builder execute` todavía no está verificado en Windows, y parte de la suite de tests
 de la CLI en Windows sigue fallando, incluidos los chequeos de confianza del manifest root y
 del SDK root que ejecuta `execute`. Para ejecutar schematics, WSL2 (Ubuntu) con las
 instrucciones de Linux de arriba sigue siendo la vía probada.

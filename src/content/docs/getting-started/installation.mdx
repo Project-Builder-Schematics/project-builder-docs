@@ -57,8 +57,7 @@ Without Scoop, download `pbuilder_<version>_windows_amd64.zip` (or `_arm64`) fro
 <Aside type="caution" title="Early support">
 A release is published only after a Windows job builds `builder.exe` and runs
 `--version`, `--help`, `init`, `new collection`, `new schematic` and `info` in a fresh
-workspace. `builder execute` is not verified on Windows yet. On Windows ARM64 it cannot run
-schematics at all, because the CLI pins no Bun runtime for that platform. Part of the CLI's Windows
+workspace. `builder execute` is not verified on Windows yet, and part of the CLI's Windows
 test suite still fails, including the trust checks on the manifest root and the SDK root
 that `execute` runs. To run schematics, WSL2 (Ubuntu) with the Linux instructions above
 remains the tested path.
