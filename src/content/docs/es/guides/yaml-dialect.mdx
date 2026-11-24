@@ -108,6 +108,9 @@ Son las 15 ops del [dialecto JSON](/es/guides/json-dialect/), con las mismas fir
 mismas reglas. Lee "objeto" como **mapping** y "array" como **sequence**. Cada una acepta además
 la opción `{ document }` como último argumento.
 
+Como en JSON, `insertItem`, `appendItem` sin `{ unique: true }`, `removeItem` y `moveItem` no
+son idempotentes: vuelven a actuar en cada ejecución.
+
 | Op | Llamada | Antes | Después |
 |---|---|---|---|
 | `setValue(path, value, { before?, after? })` | `setValue(["port"], 8080)` | `port: 80` | `port: 8080` |
@@ -318,7 +321,7 @@ bucket: !Ref my-bucket
 ## Documentos
 
 Estas dos ops no aceptan la opción `{ document }`; trabajan sobre la lista de documentos del
-archivo.
+archivo. Ninguna es idempotente: una segunda ejecución agrega o quita otro documento.
 
 ### `addDocument(value, { index? })`
 

@@ -30,7 +30,7 @@ Estos flags persistentes son aceptados por todos los comandos:
 
 | Flag | Valores | Efecto |
 |---|---|---|
-| `--output` | `pretty`, `json` | Formato de salida: `pretty` (legible para humanos) o `json` (NDJSON para CI/pipes). Por defecto: autodetección según la terminal. |
+| `--output` | `pretty`, `json` | Formato de salida: `pretty` (legible para humanos) o `json`, un sobre `{result, error, warnings}` en stdout para CI, pipes y agentes de IA. Por defecto: autodetección según la terminal. |
 | `--theme` | `light`, `dark`, `auto` | Esquema de color de la terminal. Por defecto `auto`, que se resuelve desde la variable de entorno `BUILDER_THEME` o por detección de la terminal. |
 | `--verbose` | booleano | Imprime la salida de diagnóstico completa (sanitizada) para fallas de subprocesos/motores y habilita líneas de log de nivel debug (solo en modo texto). |
 | `--help` | booleano | Muestra la ayuda del comando. |
@@ -64,7 +64,7 @@ Un `init` exitoso produce:
 4. **Un bloque de referencia delimitado en `AGENTS.md`** (preferido) o `CLAUDE.md`, idempotente y exacto línea a línea.
 5. **Configuración de `package.json`**: `devDependencies["@pbuilder/sdk"]` y una entrada `scripts["generate:types"]`, cada una agregada solo cuando falta su clave. Ver [Ediciones de `package.json`](#ediciones-de-packagejson).
 
-Después de las escrituras, `init` invoca el gestor de paquetes detectado para instalar el SDK (con un timeout de 120 segundos), salvo que se indique `--no-install`, `--no-sdk-dependency` o `--no-skill`. Luego, en una terminal interactiva, pregunta por la configuración del servidor MCP; una respuesta afirmativa imprime las instrucciones de configuración.
+Después de las escrituras, `init` invoca el gestor de paquetes detectado para instalar el SDK (con un timeout de 120 segundos), salvo que se indique `--no-install`, `--no-sdk-dependency` o `--no-skill`. `init` nunca hace preguntas salvo que pases `--interactive`: con él, en una terminal y sin `--mcp`, pregunta por la configuración del servidor MCP, y una respuesta afirmativa imprime las instrucciones de configuración.
 
 Las salidas se escriben en el orden anterior. Si un paso posterior falla, las salidas anteriores quedan en disco, porque no hay rollback de todo el `init`. Corrige la causa y vuelve a ejecutar con `--force`.
 
@@ -98,14 +98,15 @@ Estas garantías cubren la edición de la propia CLI. El paso de instalación po
 |---|---|
 | `--force` | Re-ejecutar sobre un proyecto existente: `project-builder.json` se lee y fusiona (`collections`, `dependencies`, `settings` y las claves desconocidas se preservan), mientras que el conjunto de artefactos de skill y el bloque marcador se regeneran. |
 | `--dry-run` | Previsualizar cada operación planificada sin escribir ningún archivo. |
-| `--json` | Emitir salida JSON legible por máquinas (NDJSON). Se combina con `--dry-run` para obtener un plan estructurado completo. |
-| `--non-interactive` | Deshabilitar todos los prompts (apto para CI y agentes de IA). Con `--mcp` sin establecer, el valor por defecto es `--mcp=no`. |
+| `--json` | Igual que `--output=json`: imprime el sobre JSON. Se combina con `--dry-run` para obtener un plan estructurado completo. |
+| `--interactive` | Preguntar por la configuración de MCP cuando no se indica `--mcp`. Necesita una terminal; sin ella, `init` no pregunta nada. |
+| `--non-interactive` | Obsoleto. `init` no es interactivo por defecto, así que el flag solo imprime la advertencia `warn_non_interactive_deprecated`. No se puede combinar con `--interactive`. |
 | `--package-manager=<npm\|pnpm\|yarn\|bun>` | Sobrescribir la detección del gestor de paquetes. Por defecto: detección por lockfile (pnpm > yarn > bun > npm) con `npm` como fallback. |
 | `--no-install` | Omitir únicamente el paso de instalación del gestor de paquetes. Las entradas solicitadas de `package.json` igual se agregan; ejecuta la instalación manualmente más tarde. |
 | `--no-sdk-dependency` | No agregar `@pbuilder/sdk` a `devDependencies` y no ejecutar la instalación. Las entradas existentes se preservan, nunca se eliminan. Su valor también es el valor por defecto de `--skip-types-script`. Ver [Evaluar sin adoptar el SDK](/es/guides/evaluate-without-sdk/). |
 | `--skip-types-script` | No agregar el script `generate:types`. Si se omite, toma el valor de `--no-sdk-dependency`; un valor explícito, como `--skip-types-script=false`, siempre prevalece. |
 | `--no-skill` | Omitir el conjunto de artefactos de skill, el bloque de referencia en AGENTS/CLAUDE, toda la configuración de `package.json`, la instalación y la configuración de MCP. Úsalo cuando solo quieres `project-builder.json` + `schematics/`. |
-| `--mcp=<yes\|no\|prompt>` | Controlar el prompt de configuración de MCP. Por defecto: `prompt` en una TTY, `no` bajo `--non-interactive`. `--mcp=prompt` es incompatible con `--non-interactive`. |
+| `--mcp=<yes\|no\|prompt>` | Controlar el prompt de configuración de MCP. Por defecto: `prompt` con `--interactive` en una terminal; si no, `no`. `--mcp=prompt` pregunta por sí solo y necesita una terminal: sin ella, `init` falla con `init_prompt_needs_terminal`. |
 | `--publishable` | Reservado. Actualmente devuelve el error `init_not_implemented`. |
 
 ### Flags de `package.json`
@@ -141,8 +142,11 @@ builder init ./my-new-workspace
 # Preview the full plan as JSON (no writes, no subprocess)
 builder init --dry-run --json /tmp/preview
 
-# CI / AI agent flow — non-interactive, JSON output, explicit PM, no MCP
-builder init --non-interactive --json --package-manager=pnpm --mcp=no .
+# CI / AI agent flow — JSON output, explicit PM, no MCP (init never prompts by default)
+builder init --json --package-manager=pnpm --mcp=no .
+
+# Ask about MCP setup on a terminal
+builder init --interactive
 
 # Skip install (you'll run it manually later)
 builder init --no-install
@@ -151,13 +155,13 @@ builder init --no-install
 builder init --no-skill
 
 # Evaluate without declaring the SDK — no SDK entry, no generate:types, no install
-builder init --no-sdk-dependency --non-interactive
+builder init --no-sdk-dependency
 
 # Same, but keep a generate:types entry
-builder init --no-sdk-dependency --skip-types-script=false --non-interactive
+builder init --no-sdk-dependency --skip-types-script=false
 
 # Adopt the SDK without adding generate:types
-builder init --skip-types-script --non-interactive
+builder init --skip-types-script
 
 # Force re-init over an existing workspace
 builder init --force
@@ -192,7 +196,7 @@ Antes de inspeccionar la instalación, `execute` selecciona un requisito de vers
 3. `project-builder.json` → `sdk.version`
 4. Ninguna presente: `0.2.4`, el SDK más antiguo con el que se prueba la CLI. No garantiza que cualquier SDK más nuevo funcione.
 
-El requisito es un **piso numérico**, no un rango semver: se descartan los operadores iniciales como `^`, `~` o `>=`, y la versión instalada debe ser mayor o igual al número restante. Por eso la entrada `>=0.1.0` que agrega `builder init` selecciona un piso `0.1.0`.
+El requisito se lee como npm lee un rango de versiones. Una versión sola, como `0.2.4`, es un piso; un rango de comparadores `>=`, `>`, `<=`, `<`, `=`, `^` o `~` se respeta tal como está escrito, así que `^0.15.0` acepta `0.15.x` y rechaza `0.16.0` (`sdk_version_above_ceiling`). La entrada `>=0.1.0` que agrega `builder init` acepta cualquier versión desde `0.1.0`. Un prefijo de protocolo como `workspace:` o `npm:` se rechaza con `sdk_requirement_invalid`.
 
 El valor seleccionado debe ser válido. Un valor inválido falla con `sdk_requirement_invalid`, y la CLI no recurre a una fuente de menor prioridad. Una vez seleccionada una fuente, las siguientes no se leen. Ver [Errores del SDK](/es/reference/cli-output-and-errors/#errores-del-sdk).
 
@@ -243,16 +247,16 @@ Una fuente definida que indica un directorio inutilizable hace fallar la ejecuci
 Antes de enlazar nada, `execute` valida la raíz:
 
 - **Identidad**: el `name` de su `package.json` es `@pbuilder/sdk`.
-- **Distribución**: existen `dist/bin/pbuilder-runner.js` y `dist/transport`.
+- **Distribución**: existe `dist/runner-manifest.json`, indica una entrada y una lista de archivos, y la entrada y cada archivo listado existen bajo la raíz. El SDK 0.15.x movió sus archivos, así que necesita la CLI v0.12.1 o posterior; la v0.12.0 lo rechaza con `sdk_root_dist_incomplete`. Antes de que arranque cada runner, el motor además compara cada archivo listado con el digest SHA-256 que indica el runner manifest; un archivo que difiere, falta o es un enlace simbólico hace fallar la ejecución antes de que corra cualquier factory, y el error no nombra el archivo.
 - **Versión**: la versión instalada cumple el [requisito del SDK](#requisito-del-sdk), seleccionado igual que para una instalación local.
-- **Dependencias**: las dependencias de ejecución del propio SDK (hoy `ts-morph`) se resuelven desde un `node_modules` en la raíz o por encima de ella. Un directorio de caché de un gestor de paquetes no sirve.
+- **Dependencias**: las dependencias de ejecución del propio SDK (hoy `ts-morph`) se resuelven desde un `node_modules` en la raíz o por encima de ella. Un directorio de caché de un gestor de paquetes no sirve. La instalación propia del workspace pasa por la misma comprobación.
 - **Permisos**: la raíz no es escribible por su grupo ni por otros usuarios, ningún directorio por encima es escribible por todos sin el sticky bit, y la raíz y sus ancestros te pertenecen a ti o a root. Un directorio por encima de la raíz que solo es escribible por el **grupo** no hace fallar la ejecución: emite la advertencia `warn_sdk_root_group_writable` y la ejecución continúa.
 
-**El enlace.** Cuando la ejecución hace commit, `execute` crea exactamente una entrada: `node_modules/@pbuilder/sdk` en el workspace, un **enlace simbólico** a la raíz canónica. Crea `node_modules/` y `node_modules/@pbuilder/` si faltan, y no escribe nada más. Volver a ejecutar con la misma raíz reutiliza el enlace sin escribir; indicar otra raíz lo redirige. Una escritura fallida no deja un enlace a medias. Las ejecuciones sin commit (`--dry-run` o `--commit=never`) no crean nada; para schematics nativos se rechazan de todos modos (ver la limitación del motor nativo más abajo).
+**El enlace.** Cuando la ejecución hace commit, `execute` crea exactamente una entrada: `node_modules/@pbuilder/sdk` en el workspace, un **enlace simbólico** a la raíz canónica. Crea `node_modules/` y `node_modules/@pbuilder/` si faltan, y no escribe nada más. Volver a ejecutar con la misma raíz reutiliza el enlace sin escribir; indicar otra raíz lo redirige. Una escritura fallida no deja un enlace a medias. Las ejecuciones sin commit (`--dry-run` o `--commit=never`) nunca crean ni redirigen el enlace; ver [Dry run](#dry-run).
 
 **Una instalación local no gana en silencio.** Si `node_modules/@pbuilder/sdk` ya es un directorio real, `execute` nunca lo sobrescribe ni elige uno de los dos por ti: falla con `execute_sdk_link_path_conflict`. La única excepción es una entrada local que resuelve canónicamente al mismo directorio que la raíz configurada; en ese caso la ejecución continúa sin error y sin escribir. Ninguna de las dos instalaciones se modifica nunca.
 
-**`builder new schematic`** resuelve el SDK directamente desde `sdk.root`, sin un `execute` previo y sin enlace. Valida la raíz de la misma forma, salvo el requisito de versión, que solo aplica `execute`. Una raíz que falla cualquier comprobación cuenta como "sin SDK utilizable": el comando igualmente termina con `0` y escribe el andamiaje, advierte y omite `schema.generated.ts`. Nunca ejecuta nada desde una raíz que no pasó la validación.
+**`builder new schematic`** resuelve la raíz del SDK igual que `execute` (`--sdk-root`, luego `BUILDER_SDK_ROOT`, luego `sdk.root`, luego la instalación del workspace), sin un `execute` previo y sin enlace. Valida la raíz de la misma forma, salvo el requisito de versión, que solo aplica `execute`. Una raíz indicada pero rechazada hace fallar el comando con `new_sdk_codegen_undeclared` antes de escribir ningún archivo; solo cuando no hay ninguna raíz del SDK escribe el andamiaje, advierte y omite `schema.generated.ts`. Ver [`builder new schematic`](#builder-new-schematic). Nunca ejecuta nada desde una raíz que no pasó la validación.
 
 **`builder info`** ignora `sdk.root`, sea válido o no.
 
@@ -275,7 +279,7 @@ Cada código de error y reason está en [Errores del SDK](/es/reference/cli-outp
 - **Valor.** Absoluto, o relativo al **directorio de trabajo**, no a `project-builder.json`. `~` no se expande: una shell lo expande al asignar la variable (`export` en bash o zsh, `set -x` en fish), pero un valor entre comillas en la shell o escrito en un archivo de configuración de un editor o agente queda literal y falla con `sdk_root_unresolvable`. Escribe ahí la ruta completa.
 - **Solo rutas locales.** Un valor que empieza con un esquema de URL o una letra de unidad falla con `sdk_root_unsupported_scheme` antes de tocar el sistema de archivos.
 - **Valores vacíos.** Un `BUILDER_SDK_ROOT` vacío cuenta como no definido. Un `--sdk-root=` vacío falla con `sdk_root_value_invalid`.
-- **Ubicación.** Solo `execute`. Ponlo antes de `<collection>:<schematic>`; después del posicional se rechaza (`invalid_input`), nunca se pasa al schematic. `new schematic` e `info` no leen ni el flag ni la variable.
+- **Ubicación.** `execute` y `new schematic`. En `execute`, ponlo antes de `<collection>:<schematic>`; después del posicional se rechaza (`invalid_input`), nunca se pasa al schematic. `info` no lee ni el flag ni la variable.
 - **Con `--manifest`.** Ambos funcionan juntos. El bloque `sdk` propio de un manifiesto externo se sigue ignorando sea cual sea la fuente que aporta el SDK, con `warn_manifest_sdk_root_ignored` cuando declara `sdk.root`.
 - **Anuncio.** Una raíz que vino de `BUILDER_SDK_ROOT` imprime `warn_sdk_root_ambient`, que nombra la variable pero nunca la ruta; una raíz de `--sdk-root` no se anuncia. Para ver qué SDK se ejecutó, revisa la variable o ejecuta `readlink node_modules/@pbuilder/sdk`.
 - **Mensajes.** Los reasons `sdk_root_*` de `sdk.root` aplican sin cambios, y sus mensajes siguen diciendo `sdk.root` cuando el valor vino del flag o de la variable.
@@ -305,20 +309,33 @@ Los tokens de flags de schematic siguen estas reglas:
 - **SDK.** La ejecución usa el `@pbuilder/sdk` del propio directorio de trabajo, instalado en un `node_modules` real o indicado con [`--sdk-root` o `BUILDER_SDK_ROOT`](#--sdk-root-y-builder_sdk_root). La raíz del manifiesto y sus ancestros no deben contener otra copia de `@pbuilder/sdk`, o la ejecución falla con un split module graph. Se ignoran `sdk.root` y `sdk.version` del manifiesto externo.
 - **Advertencias.** Una raíz que vino de `BUILDER_MANIFEST` se anuncia con `warn_manifest_root_ambient`; un `sdk.root` externo ignorado, con `warn_manifest_sdk_root_ignored`.
 
+### Dry run
+
+`--dry-run` (o `--commit=never`) ejecuta el schematic, imprime los archivos que crearía y modificaría, y no escribe nada en el workspace. Imprime la advertencia `warn_dry_run`. Funciona en un checkout o worktree nuevo que no tiene el enlace `node_modules/@pbuilder/sdk`: el motor carga el SDK desde la instalación propia de la raíz elegida, y el dry run nunca crea ni redirige el enlace.
+
+Si el workspace ya tiene un enlace `node_modules/@pbuilder/sdk` en la ruta de resolución del schematic y apunta a un SDK distinto del elegido, el dry run falla con `execute_dry_run_sdk_link_stale` (exit 4) y deja el enlace como está. Ejecuta sin `--dry-run`, que redirige el enlace, o borra el enlace y vuelve a ejecutar el dry run.
+
+La salida todavía no indica qué versión ni qué fuente del SDK usó el dry run.
+
+### Preguntas (`--interactive`)
+
+`execute` nunca hace preguntas salvo que pases `--interactive` antes de `<collection>:<schematic>`. Con él, antes de la ejecución, `execute` pregunta por cada entrada del `schema.json` del schematic que ningún flag indicó y que no tiene valor por defecto, en orden alfabético del nombre de la entrada. Sin una terminal no pregunta nada: si hubiera que preguntar por alguna entrada, falla con `execute_interactive_needs_terminal` y nombra esas entradas. Una entrada del schematic llamada `manifest`, `sdk-root` o `interactive` no se puede pasar después del posicional, porque esos nombres son opciones del propio `execute`.
+
 ### Flags
 
 | Flag | Efecto |
 |---|---|
 | `--manifest=<path>` | Leer el manifiesto, las colecciones y los schematics desde este directorio (o su `project-builder.json`) en lugar del directorio de trabajo. Debe ir antes de `<collection>:<schematic>`. Ver [Manifiesto externo](#manifiesto-externo---manifest). |
 | `--sdk-root=<dir>` | Ejecutar con el `@pbuilder/sdk` de este directorio en lugar del SDK instalado en el workspace o de `sdk.root`. También se lee de `BUILDER_SDK_ROOT`; el flag tiene prioridad. Debe ir antes de `<collection>:<schematic>`. Ver [`--sdk-root` y `BUILDER_SDK_ROOT`](#--sdk-root-y-builder_sdk_root). |
-| `--commit=<never\|always>` | Modo de escritura. Por defecto `always`. `ask` se acepta sintácticamente pero se rechaza; está reservado para una versión futura. |
-| `--dry-run` | Alias de `--commit=never`. Establecer `--dry-run` junto con un valor de `--commit` contradictorio es un error. |
-| `--non-interactive` | Reservado y aún no implementado; emite una advertencia si se establece. |
+| `--commit=<never\|always>` | Modo de escritura. Por defecto `always`. Cualquier otro valor se rechaza. |
+| `--dry-run` | Alias de `--commit=never`: lista los cambios planificados y no escribe nada. Ver [Dry run](#dry-run). Establecer `--dry-run` junto con un valor de `--commit` contradictorio es un error. |
+| `--interactive` | Preguntar, antes de la ejecución, por las entradas del schema que ningún flag indicó y que no tienen valor por defecto. Necesita una terminal. Debe ir antes de `<collection>:<schematic>`. Ver [Preguntas](#preguntas---interactive). |
+| `--non-interactive` | Obsoleto. `execute` no es interactivo por defecto, así que el flag solo imprime una advertencia. |
 | `--strict` | Reservado y aún no implementado; emite una advertencia si se establece. |
 | `--force` | Reservado y aún no implementado; emite una advertencia si se establece. |
 | `--auto-install` | Reservado y aún no implementado; emite una advertencia si se establece. |
 
-**Limitación del motor nativo:** `--dry-run` / `--commit=never` no está soportado. El adaptador nativo rechaza cualquier modo de commit distinto de `always` antes de construir o ejecutar el motor; no produce una previsualización. Ubica los flags de la CLI **antes** de `<collection>:<schematic>`: después de él, `--dry-run` es solo una entrada del schematic y no selecciona el modo sin escritura de la CLI. No confíes en esa ubicación para evitar escrituras.
+Ubica los flags de la CLI **antes** de `<collection>:<schematic>`. Después del posicional, `--dry-run` se rechaza con `invalid_input` (`flag --dry-run is a reserved global option and cannot be used as a schematic flag`).
 
 ### Ejemplos
 
@@ -332,8 +349,11 @@ builder g default:my-component --standalone --no-tests
 # Global flags go BEFORE the positional; schematic flags go after
 builder --output=json execute default:my-component --name=button
 
-# Unsupported for native schematics: rejected, not a preview
-builder execute --dry-run default:my-component
+# Preview: list the planned changes, write nothing
+builder execute --dry-run default:my-component --name=button
+
+# Prompt on a terminal for required inputs that no flag gave
+builder execute --interactive default:my-component
 
 # Run a schematic registered in another checkout; files land in the working directory
 builder execute --manifest=../app-schematics default:my-component --name=button
@@ -365,12 +385,14 @@ Dos modos, controlados por `--inline`.
 
 1. `schematics/<name>/factory.{ts,js}`: stub de factory (TypeScript o JavaScript según la detección de lenguaje). El stub es un default export: el execute en modo path resuelve `factory.{ts,js}#default` por convención.
 2. `schematics/<name>/schema.json`: forma canónica v1 `{"properties": {}, "description": ""}`.
-3. `schematics/<name>/schema.generated.ts`: interfaz de TypeScript autogenerada a partir de las `properties` de `schema.json` (independientemente de `--language`). Se omite con una advertencia cuando `@pbuilder/sdk` no está presente en el workspace.
+3. `schematics/<name>/schema.generated.ts`: interfaz de TypeScript autogenerada a partir de las `properties` de `schema.json` (independientemente de `--language`). Se omite con una advertencia solo cuando no hay ninguna raíz del SDK.
 4. `project-builder.json`: agrega `collections.default.<name>: { "path": "./schematics/<name>" }`.
 
 **Modo inline (`--inline`)** incrusta el schematic directamente dentro de `project-builder.json` bajo `collections.default.schematics.<name>`; no se crean archivos en `schematics/<name>/`. Se disparan advertencias suaves cuando una colección acumula 10 o más schematics inline, o cuando `project-builder.json` supera los 20KB después de la escritura.
 
-La generación de tipos se delega a `pbuilder-codegen`, un binario incluido dentro de `@pbuilder/sdk`. Cuando el SDK no está instalado, el paso automático de codegen se omite con una advertencia en lugar de hacer fallar el andamiaje (`schema.generated.ts` queda desactualizado o ausente). Con [`sdk.root`](#sdk-externo-sdkroot) configurado, el codegen se ejecuta desde esa raíz; una raíz que no pasa la validación se trata como si no hubiera un SDK utilizable. Para regenerar los tipos más tarde, para un schematic o para todas las colecciones registradas, ver [Generación de tipos](/es/guides/type-generation/).
+La generación de tipos se delega a `pbuilder-codegen`, que viene dentro de `@pbuilder/sdk`. `new schematic` toma la raíz del SDK de la primera fuente entre `--sdk-root`, `BUILDER_SDK_ROOT`, [`sdk.root`](#sdk-externo-sdkroot) y la instalación del workspace, y la comprueba igual que `execute`. Ejecuta el archivo que el `package.json` de la raíz declara como `bin.pbuilder-codegen`, con un Node.js (del `PATH` o de `NODE_BINARY`) que cumpla el `engines.node` de la raíz; la CLI no tiene una ruta de codegen ni un piso de Node.js propios.
+
+Los fallos son estrictos. Una raíz indicada pero rechazada, o que no declara `bin.pbuilder-codegen` (un archivo bajo la raíz) y `engines.node`, falla con `new_sdk_codegen_undeclared`; un Node.js fuera del rango de `engines.node` falla con `new_node_unsupported`. Ambos fallan antes de escribir ningún archivo. Solo cuando no hay ninguna raíz del SDK el paso de codegen se omite con una advertencia (`warn_codegen_sdk_missing`) y deja `schema.generated.ts` desactualizado o ausente. Para regenerar los tipos más tarde, para un schematic o para todas las colecciones registradas, ver [Generación de tipos](/es/guides/type-generation/).
 
 ### Flags
 
@@ -381,6 +403,8 @@ La generación de tipos se delega a `pbuilder-codegen`, un binario incluido dent
 | `--inline` | Incrustar la definición del schematic en `project-builder.json` en lugar de crear archivos independientes. |
 | `--language=<ts\|js>` | Forzar una factory en TypeScript o JavaScript. Autodetección por defecto: TS si existe `devDependencies.typescript` o `tsconfig.json`; en caso contrario recurre a TS con una advertencia. |
 | `--extends=<@scope/pkg:base>` | Declarar un schematic base que este extiende. La gramática se aplica estrictamente (`@scope/pkg:collection`); el path traversal se rechaza. |
+| `--sdk-root=<dir>` | Indicar la raíz del SDK que usa el codegen, por delante de `BUILDER_SDK_ROOT`, `sdk.root` en `project-builder.json` y la instalación del workspace. Ver [`--sdk-root` y `BUILDER_SDK_ROOT`](#--sdk-root-y-builder_sdk_root). |
+| `--interactive` | Preguntar por `--extends` cuando no se indica. Necesita una terminal; sin él, `new schematic` nunca pregunta. |
 | `--manifest=<path>` | Solo se acepta si indica el propio directorio de trabajo. `new schematic` siempre escribe en el directorio de trabajo: si `--manifest` o `BUILDER_MANIFEST` indican otro directorio, se niega con `manifest_scoped_authoring_refused` antes de escribir; haz `cd` a ese directorio. |
 
 ### Ejemplos

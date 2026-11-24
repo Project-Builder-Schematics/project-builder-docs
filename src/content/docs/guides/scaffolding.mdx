@@ -91,8 +91,23 @@ ship a placeholder file in it.
 
 ## How each file travels
 
-Each surviving file is classified automatically: valid, in-budget text renders as a template;
-binary or over-budget files travel verbatim (as `copyIn`).
+A file travels verbatim (as `copyIn`) only when it matches one of the `binary` globs. They
+are matched like `include` and `exclude`, against the original path inside `from`. A
+`binary` glob that matches nothing is allowed.
+
+```ts
+scaffold({ from: "files", to: "src", binary: ["**/*.png"] });
+```
+
+Every other file renders as a template. A file that cannot render rejects with
+`invalid-input`, naming the file:
+
+- the file is not valid UTF-8 text;
+- the rendered `create`, options included, does not fit one emit frame;
+- the file is both marked `.template` and declared `binary`.
+
+A text file over the frame limit must be made smaller, or declared `binary` if it needs no
+rendering.
 
 ## Collisions and `force`
 
@@ -105,6 +120,10 @@ inside the args object for a deliberate overwrite.
 - Nested symlinked directories inside `from` are skipped silently; a symlinked `from` root
   rejects outright.
 - A single `scaffold` call caps at 10,000 entries.
+- The `to` prefix and every `rename` value must pass the portable file-name check, as source
+  paths under `from` already do. Names such as `con.ts`, `out/AUX` or `src/a|b.ts` reject
+  with `invalid-input`. `.` and empty components are skipped, so `to: "."` and
+  `to: "./out"` still work.
 
 ## Next steps
 

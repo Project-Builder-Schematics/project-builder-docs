@@ -176,9 +176,12 @@ On macOS and many Linux systems `/tmp` is writable by its group, so a manifest r
   `BUILDER_MANIFEST` names a different directory, it refuses with
   `manifest_scoped_authoring_refused` before writing anything. To author in the shared
   directory, `cd` into it and run `builder new schematic` there. The shared directory has no
-  SDK, and `new schematic` does not read `BUILDER_SDK_ROOT`, so the scaffold skips
-  `schema.generated.ts` with a warning. Regenerate types with the SDK root's own script.
-  Codegen writes inside the project you name:
+  SDK of its own, so `new schematic` takes its SDK root from `--sdk-root` or
+  `BUILDER_SDK_ROOT`, the same way `execute` does, and regenerates `schema.generated.ts`
+  from it. A root that is present but refused, or that does not declare
+  `bin.pbuilder-codegen` and `engines.node`, fails with `new_sdk_codegen_undeclared`. With
+  no SDK root at all, the scaffold skips `schema.generated.ts` with a warning. To regenerate
+  types later, run the SDK root's own script. Codegen writes inside the project you name:
 
   ```sh
   node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js --project ~/work/app-schematics

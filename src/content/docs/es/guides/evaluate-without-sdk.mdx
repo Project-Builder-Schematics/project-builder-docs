@@ -43,7 +43,7 @@ las salidas escritas antes del fallo quedan en disco.
 1. **Previsualiza lo que hará `init`.** No se escribe ni se instala nada:
 
    ```sh
-   builder init . --no-sdk-dependency --dry-run --non-interactive
+   builder init . --no-sdk-dependency --dry-run
    ```
 
    Con `--no-sdk-dependency` solo, el plan no contiene ningún paso sobre `package.json`. Las
@@ -53,7 +53,7 @@ las salidas escritas antes del fallo quedan en disco.
 2. **Inicializa el workspace:**
 
    ```sh
-   builder init . --no-sdk-dependency --non-interactive
+   builder init . --no-sdk-dependency
    ```
 
    `init` no agrega la entrada del SDK ni el script `generate:types`, y no ejecuta ninguna
@@ -117,10 +117,13 @@ las salidas escritas antes del fallo quedan en disco.
 </Steps>
 
 <Aside type="danger" title="Ejecutar un schematic escribe en tu árbol de trabajo">
-`builder execute` no tiene previsualización para schematics nativos: `--dry-run` se rechaza,
-no se simula. Ubica los flags de la CLI **antes** de `<collection>:<schematic>`. Después de
-él, `--dry-run` es solo una entrada del schematic y no evita ninguna escritura. Revisa
-`git diff` después de cada ejecución.
+`builder execute --dry-run` imprime el plan y no escribe nada, incluso en un checkout nuevo
+sin `node_modules`. Nunca crea ni redirige el enlace `node_modules/@pbuilder/sdk`. Cuando
+ese enlace está en la ruta de resolución del schematic y apunta a otro SDK, el dry run falla
+con `execute_dry_run_sdk_link_stale` (exit 4) y deja el enlace como está. Ubica los flags de
+la CLI **antes** de `<collection>:<schematic>`. Después de él, `--dry-run` es solo una
+entrada del schematic y no evita ninguna escritura. Revisa `git diff` después de cada
+ejecución.
 </Aside>
 
 ## Elige la versión del SDK
@@ -212,8 +215,8 @@ Cuando la prueba te convenza:
    que previsualiza primero y revisa el diff completo después:
 
    ```sh
-   builder init . --force --dry-run --non-interactive
-   builder init . --force --non-interactive
+   builder init . --force --dry-run
+   builder init . --force
    ```
 
 </Steps>

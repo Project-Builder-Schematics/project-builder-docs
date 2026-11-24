@@ -271,6 +271,11 @@ El SDK filtra la forma *literal* de la ruta (sin segmento `..`, sin forma absolu
 tocar el disco. Los symlinks se siguen sin verificar su destino. Es un riesgo residual deliberado y
 documentado, cubierto en el `SECURITY.md` del SDK.
 
+El motor también rechaza una fuente de `copyIn` absoluta, o que sale del paquete una vez
+resueltos sus segmentos `..`, cuando pone en staging la instrucción. Lee `\` como separador en
+todas las plataformas, así que `..\x` también se rechaza. Como la verificación ocurre en el
+staging, un dry run también rechaza esa fuente.
+
 ## Leer archivos: `find(path).read()`
 
 `find(path)` localiza un archivo existente y retorna un handle para leerlo o eliminarlo.

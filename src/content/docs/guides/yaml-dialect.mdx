@@ -104,6 +104,9 @@ These are the 15 ops of the [JSON dialect](/guides/json-dialect/), with the same
 the same rules. Read "object" as **mapping** and "array" as **sequence**. Each one also takes the
 `{ document }` option as its last argument.
 
+As in JSON, `insertItem`, `appendItem` without `{ unique: true }`, `removeItem` and `moveItem`
+are not idempotent: they act again on every run.
+
 | Op | Call | Before | After |
 |---|---|---|---|
 | `setValue(path, value, { before?, after? })` | `setValue(["port"], 8080)` | `port: 80` | `port: 8080` |
@@ -309,6 +312,7 @@ bucket: !Ref my-bucket
 ## Documents
 
 These two ops take no `{ document }` option; they work on the file's list of documents.
+Neither is idempotent: a second run adds or removes another document.
 
 ### `addDocument(value, { index? })`
 

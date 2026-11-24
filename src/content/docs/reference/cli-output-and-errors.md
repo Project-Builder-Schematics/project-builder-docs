@@ -14,11 +14,19 @@ The CLI has two output formats, selected by the global `--output` flag:
 | Format | Selected by | Behaviour |
 |---|---|---|
 | `pretty` | `--output=pretty`, or default when stdout is a terminal | Human-readable, themed output: headings, paths, success/warning/error lines rendered with the active color theme. |
-| `json` | `--output=json`, or default when stdout is **not** a terminal (pipes, CI) | NDJSON for CI/pipes and AI consumption. Machine-readable envelopes are written to stdout; human "chrome" (warnings, engine event rendering) is routed to stderr so stdout carries only the envelope. |
+| `json` | `--output=json`, or default when stdout is **not** a terminal (pipes, CI) | One JSON envelope per command on stdout, for CI, pipes and AI agents. Human "chrome" (such as engine event rendering) is routed to stderr so stdout carries only the envelope. |
 
 When `--output` is unset, the format is auto-detected from the terminal: an interactive TTY gets `pretty`, a piped or redirected stdout gets `json`. This makes `builder ... | jq` and CI invocations machine-readable without any extra flags.
 
-`builder init` additionally accepts a local `--json` boolean flag selecting the same NDJSON output, and combines with `--dry-run` for a full structured plan of every operation without writing anything.
+Every command prints one envelope with the same shape, `{"result": …, "error": …, "warnings": […]}`. For example, `builder --output=json execute --dry-run default:my-component --name=button` prints:
+
+```json
+{"result":{"processed_inputs":{"name":"button"}},"warnings":[{"code":"warn_dry_run","message":"dry run: nothing is written to the workspace"}]}
+```
+
+`result` holds the command's result and `error` the coded error; only one of the two is present. `warnings` is always an array of `{code, message}` objects. `builder new` and `builder init` wrap their results in `result` like every other command. Errors raised before a command runs, such as an unknown command (`cli_unknown_command`) or a wrong number of arguments (`cli_invalid_args`), use the envelope too when `--output=json` comes before the command.
+
+`builder init` honours `--output=json`, and also accepts a local `--json` flag that does the same. Either combines with `--dry-run` for a full structured plan of every operation without writing anything.
 
 ### Flag placement with `builder execute`
 
@@ -70,9 +78,9 @@ Every error the CLI emits includes:
 
 Some codes also carry a **`reason`** that distinguishes variants of the same code, and a short, path-free **`detail`** (for example which field failed). Both appear in JSON output; the tables below list the reason where it changes the remedy.
 
-In text mode, errors render as a fixed block on **stderr**, independent of where stdout is redirected. In JSON mode, `builder execute` writes a structured JSON error envelope to stdout instead (and the text block is suppressed), so machine consumers always find the error in the stream they are parsing.
+In text mode, errors render as a fixed block on **stderr**, independent of where stdout is redirected. In JSON mode, every command writes the error in the `error` field of its envelope on stdout instead (and the text block is suppressed), so machine consumers always find the error in the stream they are parsing.
 
-Interactive prompts for **sensitive** schematic inputs are refused outside a TTY (`engine_non_tty_ask_unavailable`). In scripts and CI, pass the value explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
+No command prompts unless you pass `--interactive`. `builder execute --interactive` needs a terminal: without one it fails with `execute_interactive_needs_terminal`. In scripts and CI, pass every input explicitly with `builder execute <collection>:<schematic> --<name>=<value>`.
 
 ## Exit codes
 
@@ -99,7 +107,8 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | Code | Exit | Message | Remedy |
 |---|---|---|---|
 | `cancelled` | 130 | run cancelled | Note: re-run the command to try again |
-| `cli_prompt_failed` | 1 | could not read your answer from the terminal | Fix: re-run in an interactive terminal, or pass the value with `--<name>=<value>` |
+| `cli_invalid_args` | 1 | wrong number of arguments | Fix: run `--help` to see the command's arguments |
+| `cli_unknown_command` | 2 | unknown command | Fix: `builder --help` |
 | `cli_unknown_flag` | 2 | unrecognised command-line flag | Fix: run `--help` to see the accepted flags |
 | `invalid_input` | 2 | input value invalid | Note: check the input value against its expected format |
 | `not_implemented` | 1 | command not yet implemented | Note: this command is not implemented yet |
@@ -117,6 +126,7 @@ Complete registry of error codes, grouped by area. Where one code covers several
 | `init_marker_corrupt` | 3 | the pbuilder skill marker block in the agent file is malformed | Fix: close the block with `<!-- pbuilder:skill:end -->`, remove duplicate or orphaned marker lines, then re-run |
 | `init_not_implemented` | 1 | init mode not yet implemented | Note: this init mode is not implemented yet |
 | `init_package_manager_not_found` | 3 | package manager not found | Fix: run with `--package-manager` to select one explicitly |
+| `init_prompt_needs_terminal` | 2 | --mcp=prompt needs a terminal to ask about MCP setup | Fix: pass `--mcp=yes` or `--mcp=no` |
 | `init_skill_exists` | 2 | skill artefact set already exists (`.claude/skills/pbuilder/`) | Fix: run with `--force` to overwrite the full skill artefact set |
 | `invalid_input` | 2 | package.json is not valid JSON | Fix: fix the syntax errors in `package.json` and re-run |
 | `invalid_input` | 2 | package.json `<field>` field is not a valid string map | Note: fix the `devDependencies` or `scripts` field (for example a `null` value) and re-run. See [`package.json` edits](/reference/cli-commands/#packagejson-edits) |
@@ -134,9 +144,14 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | `new_invalid_language` | 2 | `--language` value is not supported | Note: `--language` accepts `ts` or `js` |
 | `new_invalid_name` | 2 | schematic name is invalid | Note: names may not contain path separators, shell metacharacters, or null bytes |
 | `new_mode_conflict` | 2 | incompatible flags combined | Note: `--inline`, `--force`, and `--publishable` cannot be combined in this way |
-| `new_node_not_found` | 3 | no Node.js binary found | Fix: install Node.js >= 18 and ensure it is on PATH, or set `NODE_BINARY` |
+| `new_node_not_found` | 3 | no Node.js binary found | Fix: install the Node.js the SDK's `engines.node` asks for and ensure it is on PATH, or set `NODE_BINARY` |
+| `new_node_unsupported` (`node_version_below_floor`, `node_version_above_ceiling`) | 3 | installed Node.js does not satisfy the SDK's engines.node | Fix: install a Node.js that satisfies the SDK's `engines.node` and put it on PATH, or set `NODE_BINARY` to it. `detail` names the version found and the range required, for example `found v22.3.0, need >=25.9.0` |
 | `new_not_implemented` | 1 | new mode not yet implemented | Note: this new mode is not implemented yet |
+| `new_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json` |
+| `new_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
+| `new_project_not_initialized` (`manifest_unreadable`) | 3 | project-builder.json exists but could not be read | Fix: check that `project-builder.json` is a regular file you have permission to read |
 | `new_schematic_exists` | 2 | schematic already exists | Fix: run with `--force` to overwrite |
+| `new_sdk_codegen_undeclared` (`sdk_codegen_declaration_invalid`) | 4 | the SDK root does not declare what codegen needs | Fix: install an `@pbuilder/sdk` whose `package.json` declares `bin.pbuilder-codegen` and `engines.node`. A root that is given but refused fails the same way. See [`builder new schematic`](/reference/cli-commands/#builder-new-schematic) |
 
 ### `builder execute`
 
@@ -144,7 +159,8 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 |---|---|---|---|
 | `execute_ambiguous_registration` | 2 | registration is ambiguous | Note: resolve the collection or schematic to a single registration mode |
 | `execute_collection_not_found` | 2 | collection not found in project-builder.json | Note: check `project-builder.json` for the registered collection name |
-| `execute_commit_mode_unsupported` | 2 | commit mode is not supported | Fix: use `--commit=never` or `--commit=always` (or `--dry-run` for `never`) |
+| `execute_dry_run_sdk_link_stale` (`sdk_link_on_factory_path`) | 4 | a Dry Run cannot use the chosen SDK: the workspace's node_modules/@pbuilder/sdk link is on the schematic's resolution path and points at another SDK | Fix: run without `--dry-run`, which repoints `node_modules/@pbuilder/sdk` to the chosen SDK; or delete `node_modules/@pbuilder/sdk` and run the Dry Run again. See [Dry run](/reference/cli-commands/#dry-run) |
+| `execute_interactive_needs_terminal` (`terminal_absent`) | 2 | --interactive needs a terminal to prompt for inputs | Fix: pass the inputs as flags: `builder execute <collection>:<schematic> --<name>=<value>`, or run in a terminal |
 | `execute_invalid_factory_pointer` | 2 | schematic's factory pointer does not parse | Note: edit `collection.json`'s factory to `<module>#<export>` |
 | `execute_invalid_factory_pointer` | 2 | schematic has both factory.ts and factory.js — ambiguous | Note: remove `factory.ts` or `factory.js` so only one remains |
 | `execute_invalid_factory_pointer` | 2 | schematic is missing a factory.ts or factory.js file | Note: create `factory.ts` or `factory.js` in the schematic root |
@@ -156,6 +172,8 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | `execute_missing_required_inputs` | 2 | missing required input(s) | Fix: `builder execute <collection>:<schematic> --<name>=<value>` |
 | `execute_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `execute_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
+| `execute_project_not_initialized` (`manifest_unreadable`) | 3 | project-builder.json exists but could not be read | Fix: check that `project-builder.json` is a regular file you have permission to read |
+| `execute_prompt_failed` (`terminal_unreadable`) | 1 | the answer to an --interactive prompt could not be read | Fix: pass the inputs as flags: `builder execute <collection>:<schematic> --<name>=<value>` |
 | `execute_schema_invalid` | 3 | schema.json is present but could not be parsed | Note: edit `schema.json` to fix the JSON syntax error |
 | `execute_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection definition for the registered schematic name |
 | `execute_sdk_link_failed` | 4 | varies by reason | See [SDK diagnostics](#sdk-diagnostics) |
@@ -175,12 +193,13 @@ A failed `init` leaves the outputs written before the failure on disk. Once fixe
 | Code | Reason | Exit | Message | Repair |
 |---|---|---|---|---|
 | `execute_sdk_not_installed` | `sdk_absent` | 4 | @pbuilder/sdk is not installed in this workspace | Provide a compatible SDK at `node_modules/@pbuilder/sdk` (see below) |
-| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but required distribution files are missing; reinstall it |
+| `execute_sdk_not_installed` | `sdk_dist_incomplete` | 4 | local @pbuilder/sdk distribution is incomplete | The package is there but `dist/runner-manifest.json` or a file it lists is missing; reinstall it |
 | `execute_sdk_not_installed` | `sdk_installation_unreadable` | 4 | local @pbuilder/sdk installation could not be read; check permissions and broken links | Check permissions and dangling symlinks on `node_modules/@pbuilder/sdk` |
-| `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Fix the value named in `detail`, for example `project-builder.json.sdk.version: expected a numeric version floor` |
+| `execute_sdk_version_mismatch` | `sdk_requirement_invalid` | 4 | @pbuilder/sdk requirement is invalid; correct the selected declaration or configuration | Fix the value named in `detail`. Write a plain version or range, such as `^0.2.4` or `>=0.2.4 <0.3.0`, without a protocol prefix like `workspace:` or `npm:` |
 | `execute_sdk_version_mismatch` | `sdk_requirement_unreadable` | 4 | @pbuilder/sdk requirement could not be read; check package.json permissions and size | Check that the workspace `package.json` is readable and not oversized |
 | `execute_sdk_version_mismatch` | `sdk_version_unparseable` | 4 | installed @pbuilder/sdk version is invalid; check the local package.json | Inspect the `version` in `node_modules/@pbuilder/sdk/package.json` |
 | `execute_sdk_version_mismatch` | `sdk_version_below_floor` | 4 | installed @pbuilder/sdk version is below the selected requirement; choose a compatible version | Install a version that meets the selected requirement, or correct the requirement |
+| `execute_sdk_version_mismatch` | `sdk_version_above_ceiling` | 4 | installed @pbuilder/sdk version is above the selected requirement's upper bound; choose a compatible version | Install a version inside the selected range, or widen the requirement |
 
 The CLI does not detect your package manager for these errors: its suggestions list one local installation command per manager, and you choose one. They change `package.json` and may change the lockfile:
 
@@ -203,7 +222,7 @@ These codes appear only when an external root is named by `--sdk-root`, `BUILDER
 | `execute_sdk_root_invalid` | `sdk_root_unsupported_scheme` | 4 | sdk root is not a supported location — a URL or drive letter is not accepted | Point `--sdk-root` (or `BUILDER_SDK_ROOT`) at a local directory. Only these two can hit it |
 | `execute_sdk_root_invalid` | `sdk_root_unresolvable` | 4 | sdk.root does not resolve to a readable directory | Point `sdk.root` at an existing, readable `@pbuilder/sdk` package directory |
 | `execute_sdk_root_invalid` | `sdk_root_package_mismatch` | 4 | the directory named by sdk.root is not @pbuilder/sdk | Point it at the package directory whose `package.json` name is `@pbuilder/sdk`, not its parent |
-| `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstall or rebuild the SDK so `dist/bin/pbuilder-runner.js` and `dist/transport` are present |
+| `execute_sdk_root_invalid` | `sdk_root_dist_incomplete` | 4 | the @pbuilder/sdk distribution at sdk.root is incomplete | Reinstall or rebuild the SDK so `dist/runner-manifest.json` and every file it lists are present under the root. SDK 0.15.x needs CLI v0.12.1 or later; v0.12.0 refuses every 0.15.x root with this reason |
 | `execute_sdk_root_invalid` | `sdk_root_dependencies_unresolvable` | 4 | the @pbuilder/sdk at sdk.root cannot load its own dependencies | `detail` names the dependency (for example `ts-morph`). Point `sdk.root` at a complete installation, such as the one `bun add -g @pbuilder/sdk` creates, not a package-manager cache |
 | `execute_sdk_root_invalid` | `sdk_root_writable_by_others` | 4 | sdk.root itself is writable by its group or by any user | `chmod go-w` the root so only its owner can write to it |
 | `execute_sdk_root_invalid` | `sdk_ancestor_world_writable` | 4 | a directory above sdk.root is writable by any user and is not sticky | `detail` gives the depth. `chmod o-w` that directory, or move the SDK under a directory only you can write to |
@@ -269,6 +288,7 @@ A run that fails with `engine_native_developer_fault` and a note about a *split 
 | `info_collection_definition_invalid` | 3 | collection definition could not be parsed | Note: edit `collection.json` to fix the JSON syntax error |
 | `info_project_not_initialized` | 3 | project-builder.json not found | Fix: run `builder init` to create `project-builder.json`; or re-run with `--manifest` (or `BUILDER_MANIFEST`) naming a directory that already has one |
 | `info_project_not_initialized` | 3 | project-builder.json exists but could not be parsed | Note: edit `project-builder.json` to fix the JSON syntax error |
+| `info_project_not_initialized` (`manifest_unreadable`) | 3 | project-builder.json exists but could not be read | Fix: check that `project-builder.json` is a regular file you have permission to read |
 | `info_schema_invalid` | 3 | schema.json is missing or could not be parsed | Note: ensure `schema.json` exists at the schematic root and is valid JSON |
 | `info_schematic_not_found` | 2 | schematic not found in collection | Note: check the collection definition for the registered schematic name |
 
@@ -276,10 +296,8 @@ A run that fails with `engine_native_developer_fault` and a note about a *split 
 
 | Code | Exit | Message | Remedy |
 |---|---|---|---|
-| `engine_non_tty_ask_unavailable` | 2 | sensitive input requires an interactive session | Fix: run in an interactive terminal, or provide it via `builder execute <collection>:<schematic> --<name>=<value>` |
 | `engine_not_found` | 5 | schematics engine binary not found | Fix: install the Angular Schematics CLI: `npm install -g @angular-devkit/schematics-cli` |
-| `engine_version_mismatch` | 5 | schematics engine version below the required floor | Fix: upgrade `@angular-devkit/schematics-cli` to the required version |
-| `engine_native_commit_mode_unsupported` | 5 | the native engine adapter does not support dry-run yet | Note: only `CommitMode: always` is supported today |
+| `engine_native_commit_mode_unsupported` | 5 | the native engine adapter does not support this commit mode | Note: supported commit modes: `always`, `never` |
 | `engine_native_developer_fault` | 5 | native engine execution failed due to a developer-facing fault in the schematic or its inputs | Note: check the schematic's file writes and inputs for the underlying cause |
 | `engine_native_invalid_factory_url` | 5 | factory URL is empty or malformed | Note: this indicates an internal wiring defect in factory-pointer resolution |
 | `engine_native_invalid_plan` | 5 | execute request has no pre-flight plan | Note: this indicates an internal wiring defect — pre-flight must run before the native engine adapter |
