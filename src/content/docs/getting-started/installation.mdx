@@ -55,9 +55,12 @@ Without Scoop, download `pbuilder_<version>_windows_amd64.zip` (or `_arm64`) fro
 `builder.exe` on your `PATH`.
 
 <Aside type="caution" title="Early support">
-The Windows builds have not been verified on a real Windows machine yet, and the CLI's
-Windows test suite still fails, including the trust checks on the manifest root and the
-SDK root. WSL2 (Ubuntu) with the Linux instructions above remains the tested path.
+A release is published only after a Windows job builds `builder.exe` and runs
+`--version`, `--help`, `init`, `new collection`, `new schematic` and `info` in a fresh
+workspace. `builder execute` is not verified on Windows yet, and part of the CLI's Windows
+test suite still fails, including the trust checks on the manifest root and the SDK root
+that `execute` runs. To run schematics, WSL2 (Ubuntu) with the Linux instructions above
+remains the tested path.
 </Aside>
 
 ## The SDK itself
