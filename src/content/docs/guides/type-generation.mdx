@@ -249,11 +249,11 @@ node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js
 node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js schematics/hello
 ```
 
-The link exists once a committing `builder execute` has run. Before that, use the configured root itself: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
+The link exists once a committing `builder execute` has run. A dry run never creates it. Before that, use the configured root itself: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
 
 The same applies when the link was created from [`--sdk-root` or `BUILDER_SDK_ROOT`](/reference/cli-commands/#--sdk-root-and-builder_sdk_root) instead of `sdk.root`. Before the link exists, run the script from that value: `node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js`.
 
-`builder new schematic` needs none of this with `sdk.root`: it resolves the configured root on its own and regenerates the new schematic's types. It does not read `BUILDER_SDK_ROOT`: when the variable is your only SDK source, it warns that `@pbuilder/sdk` was not found and skips `schema.generated.ts`. Run the script as above.
+`builder new schematic` needs none of this. It resolves its SDK root the way `builder execute` does, in this order: `--sdk-root`, `BUILDER_SDK_ROOT`, `sdk.root`, then the workspace's install. It runs the file that root's `package.json` declares as `bin.pbuilder-codegen`, with a Node.js that satisfies the root's `engines.node`. A root that is present but refused, or that does not declare `bin.pbuilder-codegen` and `engines.node`, fails the command with `new_sdk_codegen_undeclared` before any file is written. Only a missing SDK root warns and skips `schema.generated.ts`. See [`builder new schematic`](/reference/cli-commands/#builder-new-schematic).
 
 ## Output files and write boundaries
 

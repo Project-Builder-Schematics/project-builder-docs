@@ -257,11 +257,11 @@ node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js
 node node_modules/@pbuilder/sdk/dist/bin/pbuilder-codegen.js schematics/hello
 ```
 
-El enlace existe una vez que corrió un `builder execute` con commit. Antes de eso, usa la raíz configurada: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
+El enlace existe una vez que corrió un `builder execute` con commit. Un dry run nunca lo crea. Antes de eso, usa la raíz configurada: `node <sdk.root>/dist/bin/pbuilder-codegen.js`.
 
 Lo mismo aplica cuando el enlace se creó con [`--sdk-root` o `BUILDER_SDK_ROOT`](/es/reference/cli-commands/#--sdk-root-y-builder_sdk_root) en lugar de `sdk.root`. Antes de que exista el enlace, ejecuta el script desde ese valor: `node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js`.
 
-`builder new schematic` no necesita nada de esto con `sdk.root`: resuelve la raíz configurada por su cuenta y regenera los tipos del nuevo schematic. No lee `BUILDER_SDK_ROOT`: cuando la variable es tu única fuente de SDK, advierte que no encontró `@pbuilder/sdk` y omite `schema.generated.ts`. Ejecuta el script como se indica arriba.
+`builder new schematic` no necesita nada de esto. Resuelve su raíz del SDK igual que `builder execute`, en este orden: `--sdk-root`, `BUILDER_SDK_ROOT`, `sdk.root` y luego la instalación del workspace. Ejecuta el archivo que el `package.json` de esa raíz declara como `bin.pbuilder-codegen`, con un Node.js que cumpla el `engines.node` de la raíz. Una raíz presente pero rechazada, o que no declara `bin.pbuilder-codegen` y `engines.node`, hace fallar el comando con `new_sdk_codegen_undeclared` antes de escribir ningún archivo. Solo cuando no hay ninguna raíz del SDK advierte y omite `schema.generated.ts`. Consulta [`builder new schematic`](/es/reference/cli-commands/#builder-new-schematic).
 
 ## Archivos de salida y límites de escritura
 

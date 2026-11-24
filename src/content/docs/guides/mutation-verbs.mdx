@@ -266,6 +266,11 @@ The SDK screens the *literal* path shape (no `..` segment, no absolute form) bef
 disk. Symlinks are followed without target verification. This is a deliberate, documented
 residual risk covered in the SDK's `SECURITY.md`.
 
+The engine also rejects a `copyIn` source that is absolute or that leaves the package once its
+`..` segments resolve, when it stages the instruction. It reads `\` as a separator on every
+platform, so `..\x` is rejected too. Because the check runs at staging, a dry run rejects
+such a source as well.
+
 ## Reading files: `find(path).read()`
 
 `find(path)` locates an existing file and returns a handle for reading or removing it.

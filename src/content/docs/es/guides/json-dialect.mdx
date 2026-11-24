@@ -179,6 +179,10 @@ await json.find("config.json").renameKey(["b"], "beta");
 
 Toda op de arrays se rechaza cuando el valor en `path` existe y no es un array.
 
+Cuatro de estas ops no son idempotentes: vuelven a actuar en cada ejecución. `insertItem`, y
+`appendItem` sin `{ unique: true }`, agregan el valor otra vez. `removeItem` y `moveItem`
+vuelven a actuar sobre una posición, así que una segunda ejecución quita o mueve otro elemento.
+
 ### `insertItem(path, index, value)`
 
 Inserta `value` antes del elemento en `index`. Un `index` igual a la longitud del array agrega al

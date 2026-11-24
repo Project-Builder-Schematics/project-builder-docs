@@ -179,10 +179,13 @@ manifiesto bajo `/tmp` se rechaza. Usa un directorio dentro de tu home.
 - **`builder new schematic`** siempre escribe en el directorio de trabajo. Si `--manifest` o
   `BUILDER_MANIFEST` indican otro directorio, se niega con `manifest_scoped_authoring_refused`
   antes de escribir nada. Para crear schematics en el directorio compartido, haz `cd` a él y
-  ejecuta `builder new schematic` allí. El directorio compartido no tiene SDK, y
-  `new schematic` no lee `BUILDER_SDK_ROOT`, así que el andamiaje omite `schema.generated.ts`
-  con una advertencia. Regenera los tipos con el script de la propia raíz del SDK. El codegen
-  escribe dentro del proyecto que indiques:
+  ejecuta `builder new schematic` allí. El directorio compartido no tiene SDK propio, así que
+  `new schematic` toma su raíz del SDK de `--sdk-root` o `BUILDER_SDK_ROOT`, igual que
+  `execute`, y regenera `schema.generated.ts` desde ella. Una raíz presente pero rechazada, o
+  que no declara `bin.pbuilder-codegen` y `engines.node`, falla con
+  `new_sdk_codegen_undeclared`. Sin ninguna raíz del SDK, el andamiaje omite
+  `schema.generated.ts` con una advertencia. Para regenerar los tipos más tarde, ejecuta el
+  script de la propia raíz del SDK. El codegen escribe dentro del proyecto que indiques:
 
   ```sh
   node $BUILDER_SDK_ROOT/dist/bin/pbuilder-codegen.js --project ~/work/app-schematics

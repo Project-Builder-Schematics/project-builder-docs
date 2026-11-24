@@ -42,7 +42,7 @@ before the failure stay on disk.
 1. **Preview what `init` will do.** Nothing is written or installed:
 
    ```sh
-   builder init . --no-sdk-dependency --dry-run --non-interactive
+   builder init . --no-sdk-dependency --dry-run
    ```
 
    With `--no-sdk-dependency` alone, the plan contains no `package.json` step at all. The
@@ -52,7 +52,7 @@ before the failure stay on disk.
 2. **Initialise the workspace:**
 
    ```sh
-   builder init . --no-sdk-dependency --non-interactive
+   builder init . --no-sdk-dependency
    ```
 
    `init` adds no SDK entry, no `generate:types` script and runs no install. It also
@@ -115,9 +115,12 @@ before the failure stay on disk.
 </Steps>
 
 <Aside type="danger" title="Schematic runs write to your working tree">
-`builder execute` has no preview for native schematics: `--dry-run` is rejected, not
-simulated. Put CLI flags **before** `<collection>:<schematic>`. After it, `--dry-run` is
-just a schematic input and does not stop any write. Review `git diff` after every run.
+`builder execute --dry-run` prints the plan and writes nothing, even in a fresh checkout
+with no `node_modules`. It never creates or repoints the `node_modules/@pbuilder/sdk` link.
+When that link is on the schematic's resolution path and points at another SDK, the dry run
+fails with `execute_dry_run_sdk_link_stale` (exit 4) and leaves the link as it is. Put CLI
+flags **before** `<collection>:<schematic>`. After it, `--dry-run` is just a schematic input
+and does not stop any write. Review `git diff` after every run.
 </Aside>
 
 ## Choose the SDK version
@@ -208,8 +211,8 @@ When the trial convinces you:
    review the full diff afterwards:
 
    ```sh
-   builder init . --force --dry-run --non-interactive
-   builder init . --force --non-interactive
+   builder init . --force --dry-run
+   builder init . --force
    ```
 
 </Steps>

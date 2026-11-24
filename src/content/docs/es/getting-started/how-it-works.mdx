@@ -133,4 +133,6 @@ regular (no un pipe ni un directorio) y, si es un enlace, revisa su destino. El 
 entrada del runner está definido en el código del SDK,
 [`src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts).
 El runner no es un generador independiente: sin un host que hable el protocolo por stdin/stdout,
-se detiene en el saludo.
+se detiene en el saludo. Espera el saludo del host como máximo 30 segundos y después termina con
+código `3`. Si stdin se cierra antes de que llegue el saludo, también termina con código `3`. Un
+frame que llega pero no es un saludo válido termina con código `1`.

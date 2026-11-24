@@ -51,10 +51,11 @@ Ejecuta `builder init` en tu repositorio. Además de `project-builder.json` y la
 - Un bloque de referencia en `AGENTS.md`, o en `CLAUDE.md` cuando ese es el archivo que
   usa tu proyecto, para que el agente sepa que la skill existe.
 
-Cuando el agente ejecuta `init` por su cuenta, desactiva los prompts y pide JSON:
+Cuando el agente ejecuta `init` por su cuenta, pide JSON. `init` nunca muestra prompts
+salvo que pases `--interactive`:
 
 ```sh
-builder init --non-interactive --json --package-manager=pnpm --mcp=no .
+builder init --json --package-manager=pnpm --mcp=no .
 ```
 
 Agrega `--dry-run` para ver cada escritura planificada sin tocar el disco. Consulta
@@ -75,9 +76,9 @@ Agrega `--dry-run` para ver cada escritura planificada sin tocar el disco. Consu
 
    Pasa cada entrada como flag. Los prompts para entradas sensibles se rechazan fuera de
    una terminal, así que un agente no puede depender de ellos.
-3. Lee el resultado. Cuando stdout no es una terminal, la CLI escribe NDJSON por
-   defecto, así que la shell del agente recibe salida legible por máquina sin flags extra.
-   Cada error trae un código estructurado y una corrección sugerida.
+3. Lee el resultado. Cuando stdout no es una terminal, la CLI imprime un único envelope JSON,
+   `{result, error, warnings[]}`, así que la shell del agente recibe salida legible por
+   máquina sin flags extra. Cada error trae un código estructurado y una corrección sugerida.
 
 <Aside type="caution" title="Pon los flags de la CLI antes del nombre del schematic">
 Todo lo que va después de `<collection>:<schematic>` se pasa al schematic como entrada.
@@ -114,9 +115,9 @@ No le pidas al agente que invente un schematic para algo que hiciste una sola ve
 
 ## Límites actuales
 
-- `builder execute --dry-run` todavía no está soportado por el motor nativo: se rechaza
-  antes de ejecutar nada. Revisa los cambios del agente con `git diff` después de la
-  ejecución.
+- `builder execute --dry-run` imprime el plan y no escribe nada, pero todavía no indica la
+  versión del SDK ni de dónde salió. Revisa los cambios del agente con `git diff` después
+  de la ejecución real.
 - `builder add`, `remove`, `sync` y `validate` todavía no están implementados.
-- `--non-interactive` en `builder execute` está reservado y solo imprime una advertencia.
-  Lo que mantiene una ejecución sin prompts es pasar cada entrada como flag.
+- `builder execute` nunca muestra prompts salvo que pases `--interactive`.
+  `--non-interactive` está obsoleto en `execute` e `init` y solo imprime una advertencia.

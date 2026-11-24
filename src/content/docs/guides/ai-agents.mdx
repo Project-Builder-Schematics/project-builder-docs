@@ -49,10 +49,11 @@ folder, it writes two things for agents:
 - A reference block in `AGENTS.md`, or in `CLAUDE.md` when that is the file your project
   uses, so the agent knows the skill exists.
 
-When the agent runs `init` itself, turn off the prompts and ask for JSON:
+When the agent runs `init` itself, ask for JSON. `init` never prompts unless you pass
+`--interactive`:
 
 ```sh
-builder init --non-interactive --json --package-manager=pnpm --mcp=no .
+builder init --json --package-manager=pnpm --mcp=no .
 ```
 
 Add `--dry-run` to preview every planned write without touching the disk. See
@@ -73,9 +74,9 @@ changing `package.json`.
 
    Pass every input as a flag. Prompts for sensitive inputs are refused outside a terminal,
    so an agent cannot rely on them.
-3. Read the result. When stdout is not a terminal, the CLI writes NDJSON by default, so an
-   agent's shell gets machine-readable output without extra flags. Every error carries a
-   structured code and a suggested fix.
+3. Read the result. When stdout is not a terminal, the CLI prints one JSON envelope,
+   `{result, error, warnings[]}`, so an agent's shell gets machine-readable output without
+   extra flags. Every error carries a structured code and a suggested fix.
 
 <Aside type="caution" title="Put CLI flags before the schematic name">
 Everything after `<collection>:<schematic>` is passed to the schematic as an input.
@@ -111,8 +112,9 @@ Do not ask the agent to invent a schematic for something you have done once. See
 
 ## Current limits
 
-- `builder execute --dry-run` is not supported by the native engine yet: it is rejected
-  before anything runs. Review the agent's changes with `git diff` after the run.
+- `builder execute --dry-run` prints the plan and writes nothing, but it does not yet name
+  the SDK version or where it came from. Review the agent's changes with `git diff` after
+  the real run.
 - `builder add`, `remove`, `sync` and `validate` are not implemented yet.
-- `--non-interactive` on `builder execute` is reserved and only prints a warning. Passing
-  every input as a flag is what keeps a run free of prompts.
+- `builder execute` never prompts unless you pass `--interactive`. `--non-interactive` is
+  deprecated on `execute` and `init` and only prints a warning.

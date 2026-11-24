@@ -122,4 +122,6 @@ None of these is a factory or handshake problem: materialize the JSON into a reg
 defined in the SDK source,
 [`src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts`](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/src/bounded-contexts/runner-hosting/infrastructure/in/runner.ts).
 The runner is not a standalone generator: without a host speaking the protocol on stdin/stdout,
-it stops at the greeting.
+it stops at the greeting. It waits at most 30 seconds for the host's greeting and then exits
+with code `3`. If stdin closes before the greeting arrives, it also exits with code `3`. A frame
+that arrives but is not a valid greeting exits with code `1`.
