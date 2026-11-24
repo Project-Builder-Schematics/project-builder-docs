@@ -55,10 +55,12 @@ Sin Scoop, descarga `pbuilder_<version>_windows_amd64.zip` (o `_arm64`) desde lo
 agrega `builder.exe` a tu `PATH`.
 
 <Aside type="caution" title="Soporte inicial">
-Las builds de Windows todavía no se verificaron en una máquina Windows real, y la suite de
-tests de la CLI en Windows sigue fallando, incluidos los chequeos de confianza del manifest
-root y del SDK root. WSL2 (Ubuntu) con las instrucciones de Linux de arriba sigue siendo la
-vía probada.
+Un release se publica solo después de que un job en Windows compila `builder.exe` y ejecuta
+`--version`, `--help`, `init`, `new collection`, `new schematic` e `info` en un workspace
+nuevo. `builder execute` todavía no está verificado en Windows, y parte de la suite de tests
+de la CLI en Windows sigue fallando, incluidos los chequeos de confianza del manifest root y
+del SDK root que ejecuta `execute`. Para ejecutar schematics, WSL2 (Ubuntu) con las
+instrucciones de Linux de arriba sigue siendo la vía probada.
 </Aside>
 
 ## El SDK en sí
