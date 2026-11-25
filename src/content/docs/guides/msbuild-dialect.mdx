@@ -1,0 +1,174 @@
+---
+title: MSBuild dialect
+description: Add project references to .csproj, .props, .targets and .slnx files with @pbuilder/sdk/msbuild, leaving every other byte of the XML as it is.
+sidebar:
+  order: 17
+---
+
+`@pbuilder/sdk/msbuild` edits the XML files of a .NET build: project files, the shared `.props`
+and `.targets` files and `.slnx` solutions. It has one named op, `addProjectReference`, which
+fits schematics that scaffold several projects and wire them together, such as the layers of a
+hexagonal solution. The dialect edits the XML text itself and never runs the `dotnet` CLI. All
+ops chain on one handle and the file is written once; see
+[Modify](/guides/modify/#how-a-dialect-handle-works) for how a handle works.
+
+```xml title="src/Shop.Infrastructure/Shop.Infrastructure.csproj (before)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+```
+
+```ts title="factory.ts"
+import * as msbuild from "@pbuilder/sdk/msbuild";
+
+export const run = async () => {
+  await msbuild
+    .find("src/Shop.Infrastructure/Shop.Infrastructure.csproj")
+    .addProjectReference("../Shop.Application/Shop.Application.csproj")
+    .addProjectReference("../Shop.Domain/Shop.Domain.csproj");
+};
+```
+
+```xml title="src/Shop.Infrastructure/Shop.Infrastructure.csproj (after)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Shop.Application/Shop.Application.csproj" />
+    <ProjectReference Include="../Shop.Domain/Shop.Domain.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+## Files
+
+- **`find(path)` accepts `.csproj`, `.props`, `.targets` and `.slnx`.** The file name must end in
+  one of them after a non-empty stem, as in `Directory.Build.props` or `Shop.slnx`. Any other
+  path throws synchronously with the `dialect operation failed: ` prefix, before any op runs.
+- **The classic `.sln` solution format is rejected**, because it is not XML. Use `.slnx`.
+- **A file that is not well-formed XML fails the factory** with `could not parse "<path>"`, and
+  the file is left as it is. An empty file parses as a document with no root element, so it
+  round-trips when no op edits it.
+
+## `addProjectReference(path)`
+
+Adds `<ProjectReference Include="path" />` to a file whose root element is `Project`. `path` is
+a relative path whose file name ends in `proj` (`.csproj`, `.fsproj`, `.vbproj`, `.proj`),
+written with the separators you give.
+
+A reference goes after the last `ProjectReference` of the first `ItemGroup` without a
+`Condition` that holds one:
+
+```xml title="Shop.Infrastructure.csproj (before)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Shop.Domain\Shop.Domain.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+```ts title="factory.ts"
+await msbuild
+  .find("Shop.Infrastructure.csproj")
+  .addProjectReference("../Shop.Application/Shop.Application.csproj");
+```
+
+```xml title="Shop.Infrastructure.csproj (after)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Shop.Domain\Shop.Domain.csproj" />
+    <ProjectReference Include="../Shop.Application/Shop.Application.csproj" />
+  </ItemGroup>
+</Project>
+```
+
+When there is no such `ItemGroup`, a new `ItemGroup` holding the reference goes after the last
+child element of `Project`, after a blank line, as in the first example on this page. An empty
+`Project` gets it as its first child, and a self-closing `<Project />` is opened to hold it.
+
+A reference to the same path anywhere in the file leaves the file as it is, comparing `/` and `\`
+as one separator. On a file that already has
+`<ProjectReference Include="..\Shop.Application\Shop.Application.csproj" />`,
+`addProjectReference("../Shop.Application/Shop.Application.csproj")` changes nothing, so a second
+run of the factory changes nothing either.
+
+## Rejections
+
+The op rejects with the `dialect operation failed: ` prefix, naming `addProjectReference`, and
+leaves the file as it is, for:
+
+- a `path` that is not a string, that is absolute (`/src/A.csproj`, `C:\A.csproj`), or whose
+  file name does not end in `proj`;
+- a file whose root element is not `Project`, such as the `<Solution>` root of a `.slnx` file;
+- an empty file, which has no root element.
+
+## Format preservation
+
+A file no op touched prints byte-identical. An edited file changes only the inserted range: the
+XML declaration, comments, attribute quotes, blank lines, whitespace, a UTF-8 byte order mark and
+the final newline stay as they are.
+
+- A new element takes the indentation of its siblings, or one unit deeper than its parent when it
+  has none. The unit is the first indentation step the file shows between an element and its
+  parent, and two spaces when the file shows none. The dialect never reads `.editorconfig`.
+- A new line uses the file's line ending: `\r\n` when the file has one, `\n` otherwise.
+- The value written into `Include` is escaped (`&`, `<`, `>`, `"`), so it can never become
+  markup.
+
+## Custom edits with `.modify()`
+
+`.modify(fn)` hands `fn` the live `MsbuildDocument`, whose `text` is the file without its byte
+order mark. Replace `text` for any edit the op does not cover. `astLibrary` is
+[saxes](https://github.com/lddubeau/saxes), the streaming XML parser the dialect uses. With
+`{ position: true }`, its `position` after an `opentag` or `closetag` event is the offset just
+past the tag's `>`. This factory sets the value of `<Nullable>`:
+
+```xml title="Shop.Api.csproj (before)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+</Project>
+```
+
+```ts title="factory.ts"
+import * as msbuild from "@pbuilder/sdk/msbuild";
+
+export const run = async () => {
+  await msbuild.find("Shop.Api.csproj").modify((doc) => {
+    const parser = new msbuild.astLibrary.SaxesParser({ position: true });
+    let start: number | undefined;
+    parser.on("opentag", (node) => {
+      if (node.name === "Nullable") start = parser.position;
+    });
+    parser.on("closetag", (node) => {
+      if (node.name === "Nullable" && start !== undefined) {
+        const end = doc.text.lastIndexOf("<", parser.position - 1);
+        doc.text = `${doc.text.slice(0, start)}enable${doc.text.slice(end)}`;
+      }
+    });
+    parser.write(doc.text).close();
+  });
+};
+```
+
+```xml title="Shop.Api.csproj (after)"
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+```
+
+The general rules for custom edits are in [Modify](/guides/modify/#rules-for-custom-edits).
+
+## Next steps
+
+- [C# dialect](/guides/csharp-dialect/) and [ASP.NET dialect](/guides/aspnet-dialect/): edit the
+  `.cs` files of the projects you reference.
+- [AST libraries](/reference/ast-libraries/): which library and version back each dialect.
+- The SDK's [MSBuild dialect guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/guides/msbuild-dialect.md).

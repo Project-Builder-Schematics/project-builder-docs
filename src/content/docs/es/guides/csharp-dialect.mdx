@@ -1,0 +1,385 @@
+---
+title: Dialecto C#
+description: Agrega directivas using, tipos base, miembros y parámetros de constructor primario a archivos .cs con @pbuilder/sdk/csharp, e importa el namespace de cada tipo con la opción from.
+sidebar:
+  order: 15
+---
+
+`@pbuilder/sdk/csharp` edita archivos `.cs` con cuatro ops con nombre: `addUsing`,
+`addBaseType`, `addMember` y `addConstructorParameter`. Sirve para schematics que generan una
+solución .NET, como los puertos y adaptadores de una arquitectura hexagonal, donde una clase
+adaptadora implementa un puerto, recibe sus dependencias en su constructor primario e importa los
+namespaces que necesita. Todas las ops se encadenan sobre un handle y el archivo se escribe una
+sola vez; ver [Modify](/es/guides/modify/#cómo-funciona-un-handle-de-dialecto) para cómo
+funciona un handle.
+
+```csharp title="src/Shop.Infrastructure/SqlOrders.cs (antes)"
+namespace Shop.Infrastructure;
+
+public class SqlOrders
+{
+}
+```
+
+```ts title="factory.ts"
+import * as csharp from "@pbuilder/sdk/csharp";
+
+export const run = async () => {
+  await csharp
+    .find("src/Shop.Infrastructure/SqlOrders.cs")
+    .addBaseType("SqlOrders", "IOrders", { from: "Shop.Application.Ports" })
+    .addConstructorParameter("SqlOrders", "db", "ShopDb", { from: "Shop.Data" })
+    .addMember("SqlOrders", "public Task<Order?> GetAsync(OrderId id) => db.Orders.FindAsync(id).AsTask();");
+};
+```
+
+```csharp title="src/Shop.Infrastructure/SqlOrders.cs (después)"
+using Shop.Application.Ports;
+using Shop.Data;
+
+namespace Shop.Infrastructure;
+
+public class SqlOrders(ShopDb db) : IOrders
+{
+    public Task<Order?> GetAsync(OrderId id) => db.Orders.FindAsync(id).AsTask();
+}
+```
+
+Todas las ops son idempotentes: si ejecutas la misma factory otra vez, el archivo no cambia. Para
+registrar servicios en una aplicación ASP.NET Core, usa el
+[dialecto ASP.NET](/es/guides/aspnet-dialect/), que tiene estas cuatro ops más `addService`. Los
+archivos de proyecto (`.csproj`) son del [dialecto MSBuild](/es/guides/msbuild-dialect/).
+
+## Archivos
+
+- **`find(path)` acepta solo `.cs`.** El nombre del archivo debe terminar en `.cs` después de una
+  raíz no vacía. Cualquier otra ruta, incluidos los scripts `.csx`, lanza un error síncrono con el
+  prefijo `dialect operation failed: `, antes de que corra cualquier op.
+- **Un archivo que no es sintaxis C# válida hace fallar la factory** con
+  `could not parse "<path>"`, y el archivo queda como está. Un error de compilación que no es de
+  sintaxis, como un tipo desconocido, no la hace fallar: el dialecto ve solo su archivo y no tiene
+  un compilador detrás.
+- **El parser es [tree-sitter-c-sharp](https://github.com/tree-sitter/tree-sitter-c-sharp)
+  0.24.0**, compilado a WebAssembly y ejecutado por `web-tree-sitter`, así que el SDK no incluye
+  ningún binario nativo. Lee C# moderno: namespaces de archivo, records, constructores primarios,
+  sentencias de nivel superior, expresiones de colección, raw strings y bloques de extensión.
+
+## Argumentos
+
+Las ops validan sus argumentos antes que cualquier otra cosa, así que un valor inválido se
+rechaza incluso donde la op dejaría el archivo como está.
+
+- **Un nombre** (`typeName`, el `name` de un parámetro, un `alias`) cumple
+  `^[A-Za-z_][A-Za-z0-9_]*$` y no es una palabra reservada de C#. Se permiten las palabras clave
+  contextuales como `var`, `async` o `record`.
+- **Un namespace** es uno o más de esos nombres unidos por puntos. `"System; class X {}"` y
+  `"class"` se rechazan.
+- **Un tipo** (`base`, el `type` de un parámetro) se parsea como exactamente un tipo de C#: un
+  nombre, un nombre calificado, un tipo genérico, nullable, array o tupla. `"IA { }"` se rechaza.
+- **El `source` de un miembro** se escribe tal como se da y se confía en él como código de la
+  factory, pero debe parsearse como exactamente una declaración de miembro.
+
+## Destinos
+
+`typeName` nombra una clase, un record, un struct o una interfaz declarada en el nivel superior
+del archivo o dentro de un namespace, de archivo o de bloque. La op se rechaza, y el archivo queda
+como está, cuando:
+
+- no hay ningún tipo declarado con ese nombre;
+- coinciden dos declaraciones, como las dos partes de una clase parcial;
+- la única coincidencia es un tipo anidado. Los tipos anidados no son destinos.
+
+## `addUsing(namespace, { static?, global?, alias? })`
+
+Escribe `using namespace;`, `using static namespace;`, `global using namespace;` o
+`using alias = namespace;`, una sola vez. Cada fila parte del mismo archivo y hace una llamada:
+
+```csharp title="a.cs (antes)"
+using System;
+
+namespace Shop;
+```
+
+| Llamada | Directivas después de la llamada |
+|---|---|
+| `addUsing("Shop.Domain")` | `using System;`<br />`using Shop.Domain;` |
+| `addUsing("System")` | `using System;` (sin cambios) |
+| `addUsing("System.Math", { static: true })` | `using System;`<br />`using static System.Math;` |
+| `addUsing("Shop.Domain", { global: true })` | `global using Shop.Domain;`<br />`using System;` |
+| `addUsing("Shop.Data", { alias: "Db" })` | `using System;`<br />`using Db = Shop.Data;` |
+
+Ubicación:
+
+- Una directiva global va después de la última directiva global, o antes de la primera directiva
+  cuando no hay ninguna, porque C# exige las directivas globales primero.
+- Cualquier otra directiva va después de la última directiva del archivo.
+- Un archivo sin directivas la recibe al principio, después de cualquier comentario inicial,
+  seguida de una línea en blanco: `namespace Shop;` pasa a ser `using System;`, una línea en
+  blanco y luego `namespace Shop;`.
+- Cuando todas las directivas del archivo están dentro de su único namespace de bloque, una
+  directiva nueva va después de la última de ellas, con su indentación:
+
+```csharp title="a.cs (antes)"
+namespace Shop
+{
+    using System;
+
+    class A
+    {
+    }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("a.cs").addUsing("Shop.Domain");
+```
+
+```csharp title="a.cs (después)"
+namespace Shop
+{
+    using System;
+    using Shop.Domain;
+
+    class A
+    {
+    }
+}
+```
+
+Una directiva con el mismo namespace, alias y tipo deja el archivo como está. La op rechaza un
+alias que otra directiva liga a un namespace distinto (`using Db = Shop.Legacy;` ya está en el
+archivo y luego se llama a `addUsing("Shop.Data", { alias: "Db" })`), y también `static`
+combinado con `alias`.
+
+## `addBaseType(typeName, base, { from? })`
+
+Agrega `base` al final de la lista de bases del tipo, después de los parámetros de tipo y del
+constructor primario y antes de cualquier cláusula `where`, y crea la lista cuando no existe.
+Cada fila llama a `addBaseType("A", "IA")` sobre un tipo cuyo cuerpo `{ }` está en las líneas
+siguientes a la declaración:
+
+| Declaración antes | Declaración después |
+|---|---|
+| `public class A` | `public class A : IA` |
+| `public class A : B` | `public class A : B, IA` |
+| `public class A(int x)` | `public class A(int x) : IA` |
+| `public class A<T> where T : class` | `public class A<T> : IA where T : class` |
+| `public interface A : IB, IA` | `public interface A : IB, IA` (sin cambios) |
+
+Una base que ya está en la lista, comparada tal como está escrita e ignorando los espacios, deja
+el archivo como está. La op nunca reordena la lista, así que agrega la clase base antes que las
+interfaces.
+
+## `addMember(typeName, source)`
+
+Agrega un miembro después del último miembro del tipo. `source` debe parsearse como exactamente
+una declaración de miembro: un campo, una propiedad, un método, un constructor, un evento, un
+indexador, un operador o un tipo anidado. `"int x; int y;"` se rechaza.
+
+```csharp title="Orders.cs (antes)"
+public class Orders
+{
+    public int X { get; }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("Orders.cs").addMember("Orders", "public void M()\n{\n    Run();\n}");
+```
+
+```csharp title="Orders.cs (después)"
+public class Orders
+{
+    public int X { get; }
+
+    public void M()
+    {
+        Run();
+    }
+}
+```
+
+El miembro nuevo se separa del último como están separados los dos últimos miembros, con una
+línea en blanco o sin ella. Cuando el tipo tiene un solo miembro, un miembro que entra en una
+línea va en la línea siguiente, y uno más largo, como `M` arriba, va después de una línea en
+blanco:
+
+```csharp title="IOrders.cs (antes)"
+public interface IOrders
+{
+    void M();
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("IOrders.cs").addMember("IOrders", "Task<Order?> GetAsync(OrderId id);");
+```
+
+```csharp title="IOrders.cs (después)"
+public interface IOrders
+{
+    void M();
+    Task<Order?> GetAsync(OrderId id);
+}
+```
+
+Un miembro con el mismo texto, ignorando los espacios, deja el archivo como está: sobre el
+`IOrders` de arriba, `addMember("IOrders", "void  M();")` no cambia nada. Un miembro distinto
+nunca se reemplaza, así que una sobrecarga va junto al método que sobrecarga. Un record sin
+cuerpo (`public record A(int Id);`) recibe uno.
+
+## `addConstructorParameter(typeName, name, type, { from? })`
+
+Agrega `type name` al final del constructor primario de una clase, un record o un struct, y crea
+el constructor primario cuando el tipo no tiene ningún constructor. Cada fila llama a
+`addConstructorParameter("A", "orders", "IOrders")`:
+
+| Declaración antes | Declaración después |
+|---|---|
+| `public class A(IClock clock)` | `public class A(IClock clock, IOrders orders)` |
+| `public class A` | `public class A(IOrders orders)` |
+| `public record A(int Id);` | `public record A(int Id, IOrders orders);` |
+| `public class A(IOrders orders)` | `public class A(IOrders orders)` (sin cambios) |
+
+Una lista escrita con un parámetro por línea recibe el parámetro nuevo en su propia línea, con la
+misma indentación:
+
+```csharp title="A.cs (antes)"
+public class A(
+    IClock clock)
+{
+}
+```
+
+```csharp title="A.cs (después)"
+public class A(
+    IClock clock,
+    IOrders orders)
+{
+}
+```
+
+Un parámetro con ese nombre y ese tipo deja el archivo como está. La op se rechaza, y el archivo
+queda como está, en estos casos:
+
+- un parámetro con ese nombre y otro tipo (`public class A(IOrderStore orders)`);
+- un tipo con un constructor explícito (`public A() { }` en su cuerpo);
+- una interfaz.
+
+Edita esos tipos con [`.modify()`](#ediciones-a-medida-con-modify).
+
+## Importar con `from`
+
+`addBaseType` y `addConstructorParameter` aceptan `from`, el namespace que declara el tipo. La op
+agrega entonces `using from;` con las reglas de
+[`addUsing`](#addusingnamespace--static-global-alias-), en la misma edición. Cada fila llama a
+`addBaseType("Orders", "IOrders", { from })` sobre una clase `Orders` con el cuerpo vacío:
+
+| El archivo empieza con | `from` | `using` agregado |
+|---|---|---|
+| `namespace Shop.Infrastructure;` | `"Shop.Application.Ports"` | `using Shop.Application.Ports;` |
+| `namespace Shop.Infrastructure;` | `"Shop"` | ninguno, `Shop` contiene el namespace del archivo |
+| `namespace Shop.Infrastructure;` | `"Shop.Infrastructure"` | ninguno, es el namespace del archivo |
+| `using Shop.Ports;` y luego `namespace Shop.Data;` | `"Shop.Ports"` | ninguno, el archivo ya lo tiene |
+
+Sin `from`, no se importa nada y el tipo se escribe tal como se da. El dialecto nunca comprueba
+que el tipo exista, ni si dos directivas traen tipos con el mismo nombre.
+
+## Preservación del formato
+
+Una op cambia solo los bytes que debe, y un archivo que ninguna op tocó queda idéntico byte a
+byte.
+
+- Las líneas insertadas usan el fin de línea del archivo. Se conservan el byte order mark UTF-8 y
+  el salto de línea final.
+- Un miembro, una sentencia o una directiva nueva se indenta una unidad más que la declaración que
+  la contiene. La unidad es la indentación que el archivo ya usa para los miembros, y cuatro
+  espacios cuando no hay ninguna. El dialecto nunca lee `.editorconfig`.
+- Cada línea de un `source` de varias líneas conserva su indentación relativa a la primera.
+- Un cuerpo escrito en una línea, como `{ }`, se divide cuando se le agrega un miembro. La llave
+  de apertura queda donde está y la de cierre pasa a su propia línea.
+
+Un archivo indentado con dos espacios recibe un miembro con dos espacios:
+
+```csharp title="a.cs (antes)"
+namespace Shop
+{
+  public class A
+  {
+    public int X { get; }
+  }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("a.cs").addMember("A", "public int Y { get; }");
+```
+
+```csharp title="a.cs (después)"
+namespace Shop
+{
+  public class A
+  {
+    public int X { get; }
+    public int Y { get; }
+  }
+}
+```
+
+Y un cuerpo de una línea se divide:
+
+```ts
+// a.cs antes: public record A { }
+await csharp.find("a.cs").addMember("A", "public int X { get; init; }");
+// -> public record A {
+// ->     public int X { get; init; }
+// -> }
+```
+
+## Ediciones a medida con `.modify()`
+
+`.modify(fn)` le pasa a `fn` el `CsharpDocument` vivo, cuyo `text` es el archivo sin su byte
+order mark. Reemplaza `text` para cualquier edición que las ops no cubren. Los árboles de
+tree-sitter son vistas de solo lectura de un texto, así que una edición a medida parsea `text`,
+encuentra el rango que busca y empalma el string. El módulo exporta `web-tree-sitter` como
+`astLibrary` y la gramática de C# como `language`; libera cada árbol con `delete()`.
+
+```csharp title="Orders.cs (antes)"
+internal class Orders
+{
+}
+```
+
+```ts title="factory.ts"
+import * as csharp from "@pbuilder/sdk/csharp";
+
+export const run = async () => {
+  await csharp.find("Orders.cs").modify((doc) => {
+    const parser = new csharp.astLibrary.Parser();
+    parser.setLanguage(csharp.language);
+    const tree = parser.parse(doc.text)!;
+    const modifier = tree.rootNode.descendantsOfType("modifier")[0]!;
+    doc.text = doc.text.slice(0, modifier.startIndex) + "public" + doc.text.slice(modifier.endIndex);
+    tree.delete();
+  });
+};
+```
+
+```csharp title="Orders.cs (después)"
+public class Orders
+{
+}
+```
+
+Las reglas generales de las ediciones a medida están en
+[Modify](/es/guides/modify/#reglas-para-las-ediciones-personalizadas).
+
+## Próximos pasos
+
+- [Dialecto ASP.NET](/es/guides/aspnet-dialect/): todas las ops de esta página más `addService`.
+- [Dialecto MSBuild](/es/guides/msbuild-dialect/): agrega referencias de proyecto a archivos
+  `.csproj`.
+- [Librerías AST](/es/reference/ast-libraries/): qué librería y qué versión respalda cada
+  dialecto.
+- La [guía del dialecto C#](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/guides/csharp-dialect.md)
+  del SDK.

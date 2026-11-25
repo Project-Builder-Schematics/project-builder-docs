@@ -17,6 +17,9 @@ YAML files have dialects of their own: see [JSON dialect](/guides/json-dialect/)
 [YAML dialect](/guides/yaml-dialect/), and CSS files use the [CSS dialect](/guides/css-dialect/).
 The React dialect, the [NestJS dialect](/guides/nestjs-dialect/) and the
 [Angular dialect](/guides/angular-dialect/) add framework ops on top of the TypeScript ones.
+`.cs` files use the [C# dialect](/guides/csharp-dialect/), which the
+[ASP.NET dialect](/guides/aspnet-dialect/) extends, and .NET project files use the
+[MSBuild dialect](/guides/msbuild-dialect/).
 
 ## How a dialect handle works
 
@@ -528,6 +531,9 @@ Named ops cover the common edits. When the change you need is not in that vocabu
 | Register a provider, controller, module import or export in a NestJS `@Module` | The [NestJS dialect](/guides/nestjs-dialect/) |
 | Register a component, provider or route, or add a signal or `inject()` member in Angular | The [Angular dialect](/guides/angular-dialect/) |
 | Edit a JSON, YAML or CSS file | The [JSON](/guides/json-dialect/), [YAML](/guides/yaml-dialect/) or [CSS](/guides/css-dialect/) dialect |
+| Add a using directive, base type, member or constructor parameter to a `.cs` file | The [C# dialect](/guides/csharp-dialect/) |
+| Register a service in an ASP.NET Core dependency injection container | The [ASP.NET dialect](/guides/aspnet-dialect/) |
+| Add a project reference to a `.csproj`, `.props`, `.targets` or `.slnx` file | The [MSBuild dialect](/guides/msbuild-dialect/) |
 | Edit a file type no dialect covers, such as Markdown | [`find` from `@pbuilder/sdk/commons`](#files-without-a-dialect) |
 
 The callback receives **only the AST**: a ts-morph `SourceFile` for both dialects on this page,
@@ -694,7 +700,8 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Files without a dialect
 
-Dialects exist for `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml` and `.css` today. Any other
+Dialects exist for `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml`, `.css`, `.cs`,
+`.csproj`, `.props`, `.targets` and `.slnx` today. Any other
 file (a Markdown index, an `.scss` stylesheet, an `.env` file) is still editable with `find` from `@pbuilder/sdk/commons`: it
 returns a handle for **any** path, with `read()` plus the text-level verbs
 (`replaceContent`, `rename`, `move`, `copy`, `remove`). There is no AST: read the content,
@@ -752,6 +759,11 @@ Two differences from a dialect edit:
 - [NestJS dialect](/guides/nestjs-dialect/): register classes in a NestJS `@Module`.
 - [Angular dialect](/guides/angular-dialect/): register components, providers and routes, and
   add signal and `inject()` members.
+- [C# dialect](/guides/csharp-dialect/) and [ASP.NET dialect](/guides/aspnet-dialect/): add
+  using directives, base types, members, constructor parameters and service registrations to
+  `.cs` files.
+- [MSBuild dialect](/guides/msbuild-dialect/): add project references to `.csproj`, `.props`,
+  `.targets` and `.slnx` files.
 - [AST libraries](/reference/ast-libraries/): which library and version back each dialect,
   and how `astLibrary` exposes them.
 - Building a dialect of your own is a contributor-level surface. Every dialect must export

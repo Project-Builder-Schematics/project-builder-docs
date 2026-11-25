@@ -18,6 +18,9 @@ Cada [dialecto](/es/guides/modify/) parsea su tipo de archivo con una librería 
 | JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1`, versión exacta en las `dependencies` del SDK | [jsonc-parser en GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` recibe un `JsonDocument` (`{ text }`); la librería completa se exporta como `astLibrary` |
 | YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1`, versión exacta en las `dependencies` del SDK | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` recibe un `YamlStream` (`{ documents }`) de instancias `Document`; la librería completa se exporta como `astLibrary` |
 | CSS | `@pbuilder/sdk/css` | postcss | `8.5.30`, versión exacta en las `dependencies` del SDK | [postcss.org](https://postcss.org/) | `.modify()` recibe un `Root` de postcss; la librería completa se exporta como `astLibrary` |
+| C# | `@pbuilder/sdk/csharp` | web-tree-sitter, con la gramática tree-sitter-c-sharp 0.24.0 incluida como WebAssembly | `0.27.2`, versión exacta en las `dependencies` del SDK | [web-tree-sitter en GitHub](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) | `.modify()` recibe un `CsharpDocument` (`{ text }`); la librería completa se exporta como `astLibrary` y la gramática de C# como `language` |
+| ASP.NET | `@pbuilder/sdk/aspnet` | web-tree-sitter, con la gramática tree-sitter-c-sharp 0.24.0 incluida como WebAssembly | `0.27.2`, versión exacta en las `dependencies` del SDK | [web-tree-sitter en GitHub](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) | `.modify()` recibe un `CsharpDocument` (`{ text }`); la librería completa se exporta como `astLibrary` y la gramática de C# como `language` |
+| MSBuild | `@pbuilder/sdk/msbuild` | saxes | `6.0.0`, versión exacta en las `dependencies` del SDK | [saxes en GitHub](https://github.com/lddubeau/saxes) | `.modify()` recibe un `MsbuildDocument` (`{ text }`); la librería completa se exporta como `astLibrary` |
 
 La columna de versión es la dependencia que declara el `package.json` del SDK, no una comprobación en tiempo de ejecución de lo que instaló tu gestor de paquetes. Tampoco tiene relación con el compilador de TypeScript que usa el SDK para su propio desarrollo.
 
@@ -37,7 +40,7 @@ type Decl = astLibrary.VariableDeclaration;  // types
 
 - Es la librería entera, reexportada de forma nativa. El SDK no selecciona un subconjunto.
 - El callback de `.modify()` sigue recibiendo solo el AST. `astLibrary` se importa; nunca se pasa como argumento.
-- No necesitas una dependencia directa de ts-morph, jsonc-parser ni yaml para trabajar con el AST de un dialecto.
+- No necesitas una dependencia directa de ts-morph, jsonc-parser, yaml, postcss, web-tree-sitter ni saxes para trabajar con el AST de un dialecto.
 
 ## Pertenencia y compatibilidad
 

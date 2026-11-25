@@ -18,6 +18,9 @@ Each [dialect](/guides/modify/) parses its file type with an AST library of its 
 | JSON / JSONC | `@pbuilder/sdk/json` | jsonc-parser | `3.3.1`, exact pin in the SDK's `dependencies` | [jsonc-parser on GitHub](https://github.com/microsoft/node-jsonc-parser) | `.modify()` receives a `JsonDocument` (`{ text }`); the full library is exported as `astLibrary` |
 | YAML | `@pbuilder/sdk/yaml` | yaml | `2.9.1`, exact pin in the SDK's `dependencies` | [eemeli.org/yaml](https://eemeli.org/yaml/) | `.modify()` receives a `YamlStream` (`{ documents }`) of `Document` instances; the full library is exported as `astLibrary` |
 | CSS | `@pbuilder/sdk/css` | postcss | `8.5.30`, exact pin in the SDK's `dependencies` | [postcss.org](https://postcss.org/) | `.modify()` receives a postcss `Root`; the full library is exported as `astLibrary` |
+| C# | `@pbuilder/sdk/csharp` | web-tree-sitter, with the tree-sitter-c-sharp 0.24.0 grammar bundled as WebAssembly | `0.27.2`, exact pin in the SDK's `dependencies` | [web-tree-sitter on GitHub](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) | `.modify()` receives a `CsharpDocument` (`{ text }`); the full library is exported as `astLibrary` and the C# grammar as `language` |
+| ASP.NET | `@pbuilder/sdk/aspnet` | web-tree-sitter, with the tree-sitter-c-sharp 0.24.0 grammar bundled as WebAssembly | `0.27.2`, exact pin in the SDK's `dependencies` | [web-tree-sitter on GitHub](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) | `.modify()` receives a `CsharpDocument` (`{ text }`); the full library is exported as `astLibrary` and the C# grammar as `language` |
+| MSBuild | `@pbuilder/sdk/msbuild` | saxes | `6.0.0`, exact pin in the SDK's `dependencies` | [saxes on GitHub](https://github.com/lddubeau/saxes) | `.modify()` receives an `MsbuildDocument` (`{ text }`); the full library is exported as `astLibrary` |
 
 The version column is the dependency the SDK's `package.json` declares, not a runtime check of what your package manager installed. It is also unrelated to the TypeScript compiler the SDK uses for its own development.
 
@@ -37,7 +40,7 @@ type Decl = astLibrary.VariableDeclaration;  // types
 
 - It is the whole library, forwarded natively. The SDK does not curate a subset.
 - The `.modify()` callback still receives only the AST. `astLibrary` is imported, never passed in.
-- You do not need a direct dependency on ts-morph, jsonc-parser or yaml to work with a dialect's AST.
+- You do not need a direct dependency on ts-morph, jsonc-parser, yaml, postcss, web-tree-sitter or saxes to work with a dialect's AST.
 
 ## Ownership and compatibility
 

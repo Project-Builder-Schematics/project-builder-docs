@@ -1,0 +1,146 @@
+---
+title: ASP.NET dialect
+description: Register services in the dependency injection container of an ASP.NET Core application with @pbuilder/sdk/aspnet, on top of every C# dialect op.
+sidebar:
+  order: 16
+---
+
+`@pbuilder/sdk/aspnet` edits the `.cs` files of an ASP.NET Core application. Its handle has every
+op of [`@pbuilder/sdk/csharp`](/guides/csharp-dialect/) plus `addService`, which registers a
+service in the dependency injection container. All ops chain on one handle and the file is
+written once; see [Modify](/guides/modify/#how-a-dialect-handle-works) for how a handle works.
+
+```csharp title="Program.cs (before)"
+var builder = WebApplication.CreateBuilder(args);
+
+var app = builder.Build();
+
+app.Run();
+```
+
+```ts title="factory.ts"
+import * as aspnet from "@pbuilder/sdk/aspnet";
+
+export const run = async () => {
+  await aspnet
+    .find("Program.cs")
+    .addService("Scoped", "IOrders", "SqlOrders", {
+      serviceFrom: "Shop.Application.Ports",
+      implementationFrom: "Shop.Infrastructure",
+    });
+};
+```
+
+```csharp title="Program.cs (after)"
+using Shop.Application.Ports;
+using Shop.Infrastructure;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<IOrders, SqlOrders>();
+
+var app = builder.Build();
+
+app.Run();
+```
+
+## Inherited C# ops
+
+The handle carries every [C# dialect](/guides/csharp-dialect/) op with the same rules:
+`addUsing`, `addBaseType`, `addMember` and `addConstructorParameter`. `find(path)` accepts the
+same `.cs` files, whatever they hold.
+
+## `addService(lifetime, service, implementation, { serviceFrom?, implementationFrom?, method? })`
+
+Writes `<receiver>.Add<lifetime><service, implementation>();`. `lifetime` is `"Singleton"`,
+`"Scoped"` or `"Transient"`, and `service` and `implementation` are each one C# type. The op edits
+one of two places.
+
+**Without `method`**, it edits the top-level statements of `Program.cs`. The one local variable
+initialized by `WebApplication.CreateBuilder`, `CreateSlimBuilder` or `CreateEmptyBuilder` is the
+builder, and the receiver is `<builder>.Services`. The registration goes on the line after the
+last statement before the one that calls `<builder>.Build()`, as in the example above.
+
+**With `method`**, it edits the one static method of that name whose first parameter is
+`this IServiceCollection`, such as the `AddInfrastructure` method each layer of a solution
+exposes. The receiver is that parameter. The registration goes before the method's last
+statement when that is a `return`, and after it otherwise.
+
+```csharp title="DependencyInjection.cs (before)"
+namespace Shop.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
+    {
+        return services;
+    }
+}
+```
+
+```ts title="factory.ts"
+await aspnet
+  .find("DependencyInjection.cs")
+  .addService("Scoped", "IOrders", "SqlOrders", { method: "AddInfrastructure" });
+```
+
+```csharp title="DependencyInjection.cs (after)"
+namespace Shop.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
+    {
+        services.AddScoped<IOrders, SqlOrders>();
+        return services;
+    }
+}
+```
+
+`serviceFrom` and `implementationFrom` add the `using` of each type with the rules of the C#
+dialect's [`from`](/guides/csharp-dialect/#importing-with-from).
+
+A registration of the same lifetime, service and implementation already in those statements
+leaves the file as it is, so a second run changes nothing:
+
+```csharp title="Program.cs (unchanged)"
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<IOrders, SqlOrders>();
+
+var app = builder.Build();
+```
+
+```ts title="factory.ts"
+await aspnet.find("Program.cs").addService("Scoped", "IOrders", "SqlOrders");
+```
+
+## Rejections
+
+`addService` rejects with the `dialect operation failed: ` prefix, naming `addService`, and leaves
+the file as it is, for:
+
+- a lifetime other than `Singleton`, `Scoped` or `Transient`, such as `"Pooled"`;
+- a registration of the same service and implementation with another lifetime. On the
+  `Program.cs` just above, `addService("Singleton", "IOrders", "SqlOrders")` rejects;
+- without `method`, top-level statements with no builder, or more than one, or no statement after
+  the builder that calls `Build()`. A `Program.cs` that holds only `Console.WriteLine("hi");`
+  rejects;
+- with `method`, no such static extension method or more than one, or one with an expression
+  body.
+
+The op finds the place it edits when it runs, so `find` opens any `.cs` file. A file without
+that place fails only when `addService` runs.
+
+## Custom edits with `.modify()`
+
+As in the C# dialect, `.modify(fn)` hands `fn` the live `CsharpDocument`. Parse its `text` with
+`astLibrary` (`web-tree-sitter`) and the exported `language`, then replace `text`. See
+[Custom edits with `.modify()`](/guides/csharp-dialect/#custom-edits-with-modify) for a worked
+example. Use it for registrations `addService` does not write, such as
+`AddDbContext<ShopDb>(...)` or a registration with a factory lambda.
+
+## Next steps
+
+- [C# dialect](/guides/csharp-dialect/): the full rules of the inherited ops.
+- [MSBuild dialect](/guides/msbuild-dialect/): reference the projects that declare these types.
+- [AST libraries](/reference/ast-libraries/): which library and version back each dialect.
+- The SDK's [ASP.NET dialect guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/guides/aspnet-dialect.md).

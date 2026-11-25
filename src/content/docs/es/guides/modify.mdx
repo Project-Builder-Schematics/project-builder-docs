@@ -19,6 +19,9 @@ JSON y YAML tienen sus propios dialectos: ver [Dialecto JSON](/es/guides/json-di
 [Dialecto CSS](/es/guides/css-dialect/). El dialecto de React, el
 [Dialecto NestJS](/es/guides/nestjs-dialect/) y el
 [Dialecto Angular](/es/guides/angular-dialect/) suman ops de framework a las de TypeScript.
+Los archivos `.cs` usan el [Dialecto C#](/es/guides/csharp-dialect/), que el
+[Dialecto ASP.NET](/es/guides/aspnet-dialect/) extiende, y los archivos de proyecto de .NET
+usan el [Dialecto MSBuild](/es/guides/msbuild-dialect/).
 
 ## Cómo funciona un handle de dialecto
 
@@ -548,6 +551,9 @@ edición:
 | Registrar un provider, controller, import de módulo o export en un `@Module` de NestJS | El [dialecto NestJS](/es/guides/nestjs-dialect/) |
 | Registrar un componente, provider o ruta, o agregar un miembro signal o `inject()` en Angular | El [dialecto Angular](/es/guides/angular-dialect/) |
 | Editar un archivo JSON, YAML o CSS | El dialecto [JSON](/es/guides/json-dialect/), [YAML](/es/guides/yaml-dialect/) o [CSS](/es/guides/css-dialect/) |
+| Agregar una directiva using, un tipo base, un miembro o un parámetro de constructor a un archivo `.cs` | El [dialecto C#](/es/guides/csharp-dialect/) |
+| Registrar un servicio en el contenedor de inyección de dependencias de ASP.NET Core | El [dialecto ASP.NET](/es/guides/aspnet-dialect/) |
+| Agregar una referencia de proyecto a un archivo `.csproj`, `.props`, `.targets` o `.slnx` | El [dialecto MSBuild](/es/guides/msbuild-dialect/) |
 | Editar un tipo de archivo que ningún dialecto cubre, como Markdown | [`find` de `@pbuilder/sdk/commons`](#archivos-sin-dialecto) |
 
 El callback recibe **solo el AST**: un `SourceFile` de ts-morph en los dos dialectos de esta página,
@@ -717,7 +723,8 @@ handle.replaceContent("new content"); // succeeds — a legitimate sequential ed
 
 ## Archivos sin dialecto
 
-Hoy existen dialectos para `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml` y `.css`. Cualquier
+Hoy existen dialectos para `.ts`, `.tsx`, `.jsx`, `.json`, `.jsonc`, `.yaml`, `.yml`, `.css`, `.cs`,
+`.csproj`, `.props`, `.targets` y `.slnx`. Cualquier
 otro archivo (un índice en Markdown, una hoja de estilos `.scss`, un archivo `.env`) se puede editar igual con `find`
 de `@pbuilder/sdk/commons`: devuelve un handle para **cualquier** ruta, con `read()` y los verbos
 de texto (`replaceContent`, `rename`, `move`, `copy`, `remove`). No hay AST: lee el contenido,
@@ -776,6 +783,11 @@ Dos diferencias con una edición de dialecto:
 - [Dialecto NestJS](/es/guides/nestjs-dialect/): registra clases en un `@Module` de NestJS.
 - [Dialecto Angular](/es/guides/angular-dialect/): registra componentes, providers y rutas, y
   agrega miembros signal e `inject()`.
+- [Dialecto C#](/es/guides/csharp-dialect/) y [Dialecto ASP.NET](/es/guides/aspnet-dialect/):
+  agregan directivas using, tipos base, miembros, parámetros de constructor y registros de
+  servicios a archivos `.cs`.
+- [Dialecto MSBuild](/es/guides/msbuild-dialect/): agrega referencias de proyecto a archivos
+  `.csproj`, `.props`, `.targets` y `.slnx`.
 - [Librerías AST](/es/reference/ast-libraries/): qué librería y versión respaldan a cada
   dialecto, y cómo las expone `astLibrary`.
 - Construir un dialecto propio es una superficie para contribuidores. Todo dialecto debe

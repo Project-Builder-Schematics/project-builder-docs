@@ -77,7 +77,7 @@ export default defineConfig({
 					description:
 						'Deterministic code generation for AI coding agents and developers. The agent picks a typed, testable schematic and its inputs; the schematic writes the same files on every run. Now in beta.',
 					details:
-						'Schematics are typed file-mutation programs: seven mutation verbs, Go text/template templating with {= =} delimiters, AST-aware dialects for TypeScript, React, Angular, NestJS, CSS, JSON and YAML, and an in-memory testing harness. `builder init` installs an agent skill and an AGENTS.md or CLAUDE.md reference block; `builder execute` writes NDJSON when stdout is not a terminal and returns typed exit codes. See /guides/ai-agents/ for how an agent uses Project Builder.',
+						'Schematics are typed file-mutation programs: seven mutation verbs, Go text/template templating with {= =} delimiters, AST-aware dialects for TypeScript, React, Angular, NestJS, CSS, JSON, YAML, C#, ASP.NET and MSBuild, and an in-memory testing harness. `builder init` installs an agent skill and an AGENTS.md or CLAUDE.md reference block; `builder execute` writes NDJSON when stdout is not a terminal and returns typed exit codes. See /guides/ai-agents/ for how an agent uses Project Builder.',
 				}),
 			],
 			components: {

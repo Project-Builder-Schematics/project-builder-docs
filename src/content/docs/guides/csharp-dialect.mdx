@@ -1,0 +1,372 @@
+---
+title: C# dialect
+description: Add using directives, base types, members and primary constructor parameters to .cs files with @pbuilder/sdk/csharp, and import the namespace of each type with the from option.
+sidebar:
+  order: 15
+---
+
+`@pbuilder/sdk/csharp` edits `.cs` files through four named ops: `addUsing`, `addBaseType`,
+`addMember` and `addConstructorParameter`. It fits schematics that scaffold a .NET solution,
+such as the ports and adapters of a hexagonal architecture, where an adapter class implements a
+port, takes its dependencies in its primary constructor and imports the namespaces it needs. All
+ops chain on one handle and the file is written once; see
+[Modify](/guides/modify/#how-a-dialect-handle-works) for how a handle works.
+
+```csharp title="src/Shop.Infrastructure/SqlOrders.cs (before)"
+namespace Shop.Infrastructure;
+
+public class SqlOrders
+{
+}
+```
+
+```ts title="factory.ts"
+import * as csharp from "@pbuilder/sdk/csharp";
+
+export const run = async () => {
+  await csharp
+    .find("src/Shop.Infrastructure/SqlOrders.cs")
+    .addBaseType("SqlOrders", "IOrders", { from: "Shop.Application.Ports" })
+    .addConstructorParameter("SqlOrders", "db", "ShopDb", { from: "Shop.Data" })
+    .addMember("SqlOrders", "public Task<Order?> GetAsync(OrderId id) => db.Orders.FindAsync(id).AsTask();");
+};
+```
+
+```csharp title="src/Shop.Infrastructure/SqlOrders.cs (after)"
+using Shop.Application.Ports;
+using Shop.Data;
+
+namespace Shop.Infrastructure;
+
+public class SqlOrders(ShopDb db) : IOrders
+{
+    public Task<Order?> GetAsync(OrderId id) => db.Orders.FindAsync(id).AsTask();
+}
+```
+
+Every op is idempotent: run the same factory again and the file does not change. To register
+services in an ASP.NET Core application, use the [ASP.NET dialect](/guides/aspnet-dialect/),
+which has these four ops plus `addService`. Project files (`.csproj`) belong to the
+[MSBuild dialect](/guides/msbuild-dialect/).
+
+## Files
+
+- **`find(path)` accepts only `.cs`.** The file name must end in `.cs` after a non-empty stem.
+  Any other path, `.csx` scripts included, throws synchronously with the
+  `dialect operation failed: ` prefix, before any op runs.
+- **A file that is not valid C# syntax fails the factory** with `could not parse "<path>"`, and
+  the file is left as it is. A compile error that is not a syntax error, such as an unknown type,
+  does not fail it: the dialect sees only its file and has no compiler behind it.
+- **The parser is [tree-sitter-c-sharp](https://github.com/tree-sitter/tree-sitter-c-sharp)
+  0.24.0**, compiled to WebAssembly and run by `web-tree-sitter`, so the SDK ships no native
+  binary. It reads modern C#: file-scoped namespaces, records, primary constructors, top-level
+  statements, collection expressions, raw strings and extension blocks.
+
+## Arguments
+
+The ops check their arguments before anything else, so an invalid value rejects even where the
+op would otherwise leave the file as it is.
+
+- **A name** (`typeName`, a parameter `name`, an `alias`) matches `^[A-Za-z_][A-Za-z0-9_]*$` and
+  is not a reserved keyword of C#. Contextual keywords such as `var`, `async` or `record` are
+  allowed.
+- **A namespace** is one or more such names joined by dots. `"System; class X {}"` and `"class"`
+  both reject.
+- **A type** (`base`, a parameter `type`) parses as exactly one C# type: a name, a qualified
+  name, a generic, nullable, array or tuple type. `"IA { }"` rejects.
+- **A member `source`** is written as given and trusted as factory code, but it must parse as
+  exactly one member declaration.
+
+## Targets
+
+`typeName` names a class, record, struct or interface declared at the top level of the file or
+inside a namespace, file-scoped or block. The op rejects, and the file is left as it is, when:
+
+- no type of that name is declared;
+- two declarations match, such as the two parts of a partial class;
+- the only match is a nested type. Nested types are not targets.
+
+## `addUsing(namespace, { static?, global?, alias? })`
+
+Writes `using namespace;`, `using static namespace;`, `global using namespace;` or
+`using alias = namespace;`, once. Each row starts from the same file and makes one call:
+
+```csharp title="a.cs (before)"
+using System;
+
+namespace Shop;
+```
+
+| Call | Directives after the call |
+|---|---|
+| `addUsing("Shop.Domain")` | `using System;`<br />`using Shop.Domain;` |
+| `addUsing("System")` | `using System;` (unchanged) |
+| `addUsing("System.Math", { static: true })` | `using System;`<br />`using static System.Math;` |
+| `addUsing("Shop.Domain", { global: true })` | `global using Shop.Domain;`<br />`using System;` |
+| `addUsing("Shop.Data", { alias: "Db" })` | `using System;`<br />`using Db = Shop.Data;` |
+
+Placement:
+
+- A global directive goes after the last global directive, or before the first directive when
+  there is none, because C# requires global directives first.
+- Any other directive goes after the last directive of the file.
+- A file with no directive gets it at the top, after any leading comment, followed by a blank
+  line: `namespace Shop;` becomes `using System;`, a blank line, then `namespace Shop;`.
+- When every directive of the file sits inside its one block namespace, a new directive goes
+  after the last of them, with their indentation:
+
+```csharp title="a.cs (before)"
+namespace Shop
+{
+    using System;
+
+    class A
+    {
+    }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("a.cs").addUsing("Shop.Domain");
+```
+
+```csharp title="a.cs (after)"
+namespace Shop
+{
+    using System;
+    using Shop.Domain;
+
+    class A
+    {
+    }
+}
+```
+
+A directive with the same namespace, alias and kind leaves the file as it is. The op rejects an
+alias that another directive binds to a different namespace (`using Db = Shop.Legacy;` already in
+the file, then `addUsing("Shop.Data", { alias: "Db" })`), and `static` combined with `alias`.
+
+## `addBaseType(typeName, base, { from? })`
+
+Appends `base` to the base list of the type, after the type parameters and the primary
+constructor and before any `where` clause, and creates the list when there is none. Each row
+calls `addBaseType("A", "IA")` on a type whose body is `{ }` on the lines below the declaration:
+
+| Declaration before | Declaration after |
+|---|---|
+| `public class A` | `public class A : IA` |
+| `public class A : B` | `public class A : B, IA` |
+| `public class A(int x)` | `public class A(int x) : IA` |
+| `public class A<T> where T : class` | `public class A<T> : IA where T : class` |
+| `public interface A : IB, IA` | `public interface A : IB, IA` (unchanged) |
+
+A base already in the list, compared as written ignoring whitespace, leaves the file as it is.
+The op never reorders the list, so add a base class before the interfaces.
+
+## `addMember(typeName, source)`
+
+Appends one member after the last member of the type. `source` must parse as exactly one member
+declaration: a field, a property, a method, a constructor, an event, an indexer, an operator or a
+nested type. `"int x; int y;"` rejects.
+
+```csharp title="Orders.cs (before)"
+public class Orders
+{
+    public int X { get; }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("Orders.cs").addMember("Orders", "public void M()\n{\n    Run();\n}");
+```
+
+```csharp title="Orders.cs (after)"
+public class Orders
+{
+    public int X { get; }
+
+    public void M()
+    {
+        Run();
+    }
+}
+```
+
+The new member is separated from the last one as the last two members are, by a blank line or
+none. When the type has one member, a member that fits on one line follows on the next line, and
+a longer one, like `M` above, comes after a blank line:
+
+```csharp title="IOrders.cs (before)"
+public interface IOrders
+{
+    void M();
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("IOrders.cs").addMember("IOrders", "Task<Order?> GetAsync(OrderId id);");
+```
+
+```csharp title="IOrders.cs (after)"
+public interface IOrders
+{
+    void M();
+    Task<Order?> GetAsync(OrderId id);
+}
+```
+
+A member with the same text, ignoring whitespace, leaves the file as it is: on the `IOrders`
+above, `addMember("IOrders", "void  M();")` changes nothing. A different member is never
+replaced, so an overload goes next to the method it overloads. A record with no body
+(`public record A(int Id);`) gets one.
+
+## `addConstructorParameter(typeName, name, type, { from? })`
+
+Appends `type name` to the primary constructor of a class, record or struct, and creates the
+primary constructor when the type has no constructor at all. Each row calls
+`addConstructorParameter("A", "orders", "IOrders")`:
+
+| Declaration before | Declaration after |
+|---|---|
+| `public class A(IClock clock)` | `public class A(IClock clock, IOrders orders)` |
+| `public class A` | `public class A(IOrders orders)` |
+| `public record A(int Id);` | `public record A(int Id, IOrders orders);` |
+| `public class A(IOrders orders)` | `public class A(IOrders orders)` (unchanged) |
+
+A list written one parameter per line gets the new parameter on its own line with the same
+indentation:
+
+```csharp title="A.cs (before)"
+public class A(
+    IClock clock)
+{
+}
+```
+
+```csharp title="A.cs (after)"
+public class A(
+    IClock clock,
+    IOrders orders)
+{
+}
+```
+
+A parameter of that name and type leaves the file as it is. The op rejects, and the file is left
+as it is, for:
+
+- a parameter of that name with another type (`public class A(IOrderStore orders)`);
+- a type with an explicit constructor (`public A() { }` in its body);
+- an interface.
+
+Edit those types with [`.modify()`](#custom-edits-with-modify).
+
+## Importing with `from`
+
+`addBaseType` and `addConstructorParameter` accept `from`, the namespace that declares the type.
+The op then adds `using from;` with the rules of [`addUsing`](#addusingnamespace--static-global-alias-),
+in the same edit. Each row calls `addBaseType("Orders", "IOrders", { from })` on a class
+`Orders` with an empty body:
+
+| File starts with | `from` | `using` added |
+|---|---|---|
+| `namespace Shop.Infrastructure;` | `"Shop.Application.Ports"` | `using Shop.Application.Ports;` |
+| `namespace Shop.Infrastructure;` | `"Shop"` | none, `Shop` encloses the file's namespace |
+| `namespace Shop.Infrastructure;` | `"Shop.Infrastructure"` | none, it is the file's namespace |
+| `using Shop.Ports;` then `namespace Shop.Data;` | `"Shop.Ports"` | none, the file already has it |
+
+Without `from`, nothing is imported and the type is written as given. The dialect never checks
+that the type exists, nor whether two directives bring types of the same name.
+
+## Format preservation
+
+An op changes only the bytes it must, and a file no op touched is byte-identical.
+
+- Inserted lines take the file's line ending. A UTF-8 byte order mark and the final newline are
+  kept.
+- A new member, statement or directive is indented one unit deeper than the declaration that
+  holds it. The unit is the indentation the file already uses for members, and four spaces when
+  it has none. The dialect never reads `.editorconfig`.
+- Each line of a multi-line `source` keeps its indentation relative to its first line.
+- A body written on one line, such as `{ }`, is split when a member goes into it. The opening
+  brace stays where it is and the closing brace goes on its own line.
+
+A file indented with two spaces gets a two-space member:
+
+```csharp title="a.cs (before)"
+namespace Shop
+{
+  public class A
+  {
+    public int X { get; }
+  }
+}
+```
+
+```ts title="factory.ts"
+await csharp.find("a.cs").addMember("A", "public int Y { get; }");
+```
+
+```csharp title="a.cs (after)"
+namespace Shop
+{
+  public class A
+  {
+    public int X { get; }
+    public int Y { get; }
+  }
+}
+```
+
+And a one-line body is split:
+
+```ts
+// a.cs before: public record A { }
+await csharp.find("a.cs").addMember("A", "public int X { get; init; }");
+// -> public record A {
+// ->     public int X { get; init; }
+// -> }
+```
+
+## Custom edits with `.modify()`
+
+`.modify(fn)` hands `fn` the live `CsharpDocument`, whose `text` is the file without its byte
+order mark. Replace `text` for any edit the ops do not cover. tree-sitter trees are read-only
+views of a text, so a custom edit parses `text`, finds the range it wants and splices the string.
+The module exports `web-tree-sitter` as `astLibrary` and the C# grammar as `language`; free each
+tree with `delete()`.
+
+```csharp title="Orders.cs (before)"
+internal class Orders
+{
+}
+```
+
+```ts title="factory.ts"
+import * as csharp from "@pbuilder/sdk/csharp";
+
+export const run = async () => {
+  await csharp.find("Orders.cs").modify((doc) => {
+    const parser = new csharp.astLibrary.Parser();
+    parser.setLanguage(csharp.language);
+    const tree = parser.parse(doc.text)!;
+    const modifier = tree.rootNode.descendantsOfType("modifier")[0]!;
+    doc.text = doc.text.slice(0, modifier.startIndex) + "public" + doc.text.slice(modifier.endIndex);
+    tree.delete();
+  });
+};
+```
+
+```csharp title="Orders.cs (after)"
+public class Orders
+{
+}
+```
+
+The general rules for custom edits are in [Modify](/guides/modify/#rules-for-custom-edits).
+
+## Next steps
+
+- [ASP.NET dialect](/guides/aspnet-dialect/): every op on this page plus `addService`.
+- [MSBuild dialect](/guides/msbuild-dialect/): add project references to `.csproj` files.
+- [AST libraries](/reference/ast-libraries/): which library and version back each dialect.
+- The SDK's [C# dialect guide](https://github.com/Project-Builder-Schematics/project-builder-sdk/blob/main/docs/guides/csharp-dialect.md).
