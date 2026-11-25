@@ -183,7 +183,7 @@ Provide the schematic as `<collection>:<schematic>` (for example `@schematics/an
 
 ### What it does
 
-`execute` validates the workspace (`project-builder.json` must exist in the working directory, or in the directory named by `--manifest`), resolves the collection and schematic across all registration shapes, validates your inputs against the schematic's `schema.json`, and then runs the schematic through the engine, streaming its events to the terminal.
+`execute` validates the workspace (`project-builder.json` must exist in the working directory, or in the directory named by `--manifest`), resolves the collection and schematic across all registration shapes, validates your inputs against the schematic's `schema.json`, and then runs the schematic through the engine, streaming its events to the terminal. When the run ends, it reports every operation grouped by class, followed by a summary that counts each class; see [Output formats](/reference/cli-output-and-errors/#output-formats) for the text layout and the JSON `plan` and `changes` arrays.
 
 ### SDK requirement
 
@@ -311,7 +311,7 @@ Schematic flag tokens follow these rules:
 
 ### Dry run
 
-`--dry-run` (or `--commit=never`) runs the schematic, prints the files it would create and modify, and writes nothing to the workspace. It prints the `warn_dry_run` warning. It works in a fresh checkout or worktree that has no `node_modules/@pbuilder/sdk` link: the engine loads the SDK from the chosen root's own install, and the dry run never creates or repoints the link.
+`--dry-run` (or `--commit=never`) runs the schematic, prints its plan, every operation it would apply grouped by class, and writes nothing to the workspace. It prints the `warn_dry_run` warning. It works in a fresh checkout or worktree that has no `node_modules/@pbuilder/sdk` link: the engine loads the SDK from the chosen root's own install, and the dry run never creates or repoints the link.
 
 If the workspace already has a `node_modules/@pbuilder/sdk` link on the schematic's resolution path and it points at a different SDK than the one chosen, the dry run fails with `execute_dry_run_sdk_link_stale` (exit 4) and leaves the link as it is. Run without `--dry-run`, which repoints the link, or delete the link and run the dry run again.
 

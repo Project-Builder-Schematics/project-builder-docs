@@ -109,12 +109,14 @@ escribirás el factory y lo ejecutarás dos veces para ver la idempotencia en ac
    ```
 
    ```txt
-   + services.txt
-   + src/services/payments.ts
-   ✓ done — 2 created
+   create (2)
+     create  services.txt
+     create  src/services/payments.ts
+   ✓ done — 2 create
    ```
 
-   (`+` marca un archivo que la ejecución creó.)
+   (Las operaciones se agrupan por clase, cada grupo encabezado por su clase y su cantidad;
+   el resumen cuenta cada clase.)
 
 </Steps>
 
@@ -124,6 +126,14 @@ Ahora ejecútalo otra vez **con una entrada distinta**:
 
 ```sh
 builder execute default:hello --name=orders
+```
+
+```txt
+create (1)
+  create  src/services/orders.ts
+modify (1)
+  modify  services.txt
+✓ done — 1 create, 1 modify
 ```
 
 `services.txt` crece una línea en lugar de ser aplastado, gracias al bucle de relectura

@@ -183,7 +183,7 @@ Indica el schematic como `<collection>:<schematic>` (por ejemplo `@schematics/an
 
 ### Qué hace
 
-`execute` valida el workspace (`project-builder.json` debe existir en el directorio de trabajo, o en el directorio indicado por `--manifest`), resuelve la colección y el schematic a través de todas las formas de registro, valida tus entradas contra el `schema.json` del schematic, y luego ejecuta el schematic a través del motor, transmitiendo sus eventos a la terminal.
+`execute` valida el workspace (`project-builder.json` debe existir en el directorio de trabajo, o en el directorio indicado por `--manifest`), resuelve la colección y el schematic a través de todas las formas de registro, valida tus entradas contra el `schema.json` del schematic, y luego ejecuta el schematic a través del motor, transmitiendo sus eventos a la terminal. Al terminar, reporta cada operación agrupada por clase, seguida de un resumen que cuenta cada clase; consulta [Formatos de salida](/es/reference/cli-output-and-errors/#formatos-de-salida) para el formato de texto y los arrays JSON `plan` y `changes`.
 
 ### Requisito del SDK
 
@@ -311,7 +311,7 @@ Los tokens de flags de schematic siguen estas reglas:
 
 ### Dry run
 
-`--dry-run` (o `--commit=never`) ejecuta el schematic, imprime los archivos que crearía y modificaría, y no escribe nada en el workspace. Imprime la advertencia `warn_dry_run`. Funciona en un checkout o worktree nuevo que no tiene el enlace `node_modules/@pbuilder/sdk`: el motor carga el SDK desde la instalación propia de la raíz elegida, y el dry run nunca crea ni redirige el enlace.
+`--dry-run` (o `--commit=never`) ejecuta el schematic, imprime su plan, cada operación que aplicaría agrupada por clase, y no escribe nada en el workspace. Imprime la advertencia `warn_dry_run`. Funciona en un checkout o worktree nuevo que no tiene el enlace `node_modules/@pbuilder/sdk`: el motor carga el SDK desde la instalación propia de la raíz elegida, y el dry run nunca crea ni redirige el enlace.
 
 Si el workspace ya tiene un enlace `node_modules/@pbuilder/sdk` en la ruta de resolución del schematic y apunta a un SDK distinto del elegido, el dry run falla con `execute_dry_run_sdk_link_stale` (exit 4) y deja el enlace como está. Ejecuta sin `--dry-run`, que redirige el enlace, o borra el enlace y vuelve a ejecutar el dry run.
 
