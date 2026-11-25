@@ -108,12 +108,14 @@ you haven't.
    ```
 
    ```txt
-   + services.txt
-   + src/services/payments.ts
-   ✓ done — 2 created
+   create (2)
+     create  services.txt
+     create  src/services/payments.ts
+   ✓ done — 2 create
    ```
 
-   (`+` marks a file the run created.)
+   (Operations are grouped by class, each group headed by its class and count; the summary
+   counts each class.)
 
 </Steps>
 
@@ -123,6 +125,14 @@ Now run it again **with a different input**:
 
 ```sh
 builder execute default:hello --name=orders
+```
+
+```txt
+create (1)
+  create  src/services/orders.ts
+modify (1)
+  modify  services.txt
+✓ done — 1 create, 1 modify
 ```
 
 `services.txt` grows by one line instead of being clobbered, because of the read-back loop

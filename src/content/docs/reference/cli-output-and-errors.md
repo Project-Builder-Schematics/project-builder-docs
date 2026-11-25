@@ -18,13 +18,35 @@ The CLI has two output formats, selected by the global `--output` flag:
 
 When `--output` is unset, the format is auto-detected from the terminal: an interactive TTY gets `pretty`, a piped or redirected stdout gets `json`. This makes `builder ... | jq` and CI invocations machine-readable without any extra flags.
 
-Every command prints one envelope with the same shape, `{"result": …, "error": …, "warnings": […]}`. For example, `builder --output=json execute --dry-run default:my-component --name=button` prints:
+Every command prints one envelope with the same shape, `{"result": …, "error": …, "warnings": […]}`. For example, `builder --output=json execute --dry-run default:hello --name=payments` prints:
 
 ```json
-{"result":{"processed_inputs":{"name":"button"}},"warnings":[{"code":"warn_dry_run","message":"dry run: nothing is written to the workspace"}]}
+{"result":{"processed_inputs":{"name":"payments"},"plan":[{"class":"create","path":"services.txt"},{"class":"create","path":"src/services/payments.ts"}]},"warnings":[{"code":"warn_dry_run","message":"dry run: nothing is written to the workspace"}]}
 ```
 
 `result` holds the command's result and `error` the coded error; only one of the two is present. `warnings` is always an array of `{code, message}` objects. `builder new` and `builder init` wrap their results in `result` like every other command. Errors raised before a command runs, such as an unknown command (`cli_unknown_command`) or a wrong number of arguments (`cli_invalid_args`), use the envelope too when `--output=json` comes before the command.
+
+For `builder execute`, `result` lists every operation of the run as `{class, path, src}`: a `plan` array for a dry run, a `changes` array for a committed run, `[]` when nothing changes. `class` is one of `create`, `copy`, `copyIn`, `modify`, `rename` and `delete`; `src` is present only for `rename`, `copy` and `copyIn`. Stderr does not repeat the operations: it keeps only the summary line, such as `✓ done — 2 create`.
+
+In text mode, the same operations go to stdout grouped by class, in the order `create`, `copy`, `copyIn`, `modify`, `rename`, `delete`. Each group opens with its class and count, each line shows the class, the path and, after `←`, the source, and every operation is listed. The summary counts each class, or reads `✓ done — no changes`. A dry run prints the same report under a `dry run: nothing is written to the workspace` line. A dry run of a schematic that uses every class prints:
+
+```txt
+dry run: nothing is written to the workspace
+create (2)
+  create  page.txt
+  create  src/index.ts
+copy (1)
+  copy    b/copy.txt  ← a/orig.txt
+copyIn (1)
+  copyIn  logo.svg  ← files/logo.svg
+modify (1)
+  modify  edit.txt
+rename (1)
+  rename  new.txt  ← old.txt
+delete (1)
+  delete  gone.txt
+✓ done — 2 create, 1 copy, 1 copyIn, 1 modify, 1 rename, 1 delete
+```
 
 `builder init` honours `--output=json`, and also accepts a local `--json` flag that does the same. Either combines with `--dry-run` for a full structured plan of every operation without writing anything.
 
